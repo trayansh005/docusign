@@ -48,8 +48,12 @@ export const PDFPageCanvas: React.FC<PDFPageCanvasProps> = ({
 	return (
 		<div className={className}>
 			<Document
-				file={pdfUrl}
+				file={{ url: pdfUrl }}
 				onLoadSuccess={onDocumentLoadSuccess}
+				onLoadError={(error) => {
+					console.error("[PDFPageCanvas] Failed to load PDF:", error);
+					console.error("[PDFPageCanvas] PDF URL was:", pdfUrl);
+				}}
 				loading={
 					<div className="flex items-center justify-center p-8 min-h-[600px] bg-gray-100">
 						<div className="text-gray-600">Loading PDF...</div>
