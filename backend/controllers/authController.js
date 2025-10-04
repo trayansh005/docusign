@@ -129,15 +129,41 @@ export const register = async (req, res) => {
 		const user = new User(userData);
 		await user.save();
 
-		// Remove password from response
+		// Auto-login after registration
+		const tokenPayload = {
+			id: user._id,
+			firstName: user.firstName,
+			lastName: user.lastName,
+			email: user.email,
+			userType: 'user',
+		};
+
+		// Generate tokens
+		const { accessToken, refreshToken } = generateTokens(tokenPayload);
+
+		// Store refresh token in the database
+		manageRefreshTokens(user, refreshToken);
+
+		// Update last login
+		user.lastLogin = new Date();
+		await user.save();
+
+		// Set cookies
+		setAuthCookies(res, accessToken, refreshToken);
+
+		// Remove password and refresh tokens from response
 		const userResponse = user.toObject();
 		delete userResponse.password;
+		delete userResponse.refreshTokens;
 
 		res.status(201).json({
 			success: true,
-			message: "User registered successfully",
+			message: "User registered and logged in successfully",
 			data: {
 				user: userResponse,
+				token: accessToken, // For backward compatibility
+				accessToken,
+				refreshToken,
 			},
 		});
 	} catch (error) {
