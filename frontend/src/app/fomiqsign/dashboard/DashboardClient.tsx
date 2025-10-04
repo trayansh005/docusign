@@ -10,7 +10,7 @@ import { MultiPageTemplateViewer } from "@/components/docusign/MultiPageTemplate
 import { SignatureTracking } from "@/components/docusign/SignatureTracking";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-interface DashboardClientProps {}
+interface DashboardClientProps { }
 
 type TabType = "upload" | "templates" | "viewer" | "status" | "activity" | "tracking" | "settings";
 
@@ -66,7 +66,7 @@ const tabs: Tab[] = [
 	},
 ];
 
-export default function DashboardClient({}: DashboardClientProps) {
+export default function DashboardClient({ }: DashboardClientProps) {
 	const [activeTab, setActiveTab] = useState<TabType>("upload");
 	const [selectedTemplate, setSelectedTemplate] = useState<DocuSignTemplateData | null>(null);
 	const [recipients, setRecipients] = useState<Array<{ id: string; name: string; email?: string }>>([]);
@@ -274,11 +274,10 @@ export default function DashboardClient({}: DashboardClientProps) {
 						<button
 							key={tab.id}
 							onClick={() => setActiveTab(tab.id)}
-							className={`flex-1 min-w-0 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-								isActive
+							className={`flex-1 min-w-0 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${isActive
 									? "bg-blue-600 text-white shadow-lg"
 									: "text-gray-300 hover:text-white hover:bg-gray-700/50"
-							}`}
+								}`}
 							title={tab.description}
 						>
 							<div className="flex flex-col items-center gap-1">
@@ -369,18 +368,18 @@ function FinalizePanel({ template, recipients, subject, body }: { template: Docu
 	const generate = async () => {
 		if (!template) return;
 		setLoading(true);
-			try {
-				// The backend expects signature images + fields; include recipients and message
-				const payload = {
-					fields: template.signatureFields || [],
-					signatures: [],
-					recipients: recipients || [],
-					message: { subject: subject || "", body: body || "" },
-					// Request A4 final output at 300 DPI (approx 2480 x 3508 px)
-					outputSize: { width: 2480, height: 3508 },
-					dpi: 300,
-					viewport: { width: 2480, height: 3508 },
-				};
+		try {
+			// The backend expects signature images + fields; include recipients and message
+			const payload = {
+				fields: template.signatureFields || [],
+				signatures: [],
+				recipients: recipients || [],
+				message: { subject: subject || "", body: body || "" },
+				// Request A4 final output at 300 DPI (approx 2480 x 3508 px)
+				outputSize: { width: 2480, height: 3508 },
+				dpi: 300,
+				viewport: { width: 2480, height: 3508 },
+			};
 
 			const res = await apiClient.post(`/fomiqsign/${template._id}/apply-signatures`, payload);
 			// backend may return signed pages array or urls - handle safely without using `any`
