@@ -38,6 +38,7 @@ export interface SignatureField {
 	wPct: number;
 	hPct: number;
 	value?: string;
+	required?: boolean;
 	x?: number;
 	y?: number;
 	width?: number;

@@ -2,25 +2,24 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { 
-	History, 
-	Upload, 
-	FileText, 
-	PenTool, 
-	CheckCircle, 
-	Trash2, 
+import {
+	History,
+	Upload,
+	FileText,
+	PenTool,
+	CheckCircle,
+	Trash2,
 	Eye,
 	MapPin,
 	Clock,
 	User,
-	Search,
-	Filter
+	Search
 } from "lucide-react";
 import { getDocuSignActivities } from "@/services/activityAPI";
 
-type ActivityType = 
+type ActivityType =
 	| "DOCUSIGN_TEMPLATE_CREATED"
-	| "DOCUSIGN_TEMPLATE_UPDATED" 
+	| "DOCUSIGN_TEMPLATE_UPDATED"
 	| "DOCUSIGN_TEMPLATE_DELETED"
 	| "DOCUSIGN_TEMPLATE_SIGNED"
 	| "DOCUSIGN_TEMPLATE_COMPLETED"
@@ -82,7 +81,7 @@ export default function ActivityClient() {
 		if (diffMins < 60) return `${diffMins}m ago`;
 		if (diffHours < 24) return `${diffHours}h ago`;
 		if (diffDays < 7) return `${diffDays}d ago`;
-		
+
 		return date.toLocaleDateString("en-US", {
 			month: "short",
 			day: "numeric",
@@ -164,12 +163,12 @@ export default function ActivityClient() {
 
 			{/* Activity List */}
 			<div className="bg-gray-800/50 rounded-lg">
-				{data?.data.length === 0 ? (
+				{data?.data?.length === 0 ? (
 					<div className="text-center py-12">
 						<History className="mx-auto h-12 w-12 text-gray-400 mb-4" />
 						<h3 className="text-lg font-medium text-white mb-2">No activities found</h3>
 						<p className="text-gray-400">
-							{filters.search || filters.type !== "all" 
+							{filters.search || filters.type !== "all"
 								? "Try adjusting your search or filters"
 								: "DocuSign activities will appear here as you use the system"
 							}
@@ -177,28 +176,27 @@ export default function ActivityClient() {
 					</div>
 				) : (
 					<div className="divide-y divide-gray-700">
-						{data?.data.map((activity) => {
+						{data?.data?.map((activity) => {
 							const { icon: Icon, color } = getActivityIcon(activity.type);
-							const details = activity.details as Record<string, unknown> || {};
-							
+							const details: Record<string, unknown> = activity.details || {};
+
 							return (
 								<div key={activity._id} className="p-6 hover:bg-gray-700/30 transition-colors">
 									<div className="flex items-start gap-4">
 										<div className={`flex-shrink-0 p-2 rounded-full bg-gray-700 ${color}`}>
 											<Icon className="h-4 w-4" />
 										</div>
-										
+
 										<div className="flex-1 min-w-0">
 											<div className="flex items-start justify-between">
 												<div className="flex-1">
 													<p className="text-white font-medium">{activity.message}</p>
-													
-													{/* User info */}
+
 													<div className="flex items-center gap-4 mt-2 text-sm text-gray-400">
 														<div className="flex items-center gap-1">
 															<User className="h-3 w-3" />
 															<span>
-																{activity.user.firstName} {activity.user.lastName}
+																{typeof activity.user === 'object' && activity.user !== null ? `${activity.user.firstName} ${activity.user.lastName}` : 'Unknown User'}
 															</span>
 														</div>
 														<div className="flex items-center gap-1">
@@ -207,29 +205,27 @@ export default function ActivityClient() {
 														</div>
 													</div>
 
-													{/* Additional details */}
-													{details.templateId && (
+													{details.templateId ? (
 														<div className="mt-2 text-sm text-gray-400">
 															Template ID: <span className="font-mono text-gray-300">{String(details.templateId).slice(-8)}</span>
 														</div>
-													)}
+													) : null}
 
-													{/* IP and location info */}
-													{details.ipAddress && (
+													{details.ipAddress ? (
 														<div className="flex items-center gap-1 mt-2 text-sm text-gray-400">
 															<MapPin className="h-3 w-3" />
 															<span>
 																{String(details.ipAddress)}
-																{details.location && typeof details.location === "object" && (
+																{details.location && typeof details.location === "object" ? (
 																	<span className="ml-1">
-																		({(details.location as { city?: string; country?: string }).city}, {(details.location as { city?: string; country?: string }).country})
+																		({(details.location as { city?: string; country?: string })?.city}, {(details.location as { city?: string; country?: string })?.country})
 																	</span>
-																)}
+																) : null}
 															</span>
 														</div>
-													)}
+													) : null}
 												</div>
-												
+
 												<div className="text-xs text-gray-500 ml-4">
 													{new Date(activity.createdAt).toLocaleTimeString("en-US", {
 														hour: "2-digit",
@@ -266,8 +262,8 @@ export default function ActivityClient() {
 							Page {data.pagination.current} of {data.pagination.pages}
 						</span>
 						<button
-							onClick={() => handleFilterChange("page", Math.min(data.pagination.pages, filters.page + 1))}
-							disabled={filters.page === data.pagination.pages}
+							onClick={() => data?.pagination && handleFilterChange("page", Math.min(data.pagination.pages, filters.page + 1))}
+							disabled={data?.pagination ? filters.page === data.pagination.pages : true}
 							className="px-3 py-1 text-sm bg-gray-700 border border-gray-600 rounded-lg text-white hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
 						>
 							Next

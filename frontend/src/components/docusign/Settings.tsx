@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Settings as SettingsIcon, Save, RefreshCw, Bell, Shield, FileText, Palette } from "lucide-react";
+import { Save, RefreshCw, Bell, Shield, FileText, Palette } from "lucide-react";
 
 interface DocuSignSettings {
 	notifications: {

@@ -11,7 +11,6 @@ import {
 	RecipientData,
 	StatusHistoryData,
 	SignatureTrackingData,
-	ActivityData,
 } from "@/types/docusign";
 
 // Helper function to build URL with query parameters

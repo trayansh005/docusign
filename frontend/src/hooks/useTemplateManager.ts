@@ -5,7 +5,7 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { DocuSignTemplateData, SignatureField } from '@/types/docusign';
+import { DocuSignTemplateData, SignatureField, ApiResponse } from '@/types/docusign';
 import { getTemplates, deleteTemplate, updateTemplatePageFields } from '@/services/docusignAPI';
 
 interface UseTemplateManagerOptions {
@@ -20,7 +20,7 @@ interface UseTemplateManagerOptions {
 export const useTemplateManager = (options: UseTemplateManagerOptions = {}) => {
 	const { initialFilters = {}, pageSize = 10 } = options;
 	const queryClient = useQueryClient();
-	
+
 	// Stable filter state
 	const [filters, setFilters] = useState({
 		page: 1,
@@ -61,7 +61,7 @@ export const useTemplateManager = (options: UseTemplateManagerOptions = {}) => {
 			const previousData = queryClient.getQueryData(queryKey);
 
 			// Optimistically update
-			queryClient.setQueryData(queryKey, (old: any) => {
+			queryClient.setQueryData(queryKey, (old: ApiResponse<DocuSignTemplateData[]> | undefined) => {
 				if (!old?.data) return old;
 				return {
 					...old,
@@ -95,7 +95,7 @@ export const useTemplateManager = (options: UseTemplateManagerOptions = {}) => {
 			const templateQueryKey = ['template', templateId];
 			const previousTemplate = queryClient.getQueryData(templateQueryKey);
 
-			queryClient.setQueryData(templateQueryKey, (old: any) => {
+			queryClient.setQueryData(templateQueryKey, (old: DocuSignTemplateData | undefined) => {
 				if (!old) return old;
 				return {
 					...old,
@@ -116,7 +116,7 @@ export const useTemplateManager = (options: UseTemplateManagerOptions = {}) => {
 	// Memoized computed values
 	const computedValues = useMemo(() => {
 		const { data, isLoading, error } = templatesQuery;
-		
+
 		return {
 			templates: data?.data || [],
 			pagination: data?.pagination,
@@ -125,7 +125,7 @@ export const useTemplateManager = (options: UseTemplateManagerOptions = {}) => {
 			hasTemplates: (data?.data?.length || 0) > 0,
 			totalCount: data?.pagination?.total || 0
 		};
-	}, [templatesQuery.data, templatesQuery.isLoading, templatesQuery.error]);
+	}, [templatesQuery]);
 
 	// Stable callback functions
 	const actions = useMemo(() => ({

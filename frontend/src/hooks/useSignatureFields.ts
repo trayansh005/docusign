@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import { SignatureField } from "@/types/docusign";
 
 interface UseSignatureFieldsProps {
@@ -22,12 +22,12 @@ export const useSignatureFields = ({
 	const containerRef = useRef<HTMLDivElement>(null);
 
 	// Field type configurations
-	const fieldConfigs = {
+	const fieldConfigs = useMemo(() => ({
 		signature: { defaultWidth: 20, defaultHeight: 6, minWidth: 8, minHeight: 3 },
 		initial: { defaultWidth: 8, defaultHeight: 6, minWidth: 4, minHeight: 3 },
 		date: { defaultWidth: 12, defaultHeight: 4, minWidth: 6, minHeight: 2 },
 		text: { defaultWidth: 15, defaultHeight: 4, minWidth: 6, minHeight: 2 },
-	};
+	}), []);
 
 	const selectedField = selectedFieldId ? fields.find(f => f.id === selectedFieldId) || null : null;
 
@@ -39,7 +39,7 @@ export const useSignatureFields = ({
 		const y = ((e.clientY - rect.top) / rect.height) * 100;
 
 		const config = fieldConfigs[selectedFieldType];
-		
+
 		// Ensure field doesn't go outside bounds
 		const adjustedX = Math.max(0, Math.min(100 - config.defaultWidth, x));
 		const adjustedY = Math.max(0, Math.min(100 - config.defaultHeight, y));
@@ -114,9 +114,9 @@ export const useSignatureFields = ({
 		if (!selectedField) return;
 
 		const pageFields = fields.filter(f => f.pageNumber === selectedField.pageNumber && f.id !== selectedFieldId);
-		
+
 		pageFields.forEach(field => {
-			let updates: Partial<SignatureField> = {};
+			const updates: Partial<SignatureField> = {};
 
 			switch (alignment) {
 				case "left":
@@ -150,7 +150,7 @@ export const useSignatureFields = ({
 		selectedFieldType,
 		isAddingField,
 		containerRef,
-		
+
 		// Handlers
 		handleCanvasClick,
 		handleFieldUpdate,
@@ -161,7 +161,7 @@ export const useSignatureFields = ({
 		stopAddingField,
 		duplicateField,
 		alignFields,
-		
+
 		// Utilities
 		fieldConfigs,
 	};

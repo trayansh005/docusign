@@ -19,10 +19,11 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
     className = "",
 }) => {
     const sigCanvas = useRef<SignatureCanvas>(null);
-    const [signatureData, setSignatureData] = useState<string>("");
+
     const [signatureMode, setSignatureMode] = useState<"draw" | "type">("draw");
     const [typedSignature, setTypedSignature] = useState<string>("");
     const [selectedFont, setSelectedFont] = useState<string>("cursive");
+    const [textValue, setTextValue] = useState<string>("");
 
     const signatureFonts = [
         { name: "cursive", label: "Cursive", style: "font-family: 'Dancing Script', cursive;" },
@@ -47,7 +48,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
         if (sigCanvas.current) {
             sigCanvas.current.clear();
         }
-        setSignatureData("");
+
         setTypedSignature("");
     };
 
@@ -106,7 +107,6 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
         }
 
         if (finalSignatureData) {
-            setSignatureData(finalSignatureData);
             onSignatureComplete(field.id, finalSignatureData);
         }
     };
@@ -174,8 +174,6 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
     };
 
     const renderTextField = () => {
-        const [textValue, setTextValue] = useState("");
-
         return (
             <div className="space-y-4">
                 <div>

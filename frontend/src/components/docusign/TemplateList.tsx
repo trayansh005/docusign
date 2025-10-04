@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { getTemplates, deleteTemplate } from "@/services/docusignAPI";
 import { DocuSignTemplateData } from "@/types/docusign";
-import { ensureAbsoluteUrl } from "@/lib/urlUtils";
+
 
 interface TemplateListProps {
 	onViewTemplate?: (template: DocuSignTemplateData) => void;

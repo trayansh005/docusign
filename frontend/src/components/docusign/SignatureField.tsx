@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { Trash2, Move, RotateCcw } from "lucide-react";
+import { Trash2, Move } from "lucide-react";
 import { SignatureField as SignatureFieldType } from "@/types/docusign";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -13,7 +13,7 @@ interface SignatureFieldProps {
     onRemove: (fieldId: string) => void;
     onSelect: () => void;
     isSelected: boolean;
-    zoom: number;
+
 }
 
 interface DragState {
@@ -35,7 +35,6 @@ export const SignatureField: React.FC<SignatureFieldProps> = ({
     onRemove,
     onSelect,
     isSelected,
-    zoom,
 }) => {
     const { user } = useAuth();
     const [isHovered, setIsHovered] = useState(false);
@@ -161,7 +160,7 @@ export const SignatureField: React.FC<SignatureFieldProps> = ({
         );
 
         return Math.round(calculatedSize);
-    }, [field.hPct, field.type, zoom]); // Include zoom as dependency
+    }, [field.hPct, field.type, containerRef]); // Include containerRef as dependency
 
     // Mouse event handlers with improved smoothness
     const handleMouseDown = useCallback((e: React.MouseEvent) => {

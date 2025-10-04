@@ -13,8 +13,7 @@ import {
 	MapPin,
 	Clock,
 	User,
-	Search,
-	Filter
+	Search
 } from "lucide-react";
 import { getDocuSignActivities } from "@/services/activityAPI";
 
@@ -162,7 +161,7 @@ export const ActivityLogs: React.FC<ActivityLogsProps> = ({ className = "" }) =>
 					<div className="divide-y divide-gray-600">
 						{data?.data?.map((activity) => {
 							const { icon: Icon, color } = getActivityIcon(activity.type);
-							const details = activity.details as Record<string, unknown> || {};
+							const details: Record<string, unknown> = activity.details || {};
 
 							return (
 								<div key={activity._id} className="p-4 hover:bg-gray-600/30 transition-colors">
@@ -174,12 +173,11 @@ export const ActivityLogs: React.FC<ActivityLogsProps> = ({ className = "" }) =>
 										<div className="flex-1 min-w-0">
 											<p className="text-sm text-white font-medium">{activity.message}</p>
 
-											{/* Compact user and time info */}
 											<div className="flex items-center gap-3 mt-1 text-xs text-gray-200">
 												<div className="flex items-center gap-1">
 													<User className="h-2.5 w-2.5" />
 													<span>
-														{activity.user.firstName} {activity.user.lastName}
+														{typeof activity.user === 'object' && activity.user !== null ? `${activity.user.firstName} ${activity.user.lastName}` : 'Unknown User'}
 													</span>
 												</div>
 												<div className="flex items-center gap-1">
@@ -188,20 +186,19 @@ export const ActivityLogs: React.FC<ActivityLogsProps> = ({ className = "" }) =>
 												</div>
 											</div>
 
-											{/* IP and location info */}
-											{details.ipAddress && (
+											{details.ipAddress ? (
 												<div className="flex items-center gap-1 mt-1 text-xs text-gray-200">
 													<MapPin className="h-2.5 w-2.5" />
 													<span>
 														{String(details.ipAddress)}
-														{details.location && typeof details.location === "object" && (
+														{details.location && typeof details.location === "object" ? (
 															<span className="ml-1">
-																({(details.location as { city?: string; country?: string }).city}, {(details.location as { city?: string; country?: string }).country})
+																({(details.location as { city?: string; country?: string })?.city}, {(details.location as { city?: string; country?: string })?.country})
 															</span>
-														)}
+														) : null}
 													</span>
 												</div>
-											)}
+											) : null}
 										</div>
 									</div>
 								</div>
@@ -229,8 +226,8 @@ export const ActivityLogs: React.FC<ActivityLogsProps> = ({ className = "" }) =>
 							{data.pagination.current} / {data.pagination.pages}
 						</span>
 						<button
-							onClick={() => handleFilterChange("page", Math.min(data.pagination.pages, filters.page + 1))}
-							disabled={filters.page === data.pagination.pages}
+							onClick={() => data?.pagination && handleFilterChange("page", Math.min(data.pagination.pages, filters.page + 1))}
+							disabled={data?.pagination ? filters.page === data.pagination.pages : true}
 							className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
 						>
 							Next

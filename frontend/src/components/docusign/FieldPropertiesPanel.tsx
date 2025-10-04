@@ -27,7 +27,7 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
 
     if (!field || !localField) return null;
 
-    const handleInputChange = (key: keyof SignatureField, value: any) => {
+    const handleInputChange = (key: keyof SignatureField, value: string | number | boolean) => {
         setLocalField(prev => prev ? { ...prev, [key]: value } : null);
         setHasChanges(true);
     };
@@ -203,8 +203,8 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                     onClick={handleSave}
                     disabled={!hasChanges}
                     className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${hasChanges
-                            ? "bg-blue-600 hover:bg-blue-700 text-white"
-                            : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        ? "bg-blue-600 hover:bg-blue-700 text-white"
+                        : "bg-gray-100 text-gray-400 cursor-not-allowed"
                         }`}
                 >
                     <Check className="w-4 h-4" />
@@ -214,8 +214,8 @@ export const FieldPropertiesPanel: React.FC<FieldPropertiesPanelProps> = ({
                     onClick={handleCancel}
                     disabled={!hasChanges}
                     className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${hasChanges
-                            ? "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                            : "bg-gray-50 text-gray-400 cursor-not-allowed"
+                        ? "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                        : "bg-gray-50 text-gray-400 cursor-not-allowed"
                         }`}
                 >
                     Cancel
