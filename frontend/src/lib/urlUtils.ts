@@ -5,8 +5,14 @@ export const ensureAbsoluteUrl = (url: string): string => {
 		return url;
 	}
 
+	// Add /api prefix if path starts with /uploads (to match server static route)
+	let finalUrl = url;
+	if (url.startsWith("/uploads")) {
+		finalUrl = `/api${url}`;
+	}
+
 	// If URL is relative, prepend backend URL
 	const backendUrl =
 		process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "http://localhost:5000";
-	return `${backendUrl}${url}`;
+	return `${backendUrl}${finalUrl}`;
 };
