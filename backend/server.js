@@ -72,7 +72,7 @@ app.use(sanitizeInput);
 app.use(express.static("../frontend"));
 
 // Static files (uploads - for template images)
-app.use("/uploads", (req, res, next) => {
+app.use("/api/uploads", (req, res, next) => {
 	// Set CORS headers for static files
 	res.setHeader("Access-Control-Allow-Origin", process.env.FRONTEND_URL || "http://localhost:3000");
 	res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
@@ -80,7 +80,7 @@ app.use("/uploads", (req, res, next) => {
 	res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
 	next();
 });
-app.use("/uploads", express.static("uploads"));
+app.use("/api/uploads", express.static("uploads"));
 
 // Mount API routes
 app.use("/api/auth", authRateLimit, authRoutes);

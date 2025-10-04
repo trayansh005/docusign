@@ -291,7 +291,7 @@ export const getTemplatePage = async (req, res) => {
 			data: {
 				templateId: template._id,
 				pageNumber: page,
-				imageUrl: `http://localhost:5000${pageData.imageUrl}`,
+				imageUrl: `${process.env.API_BASE_URL || 'http://localhost:5000'}${pageData.imageUrl}`,
 				imageHash: pageData.imageHash,
 				fileSize: pageData.fileSize,
 				width: pageData.width,
