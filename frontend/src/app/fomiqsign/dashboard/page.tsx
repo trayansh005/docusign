@@ -6,6 +6,9 @@ export const metadata = {
 	description: "Manage your FomiqSign templates, apply signatures, and track document status.",
 };
 
+// Mark as dynamic to prevent SSR issues with PDF rendering
+export const dynamic = "force-dynamic";
+
 export default async function DashboardPage() {
 	return (
 		<div className="min-h-screen">

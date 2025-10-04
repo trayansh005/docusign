@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { pdfjs } from "react-pdf";
 
-// Set up PDF.js worker
+// Set up PDF.js worker only on client side
 if (typeof window !== "undefined") {
 	pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 }
@@ -27,8 +27,15 @@ export const PDFPageCanvas: React.FC<PDFPageCanvasProps> = ({
 }) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const renderTaskRef = useRef<{ cancel: () => void; promise: Promise<void> } | null>(null);
+	const [isClient, setIsClient] = useState(false);
+
+	// Ensure component only renders on client side
+	useEffect(() => {
+		setIsClient(true);
+	}, []);
 
 	useEffect(() => {
+		if (!isClient) return;
 		let isMounted = true;
 		let pdfDoc: unknown = null;
 
@@ -112,7 +119,12 @@ export const PDFPageCanvas: React.FC<PDFPageCanvasProps> = ({
 				(pdfDoc as { destroy: () => void }).destroy();
 			}
 		};
-	}, [pdfUrl, pageNumber, zoom, rotation, onPageLoad]);
+	}, [pdfUrl, pageNumber, zoom, rotation, onPageLoad, isClient]);
+
+	// Don't render canvas during SSR
+	if (!isClient) {
+		return <div className={className} style={{ minHeight: "600px", background: "#f3f4f6" }} />;
+	}
 
 	return (
 		<canvas
