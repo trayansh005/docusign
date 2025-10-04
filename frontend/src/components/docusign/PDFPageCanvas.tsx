@@ -40,9 +40,14 @@ export const PDFPageCanvas: React.FC<PDFPageCanvasProps> = ({
 		let pdfDoc: unknown = null;
 
 		const renderPage = async () => {
-			if (!canvasRef.current || !pdfUrl) return;
+			if (!canvasRef.current || !pdfUrl) {
+				console.warn("[PDFPageCanvas] Missing canvas or PDF URL:", { canvasRef: !!canvasRef.current, pdfUrl });
+				return;
+			}
 
 			try {
+				console.log("[PDFPageCanvas] Loading PDF from:", pdfUrl);
+				
 				// Cancel any ongoing render task
 				if (renderTaskRef.current) {
 					renderTaskRef.current.cancel();
@@ -52,6 +57,8 @@ export const PDFPageCanvas: React.FC<PDFPageCanvasProps> = ({
 				// Load the PDF document
 				const loadingTask = pdfjs.getDocument(pdfUrl);
 				pdfDoc = await loadingTask.promise;
+
+				console.log("[PDFPageCanvas] PDF loaded successfully, rendering page:", pageNumber);
 
 				if (!isMounted || !pdfDoc) return;
 

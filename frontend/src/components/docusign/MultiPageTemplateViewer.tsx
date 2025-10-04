@@ -30,6 +30,11 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 	const [pageHeight, setPageHeight] = useState(0);
 	const contentRef = useRef<HTMLDivElement | null>(null);
 
+	// Get user's full name for signature fields
+	const userFullName = template.createdBy 
+		? `${template.createdBy.firstName} ${template.createdBy.lastName}`
+		: "Your Signature";
+
 	// Drag state for moving/resizing fields
 	type DragState = {
 		mode?: "drag" | "resize";
@@ -151,19 +156,19 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 			top: `${field.yPct}%`,
 			width: `${field.wPct}%`,
 			height: `${field.hPct}%`,
-			border: editable ? "1px dashed rgba(59,130,246,0.25)" : "1px dashed rgba(0,0,0,0.05)",
-			backgroundColor: editable ? "rgba(59, 130, 246, 0.03)" : "transparent",
+			border: editable ? "2px dashed rgba(59,130,246,0.5)" : "2px dashed rgba(0,0,0,0.2)",
+			backgroundColor: editable ? "rgba(59, 130, 246, 0.08)" : "rgba(255, 255, 255, 0.9)",
 			display: "flex",
 			alignItems: "center",
 			justifyContent: "center",
 			fontSize: "12px",
 			color:
 				field.type === "signature" || field.type === "initial"
-					? "#111827"
+					? "#000000" // Pure black for better visibility
 					: editable
-					? "#0f172a"
-					: "#4b5563",
-			fontWeight: field.type === "signature" || field.type === "initial" ? 400 : 600,
+					? "#1e293b"
+					: "#334155",
+			fontWeight: field.type === "signature" || field.type === "initial" ? 500 : 600,
 			pointerEvents: editable ? "auto" : "none",
 			cursor: editable ? "move" : "default",
 		};
@@ -271,8 +276,8 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 							? field.value && field.value.length > 0
 								? field.value
 								: field.type === "initial"
-								? field.value || "IN"
-								: field.value || "Your Signature"
+								? field.value || userFullName.split(" ").map(n => n[0]).join("") // Use initials
+								: field.value || userFullName
 							: fieldTypeLabels[field.type]}
 					</span>
 				</div>
@@ -307,7 +312,18 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 	const handlePageLoad = useCallback((width: number, height: number) => {
 		setPageWidth(width);
 		setPageHeight(height);
-	}, []);
+		console.log("[MultiPageTemplateViewer] Page loaded:", { width, height, page: currentPage });
+	}, [currentPage]);
+
+	// Debug: Log PDF URL
+	console.log("[MultiPageTemplateViewer] Rendering with:", {
+		templateId: template._id,
+		templateName: template.name,
+		pdfUrl: template.pdfUrl,
+		absoluteUrl: ensureAbsoluteUrl(template.pdfUrl),
+		currentPage,
+		numPages: template.numPages,
+	});
 
 	return (
 		<div className={`space-y-4 ${className}`}>
