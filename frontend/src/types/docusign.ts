@@ -12,12 +12,11 @@ export interface DocuSignTemplateData {
 	name: string;
 	type: "signature" | "document" | "form";
 	status: "draft" | "active" | "final" | "archived" | "processing" | "failed";
-	imageUrl: string;
-	finalImageUrl?: string;
+	pdfUrl: string;
+	finalPdfUrl?: string;
 	numPages: number;
 	signatureFields: SignatureField[];
 	metadata: TemplateMetadata;
-	auditTrail: AuditEntry[];
 	createdAt: string;
 	updatedAt: string;
 	createdBy?: {
@@ -48,20 +47,13 @@ export interface SignatureField {
 export interface TemplateMetadata {
 	fileId: string;
 	filename: string;
-	imageHash: string;
+	fileHash: string;
 	mimeType: string;
 	fileSize: number;
-	pages: PageData[];
+	document?: string; // ObjectId reference to DocuSignDocument
 	originalPdfPath: string;
-}
-
-export interface PageData {
-	pageNumber: number;
-	imageUrl: string;
-	imageHash: string;
-	fileSize: number;
-	width: number;
-	height: number;
+	pageWidth?: number;
+	pageHeight?: number;
 }
 
 export interface AuditEntry {
@@ -115,12 +107,6 @@ export interface SignatureData {
 	image?: string;
 	dataUrl?: string;
 	dataURL?: string;
-}
-
-export interface SignedPageData {
-	pageNumber: number;
-	signedImageUrl: string;
-	originalImageUrl: string;
 }
 
 export interface ViewportData {

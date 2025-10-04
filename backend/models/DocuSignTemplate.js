@@ -131,6 +131,11 @@ templateSchema.index({ status: 1 });
 templateSchema.index({ isArchived: 1 });
 templateSchema.index({ type: 1, status: 1 });
 
+// Virtual field for frontend compatibility - provides pdfUrl
+templateSchema.virtual("pdfUrl").get(function () {
+	return this.metadata?.originalPdfPath || "";
+});
+
 // Static methods
 templateSchema.statics.findByFileId = function (fileId) {
 	return this.findOne({ "metadata.fileId": fileId, isArchived: false });

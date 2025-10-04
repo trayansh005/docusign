@@ -6,8 +6,6 @@ import {
 	SignatureField,
 	PaginationData,
 	SignatureData,
-	SignedPageData,
-	ViewportData,
 	RecipientData,
 	StatusHistoryData,
 	SignatureTrackingData,
@@ -70,41 +68,42 @@ export const deleteTemplate = async (templateId: string): Promise<void> => {
 	}
 };
 
-// Page Operations
-export const getTemplatePage = async (
+// Field Operations
+export const addSignatureField = async (
 	templateId: string,
-	pageNumber: number
-): Promise<{
-	templateId: string;
-	pageNumber: number;
-	imageUrl: string;
-	imageHash: string;
-	fileSize: number;
-	width: number;
-	height: number;
-}> => {
-	const result = await serverApi.get(`/docusign/${templateId}/page/${pageNumber}`);
+	field: Omit<SignatureField, "id">
+): Promise<DocuSignTemplateData> => {
+	const result = await serverApi.post(`/docusign/${templateId}/fields`, { field });
 
 	if (!result.success) {
-		throw new Error(result.message || "Failed to get template page");
+		throw new Error(result.message || "Failed to add signature field");
 	}
 
 	return result.data;
 };
 
-export const updateTemplatePageFields = async (
+export const updateSignatureField = async (
 	templateId: string,
-	pageNumber: number,
-	signatureFields: SignatureField[],
-	viewport?: ViewportData
+	fieldId: string,
+	updates: Partial<SignatureField>
 ): Promise<DocuSignTemplateData> => {
-	const result = await serverApi.put(`/docusign/${templateId}/page/${pageNumber}/fields`, {
-		signatureFields,
-		viewport,
-	});
+	const result = await serverApi.put(`/docusign/${templateId}/fields/${fieldId}`, updates);
 
 	if (!result.success) {
-		throw new Error(result.message || "Failed to update template page fields");
+		throw new Error(result.message || "Failed to update signature field");
+	}
+
+	return result.data;
+};
+
+export const deleteSignatureField = async (
+	templateId: string,
+	fieldId: string
+): Promise<DocuSignTemplateData> => {
+	const result = await serverApi.delete(`/docusign/${templateId}/fields/${fieldId}`);
+
+	if (!result.success) {
+		throw new Error(result.message || "Failed to delete signature field");
 	}
 
 	return result.data;
@@ -113,14 +112,10 @@ export const updateTemplatePageFields = async (
 // Signature Operations
 export const applySignatures = async (
 	templateId: string,
-	signatures: SignatureData[],
-	fields?: SignatureField[],
-	viewport?: ViewportData
-): Promise<{ templateId: string; signedPages: SignedPageData[] }> => {
+	signatures: SignatureData[]
+): Promise<{ templateId: string; finalPdfUrl: string }> => {
 	const result = await serverApi.post(`/docusign/${templateId}/apply-signatures`, {
 		signatures,
-		fields,
-		viewport,
 	});
 
 	if (!result.success) {
@@ -132,10 +127,7 @@ export const applySignatures = async (
 
 export const getSignedDocument = async (
 	templateId: string
-): Promise<{
-	template: DocuSignTemplateData;
-	signedPages: SignedPageData[];
-}> => {
+): Promise<{ template: DocuSignTemplateData; finalPdfUrl: string }> => {
 	const result = await serverApi.get(`/docusign/${templateId}/signed`);
 
 	if (!result.success) {

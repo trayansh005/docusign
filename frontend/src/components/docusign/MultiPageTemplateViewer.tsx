@@ -1,18 +1,15 @@
 "use client";
 
 import React, { useState, useCallback, useRef } from "react";
-// Image optimization not used here; using plain <img> for exact pixel control
-import { useQuery } from "@tanstack/react-query";
 import {
 	ChevronLeft,
 	ChevronRight,
 	ZoomIn,
 	ZoomOut,
 	RotateCw,
-	AlertCircle,
 	Trash2,
 } from "lucide-react";
-import { getTemplatePage } from "@/services/docusignAPI";
+import { PDFPageCanvas } from "./PDFPageCanvas";
 import { ensureAbsoluteUrl } from "@/lib/urlUtils";
 import { DocuSignTemplateData, SignatureField } from "@/types/docusign";
 
@@ -36,6 +33,8 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 	const [currentPage, setCurrentPage] = useState(1);
 	const [zoom, setZoom] = useState(1);
 	const [rotation, setRotation] = useState(0);
+	const [pageWidth, setPageWidth] = useState(0);
+	const [pageHeight, setPageHeight] = useState(0);
 	const contentRef = useRef<HTMLDivElement | null>(null);
 
 	// Drag state for moving/resizing fields
@@ -104,15 +103,6 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 		window.addEventListener("mousemove", handleWindowMouseMove);
 		window.addEventListener("mouseup", handleWindowMouseUp);
 	};
-
-	const {
-		data: pageData,
-		error,
-	} = useQuery({
-		queryKey: ["template-page", template._id, currentPage],
-		queryFn: () => getTemplatePage(template._id, currentPage),
-		enabled: !!template._id && currentPage > 0,
-	});
 
 	const currentPageFields = template.signatureFields.filter(
 		(field) => field.pageNumber === currentPage
@@ -317,14 +307,10 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 		);
 	};
 
-	if (error) {
-		return (
-			<div className={`flex items-center justify-center p-8 bg-red-50 rounded-lg ${className}`}>
-				<AlertCircle className="h-8 w-8 text-red-500 mr-2" />
-				<span className="text-red-700">Failed to load page {currentPage}</span>
-			</div>
-		);
-	}
+	const handlePageLoad = useCallback((width: number, height: number) => {
+		setPageWidth(width);
+		setPageHeight(height);
+	}, []);
 
 	return (
 		<div className={`space-y-4 ${className}`}>
@@ -396,43 +382,43 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 						minHeight: "600px",
 					}}
 				>
-					{pageData?.imageUrl && (
-						<div className="relative inline-block w-full max-w-4xl mx-auto">
-							{/* A4 aspect-ratio wrapper */}
+					<div className="relative inline-block w-full max-w-4xl mx-auto">
+						{/* A4 aspect-ratio wrapper */}
+						<div
+							className="relative bg-white"
+							style={{
+								aspectRatio: "1 / 1.4142",
+								width: "100%",
+								maxWidth: "100%",
+								transformOrigin: "top left",
+							}}
+						>
 							<div
-								className="relative bg-white"
+								ref={contentRef}
+								className="relative w-full h-full"
 								style={{
-									aspectRatio: "1 / 1.4142",
-									width: "100%",
-									maxWidth: "100%",
+									transform: `scale(${zoom}) rotate(${rotation}deg)`,
 									transformOrigin: "top left",
+									transition: "transform 0.2s ease-in-out",
+									overflow: "hidden",
 								}}
+								onClick={(e) => handleCanvasClick(e as unknown as React.MouseEvent<HTMLDivElement>)}
 							>
-								<div
-									ref={contentRef}
-									className="relative w-full h-full"
-									style={{
-										transform: `scale(${zoom}) rotate(${rotation}deg)`,
-										transformOrigin: "top left",
-										transition: "transform 0.2s ease-in-out",
-										overflow: "hidden",
-									}}
-									onClick={(e) => handleCanvasClick(e as unknown as React.MouseEvent<HTMLDivElement>)}
-								>
-									{/* eslint-disable-next-line @next/next/no-img-element */}
-									<img
-										src={ensureAbsoluteUrl(pageData.imageUrl)}
-										alt={`Page ${currentPage}`}
-										className="w-full h-full object-contain block"
-										style={{ imageRendering: zoom > 1 ? "pixelated" : "auto" }}
-									/>
+								{/* PDF Canvas */}
+								<PDFPageCanvas
+									pdfUrl={ensureAbsoluteUrl(template.pdfUrl)}
+									pageNumber={currentPage}
+									zoom={1} // Apply zoom via CSS transform instead
+									rotation={0} // Apply rotation via CSS transform instead
+									onPageLoad={handlePageLoad}
+									className="w-full h-full"
+								/>
 
-									{/* Signature Fields Overlay */}
-									{currentPageFields.map(renderSignatureField)}
-								</div>
+								{/* Signature Fields Overlay */}
+								{currentPageFields.map(renderSignatureField)}
 							</div>
 						</div>
-					)}
+					</div>
 				</div>
 			</div>
 
