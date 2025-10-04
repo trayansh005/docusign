@@ -2,8 +2,8 @@ import { Suspense } from "react";
 import ActivityClient from "./ActivityClient";
 
 export const metadata = {
-	title: "DocuSign Activity | Document Activity Logs",
-	description: "View comprehensive activity logs for all DocuSign operations and document events.",
+	title: "FomiqSign Activity | Document Activity Logs",
+	description: "View comprehensive activity logs for all FomiqSign operations and document events.",
 };
 
 export default async function ActivityPage() {
@@ -11,9 +11,9 @@ export default async function ActivityPage() {
 		<div className="min-h-screen">
 			<div className="container mx-auto px-4 py-8">
 				<div className="mb-8">
-					<h1 className="text-3xl font-bold text-white mb-2">DocuSign Activity</h1>
+					<h1 className="text-3xl font-bold text-white mb-2">FomiqSign Activity</h1>
 					<p className="text-gray-400">
-						Comprehensive activity logs for all DocuSign operations, including uploads, signatures, and status changes.
+						Comprehensive activity logs for all FomiqSign operations, including uploads, signatures, and status changes.
 					</p>
 				</div>
 

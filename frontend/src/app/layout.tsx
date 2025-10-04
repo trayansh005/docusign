@@ -24,10 +24,10 @@ const dancingScript = Dancing_Script({
 });
 
 export const metadata: Metadata = {
-	title: "DocuSign Integration Platform",
+	title: "FomiqSign Integration Platform",
 	description: "Modern platform for secure document signing and subscription management",
-	keywords: ["DocuSign", "Digital Signatures", "Document Management", "Subscription Platform"],
-	authors: [{ name: "DocuSign Team" }],
+	keywords: ["FomiqSign", "Digital Signatures", "Document Management", "Subscription Platform"],
+	authors: [{ name: "FomiqSign Team" }],
 };
 
 export const viewport: Viewport = {

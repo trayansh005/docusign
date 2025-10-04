@@ -73,7 +73,7 @@ export default function Subscription() {
 				<div className="p-8">
 					<div className="text-center mb-8">
 						<h1 className="text-3xl font-bold text-white mb-2">Subscriptions</h1>
-						<p className="text-white/70">Manage your DocuSign integration plans</p>
+						<p className="text-white/70">Manage your FomiqSign integration plans</p>
 					</div>
 
 					<form onSubmit={handleSubmit} className="mb-8 space-y-6">

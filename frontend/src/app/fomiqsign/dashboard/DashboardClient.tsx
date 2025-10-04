@@ -50,7 +50,7 @@ const tabs: Tab[] = [
 		id: "activity",
 		label: "Activity Logs",
 		icon: History,
-		description: "View all DocuSign activities",
+		description: "View all FomiqSign activities",
 	},
 	{
 		id: "tracking",
@@ -62,7 +62,7 @@ const tabs: Tab[] = [
 		id: "settings",
 		label: "Settings",
 		icon: Settings,
-		description: "Configure DocuSign preferences",
+		description: "Configure FomiqSign preferences",
 	},
 ];
 
@@ -96,7 +96,7 @@ export default function DashboardClient({}: DashboardClientProps) {
 						<div>
 							<h2 className="text-2xl font-semibold text-gray-100 mb-2">Upload PDF Document</h2>
 							<p className="text-gray-300">
-								Upload a PDF file to create a new DocuSign template. The system will automatically
+								Upload a PDF file to create a new FomiqSign template. The system will automatically
 								convert it to images and prepare it for signature placement.
 							</p>
 						</div>
@@ -201,7 +201,7 @@ export default function DashboardClient({}: DashboardClientProps) {
 						<div>
 							<h2 className="text-2xl font-semibold text-white mb-2">Activity Logs</h2>
 							<p className="text-gray-400">
-								View all DocuSign-related activities and system events.
+								View all FomiqSign-related activities and system events.
 							</p>
 						</div>
 						{/* Activity logs component will be implemented */}
@@ -243,9 +243,9 @@ export default function DashboardClient({}: DashboardClientProps) {
 				return (
 					<div className="space-y-6">
 						<div>
-							<h2 className="text-2xl font-semibold text-white mb-2">DocuSign Settings</h2>
+							<h2 className="text-2xl font-semibold text-white mb-2">FomiqSign Settings</h2>
 							<p className="text-gray-400">
-								Configure your DocuSign preferences and system settings.
+								Configure your FomiqSign preferences and system settings.
 							</p>
 						</div>
 						{/* Settings component will be implemented */}
@@ -382,7 +382,7 @@ function FinalizePanel({ template, recipients, subject, body }: { template: Docu
 					viewport: { width: 2480, height: 3508 },
 				};
 
-			const res = await apiClient.post(`/docusign/${template._id}/apply-signatures`, payload);
+			const res = await apiClient.post(`/fomiqsign/${template._id}/apply-signatures`, payload);
 			// backend may return signed pages array or urls - handle safely without using `any`
 			if (res && typeof res === "object") {
 				const r = res as Record<string, unknown>;

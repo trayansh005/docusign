@@ -9,10 +9,10 @@ const CONFIG = {
 		REGISTER: "/register",
 		DASHBOARD: "/home",
 		HOME: "/",
-		DOCUSIGN: "/docusign",
+		DOCUSIGN: "/fomiqsign",
 	},
 	// Protected routes that require authentication
-	PROTECTED_ROUTES: ["/home", "/subscription", "/docusign", "/profile"],
+	PROTECTED_ROUTES: ["/home", "/subscription", "/fomiqsign", "/profile"],
 	// Public routes that don't require authentication
 	PUBLIC_ROUTES: ["/", "/login", "/register"],
 	// Token configuration

@@ -22,7 +22,7 @@ export default function Home() {
 							<Link href="/register" className="btn btn-primary px-8 py-4 text-lg glow">
 								Get Started Free
 							</Link>
-							<Link href="/docusign" className="btn btn-outline px-8 py-4 text-lg">
+							<Link href="/FomiqSign" className="btn btn-outline px-8 py-4 text-lg">
 								Sign Document
 							</Link>
 						</div>

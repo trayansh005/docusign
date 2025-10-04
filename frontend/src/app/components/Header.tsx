@@ -26,7 +26,7 @@ export default function Header() {
 								/>
 							</svg>
 						</div>
-						<span className="text-gradient">DocuSign Platform</span>
+						<span className="text-gradient">FomiqSign Platform</span>
 					</Link>
 
 					{/* Desktop Navigation */}
@@ -46,7 +46,7 @@ export default function Header() {
 										<Link href="/register" className="nav-link">
 											Register
 										</Link>
-										<Link href="/docusign" className="btn btn-primary ml-4">
+										<Link href="/fomiqsign" className="btn btn-primary ml-4">
 											Get Started
 										</Link>
 									</>
@@ -55,7 +55,7 @@ export default function Header() {
 										<Link href="/subscription" className="nav-link">
 											Plans
 										</Link>
-										<Link href="/docusign" className="nav-link">
+										<Link href="/fomiqsign" className="nav-link">
 											Sign Document
 										</Link>
 										{/* User Profile Section */}
@@ -161,7 +161,7 @@ export default function Header() {
 											Register
 										</Link>
 										<Link
-											href="/docusign"
+											href="/fomiqsign"
 											className="btn btn-primary mx-auto mt-2"
 											onClick={() => setIsMenuOpen(false)}
 										>
@@ -196,7 +196,7 @@ export default function Header() {
 											Plans
 										</Link>
 										<Link
-											href="/docusign"
+											href="/fomiqsign"
 											className="nav-link text-center"
 											onClick={() => setIsMenuOpen(false)}
 										>

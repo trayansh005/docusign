@@ -2,8 +2,8 @@ import { Suspense } from "react";
 import DashboardClient from "./DashboardClient";
 
 export const metadata = {
-	title: "DocuSign Dashboard | Secure Document Signing",
-	description: "Manage your DocuSign templates, apply signatures, and track document status.",
+	title: "FomiqSign Dashboard | Secure Document Signing",
+	description: "Manage your FomiqSign templates, apply signatures, and track document status.",
 };
 
 export default async function DashboardPage() {
@@ -11,7 +11,7 @@ export default async function DashboardPage() {
 		<div className="min-h-screen">
 			<div className="container mx-auto px-4 py-8">
 				<div className="mb-8">
-					<h1 className="text-3xl font-bold text-white mb-2">DocuSign Dashboard</h1>
+					<h1 className="text-3xl font-bold text-white mb-2">FomiqSign Dashboard</h1>
 					<p className="text-gray-400">
 						Upload PDFs, manage templates, apply signatures, and track document status.
 					</p>

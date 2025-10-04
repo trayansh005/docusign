@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import StatusTrackerClient from "./StatusTrackerClient";
 
 export const metadata = {
-	title: "DocuSign Status Tracker | Document Status Monitoring",
+	title: "FomiqSign Status Tracker | Document Status Monitoring",
 	description: "Monitor document status, view audit trails, and access signed documents.",
 };
 

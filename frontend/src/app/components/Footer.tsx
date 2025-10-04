@@ -19,7 +19,7 @@ export default function Footer() {
 									/>
 								</svg>
 							</div>
-							<span className="text-xl font-bold text-gradient">DocuSign Platform</span>
+							<span className="text-xl font-bold text-gradient">FomiqSign Platform</span>
 						</Link>
 						<p className="text-gray-400 max-w-md leading-relaxed">
 							Secure, modern platform for digital document signing and subscription management.
@@ -67,7 +67,7 @@ export default function Footer() {
 						<ul className="space-y-3">
 							<li>
 								<Link
-									href="/docusign"
+									href="/fomiqsign"
 									className="text-gray-400 hover:text-white transition-colors duration-200"
 								>
 									Sign Documents
@@ -143,7 +143,7 @@ export default function Footer() {
 				{/* Bottom Section */}
 				<div className="mt-12 pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center">
 					<p className="text-gray-400 text-sm">
-						© {currentYear} DocuSign Platform. Built with modern technology for secure document
+						© {currentYear} FomiqSign Platform. Built with modern technology for secure document
 						management.
 					</p>
 					<div className="flex items-center space-x-6 mt-4 md:mt-0">

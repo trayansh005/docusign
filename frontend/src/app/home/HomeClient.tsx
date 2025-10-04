@@ -212,7 +212,7 @@ export default function HomeClient() {
 
 				{/* Quick Actions */}
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-					<Link href="/docusign" className="card p-6 hover:bg-gray-800/50 transition-colors group">
+					<Link href="/fomiqsign" className="card p-6 hover:bg-gray-800/50 transition-colors group">
 						<div className="flex items-center mb-4">
 							<div className="p-3 bg-blue-500/20 rounded-lg group-hover:bg-blue-500/30 transition-colors">
 								<svg
