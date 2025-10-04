@@ -5,7 +5,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { DocuSignTemplateData, SignatureField, ApiResponse } from "@/types/docusign";
+import { DocuSignTemplateData, ApiResponse } from "@/types/docusign";
 import { getTemplates, deleteTemplate } from "@/services/docusignAPI";
 
 interface UseTemplateManagerOptions {
