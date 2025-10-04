@@ -1,10 +1,18 @@
 "use client";
 
 import React, { useState, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, Trash2 } from "lucide-react";
-import { PDFPageCanvas } from "./PDFPageCanvas";
 import { ensureAbsoluteUrl } from "@/lib/urlUtils";
 import { DocuSignTemplateData, SignatureField } from "@/types/docusign";
+
+// Dynamically import PDFPageCanvas to avoid SSR issues with DOMMatrix
+const PDFPageCanvas = dynamic(() => import("./PDFPageCanvas").then((mod) => ({ default: mod.PDFPageCanvas })), {
+	ssr: false,
+	loading: () => <div className="flex items-center justify-center p-8 min-h-[600px] bg-gray-100">
+		<div className="text-gray-600">Loading PDF viewer...</div>
+	</div>
+});
 
 interface MultiPageTemplateViewerProps {
 	template: DocuSignTemplateData;
@@ -26,8 +34,6 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 	const [currentPage, setCurrentPage] = useState(1);
 	const [zoom, setZoom] = useState(1);
 	const [rotation, setRotation] = useState(0);
-	const [pageWidth, setPageWidth] = useState(0);
-	const [pageHeight, setPageHeight] = useState(0);
 	const contentRef = useRef<HTMLDivElement | null>(null);
 
 	// Get user's full name for signature fields
@@ -315,8 +321,6 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 
 	const handlePageLoad = useCallback(
 		(width: number, height: number) => {
-			setPageWidth(width);
-			setPageHeight(height);
 			console.log("[MultiPageTemplateViewer] Page loaded:", { width, height, page: currentPage });
 		},
 		[currentPage]
