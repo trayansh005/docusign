@@ -1,14 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useRef } from "react";
-import {
-	ChevronLeft,
-	ChevronRight,
-	ZoomIn,
-	ZoomOut,
-	RotateCw,
-	Trash2,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, Trash2 } from "lucide-react";
 import { PDFPageCanvas } from "./PDFPageCanvas";
 import { ensureAbsoluteUrl } from "@/lib/urlUtils";
 import { DocuSignTemplateData, SignatureField } from "@/types/docusign";
@@ -152,7 +145,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 	);
 
 	const renderSignatureField = (field: SignatureField) => {
-			const style: React.CSSProperties = {
+		const style: React.CSSProperties = {
 			position: "absolute",
 			left: `${field.xPct}%`,
 			top: `${field.yPct}%`,
@@ -164,7 +157,12 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 			alignItems: "center",
 			justifyContent: "center",
 			fontSize: "12px",
-			color: field.type === "signature" || field.type === "initial" ? "#111827" : (editable ? "#0f172a" : "#4b5563"),
+			color:
+				field.type === "signature" || field.type === "initial"
+					? "#111827"
+					: editable
+					? "#0f172a"
+					: "#4b5563",
 			fontWeight: field.type === "signature" || field.type === "initial" ? 400 : 600,
 			pointerEvents: editable ? "auto" : "none",
 			cursor: editable ? "move" : "default",
@@ -280,29 +278,28 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 				</div>
 
 				{/* Delete button - visible on hover */}
-                {editable && (
-                    <button
-                        type="button"
-                        onClick={(ev) => {
-                            ev.stopPropagation();
-                            onFieldRemove?.(currentPage, field.id);
-                        }}
-                        title="Delete field"
-                        className="absolute -top-3 -right-3 w-7 h-7 rounded-full bg-red-500 text-white shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-150 flex items-center justify-center z-20 hover:bg-red-600"
-                    >
-                        <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                )}
+				{editable && (
+					<button
+						type="button"
+						onClick={(ev) => {
+							ev.stopPropagation();
+							onFieldRemove?.(currentPage, field.id);
+						}}
+						title="Delete field"
+						className="absolute -top-3 -right-3 w-7 h-7 rounded-full bg-red-500 text-white shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-150 flex items-center justify-center z-20 hover:bg-red-600"
+					>
+						<Trash2 className="w-3.5 h-3.5" />
+					</button>
+				)}
 
-                {editable && (
-                    <div
-                        onMouseDown={onResizeMouseDown}
-                        className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-600 border-2 border-white rounded-full cursor-se-resize opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-blue-700 hover:scale-110 shadow-md"
-                        style={{ transform: "translate(50%, 50%)", zIndex: 30 }}
-                        title="Drag to resize"
-                    />
-                )}
-
+				{editable && (
+					<div
+						onMouseDown={onResizeMouseDown}
+						className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-600 border-2 border-white rounded-full cursor-se-resize opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-blue-700 hover:scale-110 shadow-md"
+						style={{ transform: "translate(50%, 50%)", zIndex: 30 }}
+						title="Drag to resize"
+					/>
+				)}
 			</div>
 		);
 	};

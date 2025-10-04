@@ -83,7 +83,12 @@ export const PDFPageCanvas: React.FC<PDFPageCanvasProps> = ({
 					renderTaskRef.current = null;
 				}
 			} catch (error: unknown) {
-				if (error && typeof error === "object" && "name" in error && error.name === "RenderingCancelledException") {
+				if (
+					error &&
+					typeof error === "object" &&
+					"name" in error &&
+					error.name === "RenderingCancelledException"
+				) {
 					// Rendering was cancelled, ignore
 					return;
 				}
@@ -98,7 +103,12 @@ export const PDFPageCanvas: React.FC<PDFPageCanvasProps> = ({
 			if (renderTaskRef.current) {
 				renderTaskRef.current.cancel();
 			}
-			if (pdfDoc && typeof pdfDoc === "object" && "destroy" in pdfDoc && typeof (pdfDoc as { destroy: () => void }).destroy === "function") {
+			if (
+				pdfDoc &&
+				typeof pdfDoc === "object" &&
+				"destroy" in pdfDoc &&
+				typeof (pdfDoc as { destroy: () => void }).destroy === "function"
+			) {
 				(pdfDoc as { destroy: () => void }).destroy();
 			}
 		};
