@@ -7,12 +7,17 @@ import { ensureAbsoluteUrl } from "@/lib/urlUtils";
 import { DocuSignTemplateData, SignatureField } from "@/types/docusign";
 
 // Dynamically import PDFPageCanvas to avoid SSR issues with DOMMatrix
-const PDFPageCanvas = dynamic(() => import("./PDFPageCanvas").then((mod) => ({ default: mod.PDFPageCanvas })), {
-	ssr: false,
-	loading: () => <div className="flex items-center justify-center p-8 min-h-[600px] bg-gray-100">
-		<div className="text-gray-600">Loading PDF viewer...</div>
-	</div>
-});
+const PDFPageCanvas = dynamic(
+	() => import("./PDFPageCanvas").then((mod) => ({ default: mod.PDFPageCanvas })),
+	{
+		ssr: false,
+		loading: () => (
+			<div className="flex items-center justify-center p-8 min-h-[600px] bg-gray-100">
+				<div className="text-gray-600">Loading PDF viewer...</div>
+			</div>
+		),
+	}
+);
 
 interface MultiPageTemplateViewerProps {
 	template: DocuSignTemplateData;

@@ -22,22 +22,8 @@ const PORT = process.env.PORT || 5000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Security middleware - Helmet should be first
-app.use(
-	helmet({
-		contentSecurityPolicy: {
-			directives: {
-				defaultSrc: ["'self'"],
-				styleSrc: ["'self'", "'unsafe-inline'", "fonts.googleapis.com"],
-				fontSrc: ["'self'", "fonts.gstatic.com"],
-				scriptSrc: ["'self'"],
-				imgSrc: ["'self'", "data:", "https:", "http://localhost:4001"],
-				connectSrc: ["'self'"],
-			},
-		},
-		crossOriginEmbedderPolicy: false, // Disable for development
-	})
-);
+// Security middleware - Helmet with default settings (same as RCSS)
+app.use(helmet());
 
 // Logging middleware
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
@@ -71,12 +57,8 @@ app.use(sanitizeInput);
 // Static files (frontend)
 app.use(express.static("../frontend"));
 
-// Static files (uploads - for template images)
+// Static files (uploads) - middleware to set CORS headers
 app.use("/api/uploads", (req, res, next) => {
-	// Set CORS headers for static files
-	res.setHeader("Access-Control-Allow-Origin", process.env.FRONTEND_URL || "http://localhost:3000");
-	res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-	res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 	res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
 	next();
 });
