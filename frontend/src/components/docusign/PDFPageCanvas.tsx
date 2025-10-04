@@ -1,12 +1,15 @@
 "use client";
 
-import React, { useRef, useEffect, useState } from "react";
-import { pdfjs } from "react-pdf";
+import React, { useState } from "react";
+import { Document, Page, pdfjs } from "react-pdf";
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
 
-// Set up PDF.js worker only on client side
-if (typeof window !== "undefined") {
-	pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-}
+// Set up PDF.js worker - same as RCSS project
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+	"pdfjs-dist/build/pdf.worker.min.mjs",
+	import.meta.url
+).toString();
 
 interface PDFPageCanvasProps {
 	pdfUrl: string;
@@ -25,122 +28,53 @@ export const PDFPageCanvas: React.FC<PDFPageCanvasProps> = ({
 	onPageLoad,
 	className = "",
 }) => {
-	const canvasRef = useRef<HTMLCanvasElement>(null);
-	const renderTaskRef = useRef<{ cancel: () => void; promise: Promise<void> } | null>(null);
-	const [isClient, setIsClient] = useState(false);
+	const [pageWidth, setPageWidth] = useState(800);
 
-	// Ensure component only renders on client side
-	useEffect(() => {
-		setIsClient(true);
-	}, []);
+	const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+		console.log("[PDFPageCanvas] PDF loaded successfully, total pages:", numPages);
+	};
 
-	useEffect(() => {
-		if (!isClient) return;
-		let isMounted = true;
-		let pdfDoc: unknown = null;
+	const onPageLoadSuccess = (page: { width: number; height: number }) => {
+		const { width, height } = page;
+		setPageWidth(width);
+		if (onPageLoad) {
+			onPageLoad(width, height);
+		}
+		console.log("[PDFPageCanvas] Page loaded:", { width, height, page: pageNumber });
+	};
 
-		const renderPage = async () => {
-			if (!canvasRef.current || !pdfUrl) {
-				console.warn("[PDFPageCanvas] Missing canvas or PDF URL:", {
-					canvasRef: !!canvasRef.current,
-					pdfUrl,
-				});
-				return;
-			}
-
-			try {
-				console.log("[PDFPageCanvas] Loading PDF from:", pdfUrl);
-
-				// Cancel any ongoing render task
-				if (renderTaskRef.current) {
-					renderTaskRef.current.cancel();
-					renderTaskRef.current = null;
-				}
-
-				// Load the PDF document
-				const loadingTask = pdfjs.getDocument(pdfUrl);
-				pdfDoc = await loadingTask.promise;
-
-				console.log("[PDFPageCanvas] PDF loaded successfully, rendering page:", pageNumber);
-
-				if (!isMounted || !pdfDoc) return;
-
-				// Get the specified page
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				const page = await (pdfDoc as any).getPage(pageNumber);
-
-				if (!isMounted) return;
-
-				// Get viewport with scale and rotation
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				const viewport = (page as any).getViewport({ scale: zoom, rotation });
-
-				// Set canvas dimensions
-				const canvas = canvasRef.current;
-				const context = canvas.getContext("2d");
-				if (!context) return;
-
-				canvas.width = viewport.width;
-				canvas.height = viewport.height;
-
-				// Call onPageLoad with dimensions
-				if (onPageLoad) {
-					onPageLoad(viewport.width, viewport.height);
-				}
-
-				// Render the page
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
-				renderTaskRef.current = (page as any).render({
-					canvasContext: context,
-					viewport: viewport,
-				});
-
-				if (renderTaskRef.current) {
-					await renderTaskRef.current.promise;
-					renderTaskRef.current = null;
-				}
-			} catch (error: unknown) {
-				if (
-					error &&
-					typeof error === "object" &&
-					"name" in error &&
-					error.name === "RenderingCancelledException"
-				) {
-					// Rendering was cancelled, ignore
-					return;
-				}
-				console.error("Error rendering PDF page:", error);
-			}
-		};
-
-		renderPage();
-
-		return () => {
-			isMounted = false;
-			if (renderTaskRef.current) {
-				renderTaskRef.current.cancel();
-			}
-			if (
-				pdfDoc &&
-				typeof pdfDoc === "object" &&
-				"destroy" in pdfDoc &&
-				typeof (pdfDoc as { destroy: () => void }).destroy === "function"
-			) {
-				(pdfDoc as { destroy: () => void }).destroy();
-			}
-		};
-	}, [pdfUrl, pageNumber, zoom, rotation, onPageLoad, isClient]);
-
-	// Don't render canvas during SSR
-	if (!isClient) {
-		return <div className={className} style={{ minHeight: "600px", background: "#f3f4f6" }} />;
-	}
+	console.log("[PDFPageCanvas] Rendering PDF from:", pdfUrl, "page:", pageNumber);
 
 	return (
-		<canvas
-			ref={canvasRef}
-			className={className}
-			style={{ display: "block", width: "100%", height: "auto" }}
-		/>
+		<div className={className}>
+			<Document
+				file={pdfUrl}
+				onLoadSuccess={onDocumentLoadSuccess}
+				loading={
+					<div className="flex items-center justify-center p-8 min-h-[600px] bg-gray-100">
+						<div className="text-gray-600">Loading PDF...</div>
+					</div>
+				}
+				error={
+					<div className="flex items-center justify-center p-8 min-h-[600px] bg-red-50">
+						<div className="text-red-600">Failed to load PDF. Please check the file path.</div>
+					</div>
+				}
+			>
+				<Page
+					pageNumber={pageNumber}
+					width={pageWidth}
+					rotate={rotation}
+					scale={zoom}
+					onLoadSuccess={onPageLoadSuccess}
+					loading={
+						<div className="flex items-center justify-center p-8 min-h-[400px] bg-gray-50">
+							<div className="text-gray-600">Loading page {pageNumber}...</div>
+						</div>
+					}
+					className="border shadow-lg bg-white"
+				/>
+			</Document>
+		</div>
 	);
 };
