@@ -85,16 +85,14 @@ export const StatusTracker: React.FC<StatusTrackerProps> = ({ className = "", on
 	const handleDownload = async (templateId: string) => {
 		try {
 			const data = await getSignedDocument(templateId);
-			if (data.signedPages && data.signedPages.length > 0) {
-				data.signedPages.forEach((page) => {
-					const link = document.createElement("a");
-					link.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${page.signedImageUrl}`;
-					link.target = "_blank";
-					link.download = `signed-page-${page.pageNumber}.png`;
-					document.body.appendChild(link);
-					link.click();
-					document.body.removeChild(link);
-				});
+			if (data.finalPdfUrl) {
+				const link = document.createElement("a");
+				link.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${data.finalPdfUrl}`;
+				link.target = "_blank";
+				link.download = `signed-document-${data.template.name}.pdf`;
+				document.body.appendChild(link);
+				link.click();
+				document.body.removeChild(link);
 			}
 		} catch (error) {
 			console.error("Failed to download signed document:", error);

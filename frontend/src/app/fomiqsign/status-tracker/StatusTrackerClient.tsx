@@ -54,17 +54,15 @@ export default function StatusTrackerClient() {
 	const downloadMutation = useMutation({
 		mutationFn: (templateId: string) => getSignedDocument(templateId),
 		onSuccess: (data) => {
-			// Handle download - could open in new tab or trigger download
-			if (data.signedPages && data.signedPages.length > 0) {
-				data.signedPages.forEach((page) => {
-					const link = document.createElement("a");
-					link.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${page.signedImageUrl}`;
-					link.target = "_blank";
-					link.download = `signed-page-${page.pageNumber}.png`;
-					document.body.appendChild(link);
-					link.click();
-					document.body.removeChild(link);
-				});
+			// Handle download - open final PDF in new tab or trigger download
+			if (data.finalPdfUrl) {
+				const link = document.createElement("a");
+				link.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${data.finalPdfUrl}`;
+				link.target = "_blank";
+				link.download = `signed-document-${data.template.name}.pdf`;
+				document.body.appendChild(link);
+				link.click();
+				document.body.removeChild(link);
 			}
 		},
 	});

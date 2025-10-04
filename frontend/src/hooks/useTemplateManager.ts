@@ -6,7 +6,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DocuSignTemplateData, SignatureField, ApiResponse } from '@/types/docusign';
-import { getTemplates, deleteTemplate, updateTemplatePageFields } from '@/services/docusignAPI';
+import { getTemplates, deleteTemplate } from '@/services/docusignAPI';
 
 interface UseTemplateManagerOptions {
 	initialFilters?: {
@@ -83,35 +83,12 @@ export const useTemplateManager = (options: UseTemplateManagerOptions = {}) => {
 		},
 	});
 
-	// Update fields mutation with optimistic updates
-	const updateFieldsMutation = useMutation({
-		mutationFn: ({ templateId, pageNumber, fields }: {
-			templateId: string;
-			pageNumber: number;
-			fields: SignatureField[];
-		}) => updateTemplatePageFields(templateId, pageNumber, fields),
-		onMutate: async ({ templateId, fields }) => {
-			// Optimistically update template in cache
-			const templateQueryKey = ['template', templateId];
-			const previousTemplate = queryClient.getQueryData(templateQueryKey);
-
-			queryClient.setQueryData(templateQueryKey, (old: DocuSignTemplateData | undefined) => {
-				if (!old) return old;
-				return {
-					...old,
-					signatureFields: fields
-				};
-			});
-
-			return { previousTemplate, templateQueryKey };
-		},
-		onError: (err, variables, context) => {
-			// Rollback on error
-			if (context?.previousTemplate && context?.templateQueryKey) {
-				queryClient.setQueryData(context.templateQueryKey, context.previousTemplate);
-			}
-		},
-	});
+	// NOTE: Field updates are now handled individually via updateSignatureField() API
+	// The old updateTemplatePageFields() function has been removed in favor of:
+	// - addSignatureField(templateId, field)
+	// - updateSignatureField(templateId, fieldId, updates)
+	// - deleteSignatureField(templateId, fieldId)
+	// Components should use these APIs directly instead of batch updates
 
 	// Memoized computed values
 	const computedValues = useMemo(() => {
@@ -130,11 +107,10 @@ export const useTemplateManager = (options: UseTemplateManagerOptions = {}) => {
 	// Stable callback functions
 	const actions = useMemo(() => ({
 		deleteTemplate: deleteMutation.mutate,
-		updateFields: updateFieldsMutation.mutate,
 		refetch: templatesQuery.refetch,
 		updateFilters,
 		resetFilters: () => setFilters({ page: 1, limit: pageSize, ...initialFilters }),
-	}), [deleteMutation.mutate, updateFieldsMutation.mutate, templatesQuery.refetch, updateFilters, pageSize, initialFilters]);
+	}), [deleteMutation.mutate, templatesQuery.refetch, updateFilters, pageSize, initialFilters]);
 
 	return {
 		...computedValues,
@@ -142,7 +118,6 @@ export const useTemplateManager = (options: UseTemplateManagerOptions = {}) => {
 		actions,
 		mutations: {
 			delete: deleteMutation,
-			updateFields: updateFieldsMutation,
 		}
 	};
 };
