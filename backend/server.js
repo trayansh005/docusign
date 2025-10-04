@@ -31,7 +31,7 @@ app.use(
 				styleSrc: ["'self'", "'unsafe-inline'", "fonts.googleapis.com"],
 				fontSrc: ["'self'", "fonts.gstatic.com"],
 				scriptSrc: ["'self'"],
-				imgSrc: ["'self'", "data:", "https:", "http://localhost:5000"],
+				imgSrc: ["'self'", "data:", "https:", "http://localhost:4001"],
 				connectSrc: ["'self'"],
 			},
 		},
