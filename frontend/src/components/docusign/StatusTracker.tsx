@@ -12,17 +12,30 @@ import {
 	Eye,
 	Download,
 	Calendar,
-	User
+	User,
 } from "lucide-react";
 import { getTemplatesByStatus, getSignedDocument } from "@/services/docusignAPI";
 import { DocuSignTemplateData } from "@/types/docusign";
 
 type StatusFilter = "all" | "draft" | "active" | "final" | "archived" | "processing" | "failed";
 
-const statusConfig: Record<string, { icon: React.ComponentType<{ className?: string }>, color: string, bgColor: string, label: string }> = {
+const statusConfig: Record<
+	string,
+	{
+		icon: React.ComponentType<{ className?: string }>;
+		color: string;
+		bgColor: string;
+		label: string;
+	}
+> = {
 	draft: { icon: FileText, color: "text-yellow-600", bgColor: "bg-yellow-100", label: "Draft" },
 	active: { icon: Clock, color: "text-blue-600", bgColor: "bg-blue-100", label: "Active" },
-	processing: { icon: Clock, color: "text-indigo-600", bgColor: "bg-indigo-100", label: "Processing" },
+	processing: {
+		icon: Clock,
+		color: "text-indigo-600",
+		bgColor: "bg-indigo-100",
+		label: "Processing",
+	},
 	final: { icon: CheckCircle, color: "text-green-600", bgColor: "bg-green-100", label: "Final" },
 	archived: { icon: Archive, color: "text-gray-600", bgColor: "bg-gray-100", label: "Archived" },
 	failed: { icon: AlertCircle, color: "text-red-600", bgColor: "bg-red-100", label: "Failed" },
@@ -33,16 +46,20 @@ interface StatusTrackerProps {
 	onTemplateSelect?: (template: DocuSignTemplateData) => void;
 }
 
-export const StatusTracker: React.FC<StatusTrackerProps> = ({ className = "", onTemplateSelect }) => {
+export const StatusTracker: React.FC<StatusTrackerProps> = ({
+	className = "",
+	onTemplateSelect,
+}) => {
 	const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
 	const { data: templates, isLoading } = useQuery({
 		queryKey: ["templates-by-status", statusFilter],
-		queryFn: () => getTemplatesByStatus({
-			status: statusFilter !== "all" ? statusFilter : undefined,
-			page: 1,
-			limit: 20,
-		}),
+		queryFn: () =>
+			getTemplatesByStatus({
+				status: statusFilter !== "all" ? statusFilter : undefined,
+				page: 1,
+				limit: 20,
+			}),
 	});
 
 	const getStatusIcon = (status: string) => {
@@ -73,7 +90,7 @@ export const StatusTracker: React.FC<StatusTrackerProps> = ({ className = "", on
 			failed: 0,
 		};
 
-		templates.data.forEach(template => {
+		templates.data.forEach((template) => {
 			counts[template.status] = (counts[template.status] || 0) + 1;
 		});
 
@@ -87,7 +104,9 @@ export const StatusTracker: React.FC<StatusTrackerProps> = ({ className = "", on
 			const data = await getSignedDocument(templateId);
 			if (data.finalPdfUrl) {
 				const link = document.createElement("a");
-				link.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${data.finalPdfUrl}`;
+				link.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${
+					data.finalPdfUrl
+				}`;
 				link.target = "_blank";
 				link.download = `signed-document-${data.template.name}.pdf`;
 				document.body.appendChild(link);
@@ -112,10 +131,13 @@ export const StatusTracker: React.FC<StatusTrackerProps> = ({ className = "", on
 		<div className={`space-y-4 ${className}`}>
 			{/* Compact Status Filter */}
 			<div className="flex flex-wrap gap-1">
-				{(["all", "draft", "active", "processing", "final", "archived", "failed"] as StatusFilter[]).map((status) => {
-					const config = status === "all" ?
-						{ icon: BarChart3, color: "text-blue-600", bgColor: "bg-blue-100", label: "All" } :
-						statusConfig[status];
+				{(
+					["all", "draft", "active", "processing", "final", "archived", "failed"] as StatusFilter[]
+				).map((status) => {
+					const config =
+						status === "all"
+							? { icon: BarChart3, color: "text-blue-600", bgColor: "bg-blue-100", label: "All" }
+							: statusConfig[status];
 					const Icon = config.icon;
 					const count = statusCounts[status] || 0;
 					const isActive = statusFilter === status;
@@ -124,15 +146,17 @@ export const StatusTracker: React.FC<StatusTrackerProps> = ({ className = "", on
 						<button
 							key={status}
 							onClick={() => setStatusFilter(status)}
-							className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${isActive
-								? "bg-blue-600 text-white"
-								: "bg-gray-700 text-gray-200 hover:bg-gray-600"
-								}`}
+							className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+								isActive ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-200 hover:bg-gray-600"
+							}`}
 						>
 							<Icon className="h-3 w-3" />
 							<span>{config.label}</span>
-							<span className={`px-1 py-0.5 rounded text-xs ${isActive ? "bg-blue-500" : "bg-gray-600"
-								}`}>
+							<span
+								className={`px-1 py-0.5 rounded text-xs ${
+									isActive ? "bg-blue-500" : "bg-gray-600"
+								}`}
+							>
 								{count}
 							</span>
 						</button>
@@ -149,8 +173,7 @@ export const StatusTracker: React.FC<StatusTrackerProps> = ({ className = "", on
 						<p className="text-xs text-gray-200">
 							{statusFilter !== "all"
 								? `No documents with ${statusConfig[statusFilter]?.label.toLowerCase()} status`
-								: "No documents available"
-							}
+								: "No documents available"}
 						</p>
 					</div>
 				) : (
@@ -171,7 +194,9 @@ export const StatusTracker: React.FC<StatusTrackerProps> = ({ className = "", on
 													<h3 className="text-sm font-medium text-white truncate">
 														{template.metadata.filename}
 													</h3>
-													<span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${bgColor} ${color}`}>
+													<span
+														className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${bgColor} ${color}`}
+													>
 														{statusConfig[template.status]?.label || template.status}
 													</span>
 												</div>

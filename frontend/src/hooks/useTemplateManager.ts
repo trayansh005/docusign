@@ -3,10 +3,10 @@
  * Reduces re-renders and improves performance
  */
 
-import { useState, useCallback, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { DocuSignTemplateData, SignatureField, ApiResponse } from '@/types/docusign';
-import { getTemplates, deleteTemplate } from '@/services/docusignAPI';
+import { useState, useCallback, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { DocuSignTemplateData, SignatureField, ApiResponse } from "@/types/docusign";
+import { getTemplates, deleteTemplate } from "@/services/docusignAPI";
 
 interface UseTemplateManagerOptions {
 	initialFilters?: {
@@ -25,11 +25,11 @@ export const useTemplateManager = (options: UseTemplateManagerOptions = {}) => {
 	const [filters, setFilters] = useState({
 		page: 1,
 		limit: pageSize,
-		...initialFilters
+		...initialFilters,
 	});
 
 	// Memoized query key to prevent unnecessary refetches
-	const queryKey = useMemo(() => ['templates', filters], [filters]);
+	const queryKey = useMemo(() => ["templates", filters], [filters]);
 
 	// Templates query with optimized caching
 	const templatesQuery = useQuery({
@@ -42,11 +42,11 @@ export const useTemplateManager = (options: UseTemplateManagerOptions = {}) => {
 
 	// Optimized filter updates
 	const updateFilters = useCallback((newFilters: Partial<typeof filters>) => {
-		setFilters(prev => ({
+		setFilters((prev) => ({
 			...prev,
 			...newFilters,
 			// Reset page when other filters change
-			...(Object.keys(newFilters).some(key => key !== 'page') && { page: 1 })
+			...(Object.keys(newFilters).some((key) => key !== "page") && { page: 1 }),
 		}));
 	}, []);
 
@@ -65,7 +65,7 @@ export const useTemplateManager = (options: UseTemplateManagerOptions = {}) => {
 				if (!old?.data) return old;
 				return {
 					...old,
-					data: old.data.filter((template: DocuSignTemplateData) => template._id !== templateId)
+					data: old.data.filter((template: DocuSignTemplateData) => template._id !== templateId),
 				};
 			});
 
@@ -100,17 +100,20 @@ export const useTemplateManager = (options: UseTemplateManagerOptions = {}) => {
 			isLoading,
 			error,
 			hasTemplates: (data?.data?.length || 0) > 0,
-			totalCount: data?.pagination?.total || 0
+			totalCount: data?.pagination?.total || 0,
 		};
 	}, [templatesQuery]);
 
 	// Stable callback functions
-	const actions = useMemo(() => ({
-		deleteTemplate: deleteMutation.mutate,
-		refetch: templatesQuery.refetch,
-		updateFilters,
-		resetFilters: () => setFilters({ page: 1, limit: pageSize, ...initialFilters }),
-	}), [deleteMutation.mutate, templatesQuery.refetch, updateFilters, pageSize, initialFilters]);
+	const actions = useMemo(
+		() => ({
+			deleteTemplate: deleteMutation.mutate,
+			refetch: templatesQuery.refetch,
+			updateFilters,
+			resetFilters: () => setFilters({ page: 1, limit: pageSize, ...initialFilters }),
+		}),
+		[deleteMutation.mutate, templatesQuery.refetch, updateFilters, pageSize, initialFilters]
+	);
 
 	return {
 		...computedValues,
@@ -118,6 +121,6 @@ export const useTemplateManager = (options: UseTemplateManagerOptions = {}) => {
 		actions,
 		mutations: {
 			delete: deleteMutation,
-		}
+		},
 	};
 };

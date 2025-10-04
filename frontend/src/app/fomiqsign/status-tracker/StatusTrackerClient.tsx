@@ -14,17 +14,35 @@ import {
 	History,
 	MapPin,
 	User,
-	Calendar
+	Calendar,
 } from "lucide-react";
-import { getTemplatesByStatus, getTemplateStatusHistory, getSignedDocument, updateTemplateStatus } from "@/services/docusignAPI";
+import {
+	getTemplatesByStatus,
+	getTemplateStatusHistory,
+	getSignedDocument,
+	updateTemplateStatus,
+} from "@/services/docusignAPI";
 import { DocuSignTemplateData } from "@/types/docusign";
 
 type StatusFilter = "all" | "draft" | "active" | "final" | "archived" | "processing" | "failed";
 
-const statusConfig: Record<string, { icon: React.ComponentType<{ className?: string }>, color: string, bgColor: string, label: string }> = {
+const statusConfig: Record<
+	string,
+	{
+		icon: React.ComponentType<{ className?: string }>;
+		color: string;
+		bgColor: string;
+		label: string;
+	}
+> = {
 	draft: { icon: FileText, color: "text-yellow-600", bgColor: "bg-yellow-100", label: "Draft" },
 	active: { icon: Clock, color: "text-blue-600", bgColor: "bg-blue-100", label: "Active" },
-	processing: { icon: Clock, color: "text-indigo-600", bgColor: "bg-indigo-100", label: "Processing" },
+	processing: {
+		icon: Clock,
+		color: "text-indigo-600",
+		bgColor: "bg-indigo-100",
+		label: "Processing",
+	},
 	final: { icon: CheckCircle, color: "text-green-600", bgColor: "bg-green-100", label: "Final" },
 	archived: { icon: Archive, color: "text-gray-600", bgColor: "bg-gray-100", label: "Archived" },
 	failed: { icon: AlertCircle, color: "text-red-600", bgColor: "bg-red-100", label: "Failed" },
@@ -38,16 +56,17 @@ export default function StatusTrackerClient() {
 
 	const { data: templates, isLoading } = useQuery({
 		queryKey: ["templates-by-status", statusFilter],
-		queryFn: () => getTemplatesByStatus({
-			status: statusFilter !== "all" ? statusFilter : undefined,
-			page: 1,
-			limit: 50,
-		}),
+		queryFn: () =>
+			getTemplatesByStatus({
+				status: statusFilter !== "all" ? statusFilter : undefined,
+				page: 1,
+				limit: 50,
+			}),
 	});
 
 	const { data: statusHistory } = useQuery({
 		queryKey: ["template-status-history", selectedTemplate?._id],
-		queryFn: () => selectedTemplate ? getTemplateStatusHistory(selectedTemplate._id) : null,
+		queryFn: () => (selectedTemplate ? getTemplateStatusHistory(selectedTemplate._id) : null),
 		enabled: !!selectedTemplate && showHistory,
 	});
 
@@ -57,7 +76,9 @@ export default function StatusTrackerClient() {
 			// Handle download - open final PDF in new tab or trigger download
 			if (data.finalPdfUrl) {
 				const link = document.createElement("a");
-				link.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${data.finalPdfUrl}`;
+				link.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${
+					data.finalPdfUrl
+				}`;
 				link.target = "_blank";
 				link.download = `signed-document-${data.template.name}.pdf`;
 				document.body.appendChild(link);
@@ -105,7 +126,7 @@ export default function StatusTrackerClient() {
 			failed: 0,
 		};
 
-		templates.data.forEach(template => {
+		templates.data.forEach((template) => {
 			counts[template.status] = (counts[template.status] || 0) + 1;
 		});
 
@@ -128,10 +149,21 @@ export default function StatusTrackerClient() {
 			{/* Status Filter Tabs */}
 			<div className="bg-gray-800/50 rounded-lg p-6">
 				<div className="flex flex-wrap gap-2">
-					{(["all", "draft", "active", "processing", "final", "archived", "failed"] as StatusFilter[]).map((status) => {
-						const config = status === "all" ?
-							{ icon: BarChart3, color: "text-blue-600", bgColor: "bg-blue-100", label: "All" } :
-							statusConfig[status];
+					{(
+						[
+							"all",
+							"draft",
+							"active",
+							"processing",
+							"final",
+							"archived",
+							"failed",
+						] as StatusFilter[]
+					).map((status) => {
+						const config =
+							status === "all"
+								? { icon: BarChart3, color: "text-blue-600", bgColor: "bg-blue-100", label: "All" }
+								: statusConfig[status];
 						const Icon = config.icon;
 						const count = statusCounts[status] || 0;
 						const isActive = statusFilter === status;
@@ -140,15 +172,19 @@ export default function StatusTrackerClient() {
 							<button
 								key={status}
 								onClick={() => setStatusFilter(status)}
-								className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive
-									? "bg-blue-600 text-white"
-									: "bg-gray-700 text-gray-300 hover:bg-gray-600"
-									}`}
+								className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+									isActive
+										? "bg-blue-600 text-white"
+										: "bg-gray-700 text-gray-300 hover:bg-gray-600"
+								}`}
 							>
 								<Icon className="h-4 w-4" />
 								<span>{config.label}</span>
-								<span className={`px-2 py-0.5 rounded-full text-xs ${isActive ? "bg-blue-500" : "bg-gray-600"
-									}`}>
+								<span
+									className={`px-2 py-0.5 rounded-full text-xs ${
+										isActive ? "bg-blue-500" : "bg-gray-600"
+									}`}
+								>
 									{count}
 								</span>
 							</button>
@@ -166,8 +202,7 @@ export default function StatusTrackerClient() {
 						<p className="text-gray-400">
 							{statusFilter !== "all"
 								? `No documents with ${statusConfig[statusFilter]?.label.toLowerCase()} status`
-								: "No documents available"
-							}
+								: "No documents available"}
 						</p>
 					</div>
 				) : (
@@ -188,7 +223,9 @@ export default function StatusTrackerClient() {
 													<h3 className="text-lg font-medium text-white truncate">
 														{template.metadata.filename}
 													</h3>
-													<span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${bgColor} ${color}`}>
+													<span
+														className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${bgColor} ${color}`}
+													>
 														{statusConfig[template.status]?.label || template.status}
 													</span>
 												</div>
@@ -205,7 +242,9 @@ export default function StatusTrackerClient() {
 													{template.createdBy && (
 														<div className="flex items-center gap-1">
 															<User className="h-3 w-3" />
-															<span>{template.createdBy.firstName} {template.createdBy.lastName}</span>
+															<span>
+																{template.createdBy.firstName} {template.createdBy.lastName}
+															</span>
 														</div>
 													)}
 												</div>
@@ -281,7 +320,9 @@ export default function StatusTrackerClient() {
 									</div>
 									<div>
 										<span className="text-gray-400">Status:</span>
-										<p className="text-white">{statusConfig[selectedTemplate.status]?.label || selectedTemplate.status}</p>
+										<p className="text-white">
+											{statusConfig[selectedTemplate.status]?.label || selectedTemplate.status}
+										</p>
 									</div>
 									<div>
 										<span className="text-gray-400">Pages:</span>
@@ -308,12 +349,17 @@ export default function StatusTrackerClient() {
 									<h3 className="text-lg font-medium text-white mb-3">Status History</h3>
 									<div className="space-y-3">
 										{statusHistory.auditTrail.map((entry, index) => (
-											<div key={index} className="flex items-start gap-3 p-3 bg-gray-700/50 rounded-lg">
+											<div
+												key={index}
+												className="flex items-start gap-3 p-3 bg-gray-700/50 rounded-lg"
+											>
 												<div className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
 												<div className="flex-1">
 													<div className="flex items-center justify-between">
 														<p className="text-white font-medium capitalize">{entry.action}</p>
-														<span className="text-xs text-gray-400">{formatDate(entry.timestamp)}</span>
+														<span className="text-xs text-gray-400">
+															{formatDate(entry.timestamp)}
+														</span>
 													</div>
 													<p className="text-gray-300 text-sm mt-1">{entry.details}</p>
 													{entry.ipAddress && (
@@ -351,10 +397,12 @@ export default function StatusTrackerClient() {
 
 								{selectedTemplate.status !== "archived" && (
 									<button
-										onClick={() => statusUpdateMutation.mutate({
-											templateId: selectedTemplate._id,
-											status: "archived"
-										})}
+										onClick={() =>
+											statusUpdateMutation.mutate({
+												templateId: selectedTemplate._id,
+												status: "archived",
+											})
+										}
 										disabled={statusUpdateMutation.isPending}
 										className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
 									>
