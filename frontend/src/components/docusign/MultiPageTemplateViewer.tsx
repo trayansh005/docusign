@@ -31,7 +31,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 	const contentRef = useRef<HTMLDivElement | null>(null);
 
 	// Get user's full name for signature fields
-	const userFullName = template.createdBy 
+	const userFullName = template.createdBy
 		? `${template.createdBy.firstName} ${template.createdBy.lastName}`
 		: "Your Signature";
 
@@ -276,7 +276,11 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 							? field.value && field.value.length > 0
 								? field.value
 								: field.type === "initial"
-								? field.value || userFullName.split(" ").map(n => n[0]).join("") // Use initials
+								? field.value ||
+								  userFullName
+										.split(" ")
+										.map((n) => n[0])
+										.join("") // Use initials
 								: field.value || userFullName
 							: fieldTypeLabels[field.type]}
 					</span>
@@ -309,11 +313,14 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 		);
 	};
 
-	const handlePageLoad = useCallback((width: number, height: number) => {
-		setPageWidth(width);
-		setPageHeight(height);
-		console.log("[MultiPageTemplateViewer] Page loaded:", { width, height, page: currentPage });
-	}, [currentPage]);
+	const handlePageLoad = useCallback(
+		(width: number, height: number) => {
+			setPageWidth(width);
+			setPageHeight(height);
+			console.log("[MultiPageTemplateViewer] Page loaded:", { width, height, page: currentPage });
+		},
+		[currentPage]
+	);
 
 	// Debug: Log PDF URL
 	console.log("[MultiPageTemplateViewer] Rendering with:", {

@@ -41,13 +41,16 @@ export const PDFPageCanvas: React.FC<PDFPageCanvasProps> = ({
 
 		const renderPage = async () => {
 			if (!canvasRef.current || !pdfUrl) {
-				console.warn("[PDFPageCanvas] Missing canvas or PDF URL:", { canvasRef: !!canvasRef.current, pdfUrl });
+				console.warn("[PDFPageCanvas] Missing canvas or PDF URL:", {
+					canvasRef: !!canvasRef.current,
+					pdfUrl,
+				});
 				return;
 			}
 
 			try {
 				console.log("[PDFPageCanvas] Loading PDF from:", pdfUrl);
-				
+
 				// Cancel any ongoing render task
 				if (renderTaskRef.current) {
 					renderTaskRef.current.cancel();
