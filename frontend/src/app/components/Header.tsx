@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -17,16 +18,14 @@ export default function Header() {
 						href="/"
 						className="flex items-center space-x-3 text-xl font-bold text-white hover:text-blue-400 transition-colors duration-200"
 					>
-						<div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
-							<svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-								<path
-									fillRule="evenodd"
-									d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z"
-									clipRule="evenodd"
-								/>
-							</svg>
-						</div>
-						<span className="text-gradient">FomiqSign Platform</span>
+						<Image
+							src="/fomiqsign-logo.png"
+							alt="FomiqSign Platform"
+							width={150}
+							height={40}
+							className="h-10 w-auto object-contain"
+						/>
+						<span className="text-gradient">FomiqSign</span>
 					</Link>
 
 					{/* Desktop Navigation */}
@@ -46,7 +45,7 @@ export default function Header() {
 										<Link href="/register" className="nav-link">
 											Register
 										</Link>
-										<Link href="/fomiqsign" className="btn btn-primary ml-4">
+										<Link href="/fomiqsign/dashboard" className="btn btn-primary ml-4">
 											Get Started
 										</Link>
 									</>
@@ -55,7 +54,7 @@ export default function Header() {
 										<Link href="/subscription" className="nav-link">
 											Plans
 										</Link>
-										<Link href="/fomiqsign" className="nav-link">
+										<Link href="/fomiqsign/dashboard" className="nav-link">
 											Sign Document
 										</Link>
 										{/* User Profile Section */}
@@ -161,7 +160,7 @@ export default function Header() {
 											Register
 										</Link>
 										<Link
-											href="/fomiqsign"
+											href="/fomiqsign/dashboard"
 											className="btn btn-primary mx-auto mt-2"
 											onClick={() => setIsMenuOpen(false)}
 										>
@@ -196,7 +195,7 @@ export default function Header() {
 											Plans
 										</Link>
 										<Link
-											href="/fomiqsign"
+											href="/fomiqsign/dashboard"
 											className="nav-link text-center"
 											onClick={() => setIsMenuOpen(false)}
 										>

@@ -67,7 +67,7 @@ export default function Login() {
 							</svg>
 						</div>
 						<h1 className="text-3xl font-bold mb-2">Welcome Back</h1>
-						<p className="text-gray-200">Sign in to your account</p>
+						<p className="text-slate-300">Sign in to your account</p>
 					</div>
 
 					<form onSubmit={handleSubmit} className="space-y-6">

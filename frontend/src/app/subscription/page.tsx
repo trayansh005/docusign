@@ -1,13 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-
-interface Subscription {
-	_id: string;
-	plan: string;
-	price: number;
-	status: string;
-}
+import { subscriptionAPI, type Subscription } from "@/services/subscriptionAPI";
 
 export default function Subscription() {
 	const [plan, setPlan] = useState("");
@@ -22,27 +16,7 @@ export default function Subscription() {
 
 	const loadSubscriptions = async () => {
 		try {
-			const response = await fetch("http://localhost:5000/api/subscription", {
-				method: "GET",
-				credentials: "include",
-			});
-			if (response.status === 401) {
-				// Not authenticated
-				window.location.href = "/login";
-				return;
-			}
-			if (!response.ok) {
-				console.error("Failed to load subscriptions", response.status);
-				setSubscriptions([]);
-				return;
-			}
-			const body = await response.json();
-			// Accept multiple shapes from the API: array directly, { data: [] }, or { subscriptions: [] }
-			let subsArray: Subscription[] = [];
-			if (Array.isArray(body)) subsArray = body;
-			else if (Array.isArray(body.data)) subsArray = body.data;
-			else if (Array.isArray(body.subscriptions)) subsArray = body.subscriptions;
-			else subsArray = [];
+			const subsArray = await subscriptionAPI.getSubscriptions();
 			setSubscriptions(subsArray);
 		} catch (err) {
 			console.error("Error loading subscriptions:", err);
@@ -52,19 +26,16 @@ export default function Subscription() {
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		const response = await fetch("http://localhost:5000/api/subscription", {
-			method: "POST",
-			credentials: "include",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ plan, price: parseFloat(price) }),
-		});
-		if (response.status === 401) {
-			window.location.href = "/login";
-			return;
+		try {
+			const result = await subscriptionAPI.createSubscription(plan, parseFloat(price));
+			setMessage(result.message);
+			if (result.success) {
+				await loadSubscriptions();
+			}
+		} catch (error) {
+			console.error("Error creating subscription:", error);
+			setMessage("Error creating subscription");
 		}
-		const data = await response.json();
-		setMessage(response.ok ? "Subscribed!" : data.message);
-		await loadSubscriptions();
 	};
 
 	return (

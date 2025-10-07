@@ -38,6 +38,7 @@ export interface SignatureField {
 	hPct: number;
 	value?: string;
 	required?: boolean;
+	fontId?: string; // Font selection for signature/initial fields
 	x?: number;
 	y?: number;
 	width?: number;

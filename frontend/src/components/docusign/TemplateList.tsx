@@ -15,7 +15,6 @@ import {
 import { getTemplates, deleteTemplate } from "@/services/docusignAPI";
 import { DocuSignTemplateData } from "@/types/docusign";
 
-
 interface TemplateListProps {
 	onViewTemplate?: (template: DocuSignTemplateData) => void;
 	onEditTemplate?: (template: DocuSignTemplateData) => void;
@@ -70,17 +69,17 @@ export const TemplateList: React.FC<TemplateListProps> = ({
 	const getStatusColor = (status: string) => {
 		switch (status) {
 			case "active":
-				return "bg-green-100 text-green-800";
+				return "bg-emerald-50 text-emerald-700 border-emerald-200";
 			case "draft":
-				return "bg-yellow-100 text-yellow-800";
+				return "bg-amber-50 text-amber-700 border-amber-200";
 			case "processing":
-				return "bg-blue-100 text-blue-800";
+				return "bg-sky-50 text-sky-700 border-sky-200";
 			case "final":
-				return "bg-purple-100 text-purple-800";
+				return "bg-violet-50 text-violet-700 border-violet-200";
 			case "failed":
-				return "bg-red-100 text-red-800";
+				return "bg-red-50 text-red-700 border-red-200";
 			default:
-				return "bg-gray-100 text-gray-800";
+				return "bg-slate-50 text-slate-700 border-slate-200";
 		}
 	};
 
@@ -101,19 +100,30 @@ export const TemplateList: React.FC<TemplateListProps> = ({
 
 	if (isLoading) {
 		return (
-			<div className={`flex items-center justify-center p-8 ${className}`}>
-				<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-				<span className="ml-2 text-gray-600">Loading templates...</span>
+			<div className={`flex flex-col items-center justify-center p-12 ${className}`}>
+				<div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mb-4"></div>
+				<span className="text-lg font-medium text-slate-700">Loading templates...</span>
+				<span className="text-sm text-slate-500 mt-1">
+					Please wait while we fetch your templates
+				</span>
 			</div>
 		);
 	}
 
 	if (error) {
 		return (
-			<div className={`p-8 text-center ${className}`}>
-				<AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-				<div className="text-lg font-medium text-red-700 mb-2">Failed to load templates</div>
-				<div className="text-sm text-gray-600">Please try again later</div>
+			<div className={`bg-white border border-red-200 rounded-xl p-8 text-center ${className}`}>
+				<AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+				<div className="text-xl font-semibold text-red-700 mb-2">Failed to load templates</div>
+				<div className="text-slate-600 mb-4">
+					We encountered an error while loading your templates.
+				</div>
+				<button
+					onClick={() => window.location.reload()}
+					className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+				>
+					Try Again
+				</button>
 			</div>
 		);
 	}
@@ -121,94 +131,136 @@ export const TemplateList: React.FC<TemplateListProps> = ({
 	return (
 		<div className={`space-y-6 ${className}`}>
 			{/* Filters */}
-			<div className="flex flex-col sm:flex-row gap-4">
-				<div className="flex-1">
-					<input
-						type="text"
-						placeholder="Search templates..."
-						value={searchTerm}
-						onChange={(e) => setSearchTerm(e.target.value)}
-						className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-					/>
-				</div>
-				<div className="sm:w-48">
-					<select
-						value={statusFilter}
-						onChange={(e) => setStatusFilter(e.target.value)}
-						className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-					>
-						<option value="all">All Status</option>
-						<option value="active">Active</option>
-						<option value="draft">Draft</option>
-						<option value="processing">Processing</option>
-						<option value="final">Final</option>
-						<option value="archived">Archived</option>
-						<option value="failed">Failed</option>
-					</select>
+			<div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+				<div className="flex flex-col sm:flex-row gap-4">
+					<div className="flex-1">
+						<label
+							htmlFor="search-templates"
+							className="block text-sm font-medium text-slate-700 mb-2"
+						>
+							Search Templates
+						</label>
+						<input
+							id="search-templates"
+							type="text"
+							placeholder="Search by filename..."
+							value={searchTerm}
+							onChange={(e) => setSearchTerm(e.target.value)}
+							className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+						/>
+					</div>
+					<div className="sm:w-48">
+						<label
+							htmlFor="status-filter"
+							className="block text-sm font-medium text-slate-700 mb-2"
+						>
+							Status Filter
+						</label>
+						<select
+							id="status-filter"
+							value={statusFilter}
+							onChange={(e) => setStatusFilter(e.target.value)}
+							className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors bg-white"
+						>
+							<option value="all">All Status</option>
+							<option value="active">Active</option>
+							<option value="draft">Draft</option>
+							<option value="processing">Processing</option>
+							<option value="final">Final</option>
+							<option value="archived">Archived</option>
+							<option value="failed">Failed</option>
+						</select>
+					</div>
 				</div>
 			</div>
 
 			{/* Templates List */}
 			<div className="space-y-4">
 				{data?.data.length === 0 ? (
-					<div className="text-center py-12">
-						<FileText className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-						<div className="text-lg font-medium text-gray-900 mb-2">No templates found</div>
-						<div className="text-sm text-gray-600">
+					<div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
+						<FileText className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+						<div className="text-xl font-semibold text-slate-900 mb-2">No templates found</div>
+						<div className="text-slate-600 mb-6">
 							{searchTerm || statusFilter !== "all"
-								? "Try adjusting your search or filters"
-								: "Upload a PDF to create your first template"}
+								? "Try adjusting your search or filters to find what you're looking for"
+								: "Get started by uploading a PDF to create your first template"}
 						</div>
+						{!searchTerm && statusFilter === "all" && (
+							<button className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
+								Upload PDF
+							</button>
+						)}
 					</div>
 				) : (
 					data?.data.map((template) => (
 						<div
 							key={template._id}
-							className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+							className="group bg-white border border-slate-200 rounded-xl p-6 hover:shadow-lg hover:border-slate-300 transition-all duration-200 hover:-translate-y-0.5"
 						>
 							<div className="flex items-start justify-between">
 								<div className="flex items-start space-x-4 flex-1">
-									<div className="flex-shrink-0">{getStatusIcon(template.status)}</div>
+									<div className="flex-shrink-0 mt-1">{getStatusIcon(template.status)}</div>
 									<div className="flex-1 min-w-0">
-										<div className="flex items-center space-x-2 mb-2">
-											<h3 className="text-lg font-medium text-gray-900 truncate">
-												{template.metadata.filename}
+										<div className="flex items-center space-x-3 mb-3">
+											<h3 className="text-lg font-semibold text-slate-900 truncate">
+												{template.metadata?.filename || template.name || "Untitled Template"}
 											</h3>
 											<span
-												className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
+												className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(
 													template.status
 												)}`}
 											>
 												{template.status}
 											</span>
 										</div>
-										<div className="text-sm text-gray-600 space-y-1">
-											<div>Pages: {template.numPages}</div>
-											<div>Size: {formatFileSize(template.metadata.fileSize)}</div>
-											<div>Fields: {template.signatureFields.length}</div>
-											<div>Created: {formatDate(template.createdAt)}</div>
+										<div className="grid grid-cols-2 gap-4 text-sm text-slate-600">
+											<div className="flex items-center space-x-2">
+												<span className="font-medium">Pages:</span>
+												<span>{template.numPages || 0}</span>
+											</div>
+											<div className="flex items-center space-x-2">
+												<span className="font-medium">Size:</span>
+												<span>
+													{template.metadata?.fileSize
+														? formatFileSize(template.metadata.fileSize)
+														: "Unknown"}
+												</span>
+											</div>
+											<div className="flex items-center space-x-2">
+												<span className="font-medium">Fields:</span>
+												<span>{template.signatureFields?.length || 0}</span>
+											</div>
+											<div className="flex items-center space-x-2">
+												<span className="font-medium">Created:</span>
+												<span>
+													{template.createdAt ? formatDate(template.createdAt) : "Unknown"}
+												</span>
+											</div>
 											{template.createdBy && (
-												<div>
-													By: {template.createdBy.firstName} {template.createdBy.lastName}
+												<div className="col-span-2 flex items-center space-x-2">
+													<span className="font-medium">By:</span>
+													<span>
+														{template.createdBy.firstName} {template.createdBy.lastName}
+													</span>
 												</div>
 											)}
 										</div>
 									</div>
 								</div>
-								<div className="flex items-center space-x-2">
+								<div className="flex items-center space-x-1 ml-4">
 									<button
 										onClick={() => onViewTemplate?.(template)}
-										className="p-2 text-gray-300 hover:text-blue-400 hover:bg-blue-900/20 rounded-lg transition-colors"
+										className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 group-hover:bg-slate-50"
 										title="View template"
 									>
-										<Eye className="h-4 w-4" />
+										<Eye className="h-5 w-5" />
 									</button>
 									<button
 										onClick={() => onEditTemplate?.(template)}
-										className="p-2 text-gray-300 hover:text-green-400 hover:bg-green-900/20 rounded-lg transition-colors"
+										className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all duration-200 group-hover:bg-slate-50"
 										title="Edit template"
 									>
-										<Edit className="h-4 w-4" />
+										<Edit className="h-5 w-5" />
 									</button>
 									<button
 										onClick={() => {
@@ -217,10 +269,10 @@ export const TemplateList: React.FC<TemplateListProps> = ({
 											}
 										}}
 										disabled={deleteMutation.isPending}
-										className="p-2 text-gray-300 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
+										className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 group-hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
 										title="Delete template"
 									>
-										<Trash2 className="h-4 w-4" />
+										<Trash2 className="h-5 w-5" />
 									</button>
 								</div>
 							</div>
@@ -231,30 +283,34 @@ export const TemplateList: React.FC<TemplateListProps> = ({
 
 			{/* Pagination */}
 			{data?.pagination && data.pagination.pages > 1 && (
-				<div className="flex items-center justify-between">
-					<div className="text-sm text-gray-600">
-						Showing {(data.pagination.current - 1) * data.pagination.limit + 1} to{" "}
-						{Math.min(data.pagination.current * data.pagination.limit, data.pagination.total)} of{" "}
-						{data.pagination.total} templates
-					</div>
-					<div className="flex items-center space-x-2">
-						<button
-							onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-							disabled={currentPage === 1}
-							className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-						>
-							Previous
-						</button>
-						<span className="text-sm text-gray-600">
-							Page {data.pagination.current} of {data.pagination.pages}
-						</span>
-						<button
-							onClick={() => setCurrentPage((prev) => Math.min(data.pagination.pages, prev + 1))}
-							disabled={currentPage === data.pagination.pages}
-							className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-						>
-							Next
-						</button>
+				<div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+					<div className="flex items-center justify-between">
+						<div className="text-sm text-slate-600 font-medium">
+							Showing {(data.pagination.current - 1) * data.pagination.limit + 1} to{" "}
+							{Math.min(data.pagination.current * data.pagination.limit, data.pagination.total)} of{" "}
+							{data.pagination.total} templates
+						</div>
+						<div className="flex items-center space-x-3">
+							<button
+								onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+								disabled={currentPage === 1}
+								className="px-4 py-2 text-sm font-medium border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors"
+							>
+								Previous
+							</button>
+							<div className="flex items-center space-x-2">
+								<span className="text-sm font-medium text-slate-700">
+									Page {data.pagination.current} of {data.pagination.pages}
+								</span>
+							</div>
+							<button
+								onClick={() => setCurrentPage((prev) => Math.min(data.pagination.pages, prev + 1))}
+								disabled={currentPage === data.pagination.pages}
+								className="px-4 py-2 text-sm font-medium border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors"
+							>
+								Next
+							</button>
+						</div>
 					</div>
 				</div>
 			)}

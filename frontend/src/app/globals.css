@@ -67,7 +67,7 @@ html {
 
 body {
 	background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #000000 100%);
-	color: #f1f5f9;
+	color: #e2e8f0;
 	font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
 	line-height: 1.6;
 	min-height: 100vh;
@@ -83,7 +83,6 @@ h4,
 h5,
 h6 {
 	font-weight: 700;
-	color: #ffffff;
 	letter-spacing: -0.025em;
 }
 
@@ -104,18 +103,12 @@ h3 {
 }
 
 p {
-	color: #cbd5e1;
 	line-height: 1.75;
 }
 
 /* Links */
 a {
-	color: #60a5fa;
 	transition: color 0.2s ease-in-out;
-}
-
-a:hover {
-	color: #93c5fd;
 }
 
 /* Focus states */
@@ -182,13 +175,11 @@ a:hover {
 }
 
 .btn-ghost {
-	color: #cbd5e1;
 	background-color: transparent;
 }
 
 .btn-ghost:hover {
 	background-color: #1e293b;
-	color: #ffffff;
 }
 
 /* Card Components */
@@ -259,7 +250,6 @@ a:hover {
 	display: block;
 	font-size: 0.875rem;
 	font-weight: 500;
-	color: #cbd5e1;
 	margin-bottom: 0.5rem;
 }
 
@@ -267,7 +257,6 @@ a:hover {
 .nav-link {
 	padding: 0.5rem 1rem;
 	border-radius: 0.5rem;
-	color: #cbd5e1;
 	transition: all 0.2s ease-in-out;
 	position: relative;
 	overflow: hidden;
@@ -285,7 +274,6 @@ a:hover {
 }
 
 .nav-link:hover {
-	color: #ffffff;
 	background-color: rgba(30, 41, 59, 0.5);
 }
 
@@ -376,25 +364,26 @@ a:hover {
 
 /* Signature Fonts */
 .signature-font {
-	font-family: var(--font-dancing-script), 'Dancing Script', 'Brush Script MT', 'Lucida Handwriting', 'Segoe Script', cursive;
+	font-family: var(--font-dancing-script), "Dancing Script", "Brush Script MT", "Lucida Handwriting",
+		"Segoe Script", cursive;
 	font-weight: 400;
 	letter-spacing: 0.5px;
 }
 
 .signature-elegant {
-	font-family: var(--font-dancing-script), 'Dancing Script', 'Great Vibes', 'Allura', cursive;
+	font-family: var(--font-dancing-script), "Dancing Script", "Great Vibes", "Allura", cursive;
 	font-weight: 400;
 	letter-spacing: 0.8px;
 }
 
 .signature-bold {
-	font-family: 'Brush Script MT', 'Lucida Handwriting', var(--font-dancing-script), cursive;
+	font-family: "Brush Script MT", "Lucida Handwriting", var(--font-dancing-script), cursive;
 	font-weight: 700;
 	letter-spacing: 0.3px;
 }
 
 .signature-script {
-	font-family: 'Segoe Script', 'Brush Script MT', var(--font-dancing-script), cursive;
+	font-family: "Segoe Script", "Brush Script MT", var(--font-dancing-script), cursive;
 	font-weight: 400;
 	letter-spacing: 0.4px;
 }

@@ -2,9 +2,53 @@
 
 import React, { useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, Trash2 } from "lucide-react";
+import {
+	ChevronLeft,
+	ChevronRight,
+	ZoomIn,
+	ZoomOut,
+	RotateCw,
+	Trash2,
+	Palette,
+} from "lucide-react";
+import { DndContext, useDraggable, DragEndEvent } from "@dnd-kit/core";
 import { ensureAbsoluteUrl } from "@/lib/urlUtils";
 import { DocuSignTemplateData, SignatureField } from "@/types/docusign";
+import { useAuth } from "@/contexts/AuthContext";
+
+// Available signature fonts
+const SIGNATURE_FONTS = [
+	{
+		id: "dancing-script",
+		name: "Dancing Script",
+		fontFamily: "var(--font-dancing-script), 'Dancing Script', cursive",
+	},
+	{
+		id: "great-vibes",
+		name: "Great Vibes",
+		fontFamily: "var(--font-great-vibes), 'Great Vibes', cursive",
+	},
+	{ id: "allura", name: "Allura", fontFamily: "var(--font-allura), 'Allura', cursive" },
+	{
+		id: "alex-brush",
+		name: "Alex Brush",
+		fontFamily: "var(--font-alex-brush), 'Alex Brush', cursive",
+	},
+	{ id: "amatic-sc", name: "Amatic SC", fontFamily: "var(--font-amatic-sc), 'Amatic SC', cursive" },
+	{ id: "caveat", name: "Caveat", fontFamily: "var(--font-caveat), 'Caveat', cursive" },
+	{
+		id: "kaushan-script",
+		name: "Kaushan Script",
+		fontFamily: "var(--font-kaushan-script), 'Kaushan Script', cursive",
+	},
+	{ id: "pacifico", name: "Pacifico", fontFamily: "var(--font-pacifico), 'Pacifico', cursive" },
+	{ id: "satisfy", name: "Satisfy", fontFamily: "var(--font-satisfy), 'Satisfy', cursive" },
+	{
+		id: "permanent-marker",
+		name: "Permanent Marker",
+		fontFamily: "var(--font-permanent-marker), 'Permanent Marker', cursive",
+	},
+];
 
 // Dynamically import PDFPageCanvas to avoid SSR issues with DOMMatrix
 const PDFPageCanvas = dynamic(
@@ -41,77 +85,54 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 	const [rotation, setRotation] = useState(0);
 	const contentRef = useRef<HTMLDivElement | null>(null);
 
+	// Get logged-in user
+	const { user } = useAuth();
+
 	// Get user's full name for signature fields
-	const userFullName = template.createdBy
-		? `${template.createdBy.firstName} ${template.createdBy.lastName}`
-		: "Your Signature";
+	const userFullName =
+		user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : "Your Signature";
 
-	// Drag state for moving/resizing fields
-	type DragState = {
-		mode?: "drag" | "resize";
-		fieldId?: string;
-		pageNumber?: number;
-		startClientX?: number;
-		startClientY?: number;
-		startX?: number;
-		startY?: number;
-		startW?: number;
-		startH?: number;
-	} | null;
-	const dragStateRef = useRef<DragState>(null);
+	const userInitials =
+		user?.firstName && user?.lastName ? `${user.firstName[0]}${user.lastName[0]}` : "YI";
 
-	const handleWindowMouseMove = (e: MouseEvent) => {
-		const ds = dragStateRef.current;
-		if (!ds || !ds.fieldId) return;
-		const rect = contentRef.current?.getBoundingClientRect();
-		if (!rect) return;
-		const width = rect.width || 1;
-		const height = rect.height || 1;
-		if (
-			ds.startClientX == null ||
-			ds.startClientY == null ||
-			ds.startX == null ||
-			ds.startY == null
-		)
-			return;
-		const deltaX = ((e.clientX - ds.startClientX) / width) * 100;
-		const deltaY = ((e.clientY - ds.startClientY) / height) * 100;
+	// Handle font change for signature fields
+	const handleFontChange = useCallback(
+		(fieldId: string) => {
+			if (!editable || !onFieldUpdate) return;
 
-		if (ds.mode === "drag") {
-			const newX = Math.max(0, Math.min(100, ds.startX + deltaX));
-			const newY = Math.max(0, Math.min(100, ds.startY + deltaY));
-			if (typeof onFieldUpdate === "function" && ds.pageNumber != null && ds.fieldId)
-				onFieldUpdate(ds.pageNumber, ds.fieldId, { xPct: newX, yPct: newY });
-		} else if (ds.mode === "resize") {
-			if (ds.startW == null || ds.startH == null) return;
-			const newW = Math.max(1, Math.min(100, ds.startW + deltaX));
-			const newH = Math.max(1, Math.min(100, ds.startH + deltaY));
-			if (typeof onFieldUpdate === "function" && ds.pageNumber != null && ds.fieldId)
-				onFieldUpdate(ds.pageNumber, ds.fieldId, { wPct: newW, hPct: newH });
-		}
-	};
+			const field = template.signatureFields.find((f) => f.id === fieldId);
+			if (!field || (field.type !== "signature" && field.type !== "initial")) return;
 
-	const handleWindowMouseUp = () => {
-		const ds = dragStateRef.current;
-		if (ds && ds.fieldId && typeof onFieldUpdate === "function" && ds.pageNumber != null) {
-			// commit final values based on mode
-			if (ds.mode === "drag") {
-				// nothing special to commit: onFieldUpdate was called during move
-			} else if (ds.mode === "resize") {
-				if (ds.startW != null && ds.startH != null) {
-					onFieldUpdate(ds.pageNumber, ds.fieldId, { wPct: ds.startW, hPct: ds.startH });
-				}
-			}
-		}
-		dragStateRef.current = null;
-		window.removeEventListener("mousemove", handleWindowMouseMove);
-		window.removeEventListener("mouseup", handleWindowMouseUp);
-	};
+			const currentFontIndex = SIGNATURE_FONTS.findIndex((font) => font.id === field.fontId);
+			const nextFontIndex = (currentFontIndex + 1) % SIGNATURE_FONTS.length;
+			const nextFontId = SIGNATURE_FONTS[nextFontIndex].id;
 
-	const attachWindowListeners = () => {
-		window.addEventListener("mousemove", handleWindowMouseMove);
-		window.addEventListener("mouseup", handleWindowMouseUp);
-	};
+			onFieldUpdate(currentPage, fieldId, { fontId: nextFontId });
+		},
+		[editable, onFieldUpdate, template.signatureFields, currentPage]
+	);
+
+	// Handle drag end for dnd-kit
+	const handleDragEnd = useCallback(
+		(event: DragEndEvent) => {
+			const { active, delta } = event;
+			const field = active.data.current?.field as SignatureField;
+
+			if (!field || !contentRef.current) return;
+
+			const containerRect = contentRef.current.getBoundingClientRect();
+
+			// Convert pixel delta to percentage delta
+			const deltaXPct = (delta.x / containerRect.width) * 100;
+			const deltaYPct = (delta.y / containerRect.height) * 100;
+
+			const newXPct = Math.max(0, Math.min(100 - field.wPct, field.xPct + deltaXPct));
+			const newYPct = Math.max(0, Math.min(100 - field.hPct, field.yPct + deltaYPct));
+
+			onFieldUpdate?.(currentPage, field.id, { xPct: newXPct, yPct: newYPct });
+		},
+		[onFieldUpdate, currentPage]
+	);
 
 	const currentPageFields = template.signatureFields.filter(
 		(field) => field.pageNumber === currentPage
@@ -121,9 +142,249 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 	const handleZoomOut = () => setZoom((prev) => Math.max(prev - 0.25, 0.25));
 	const handleRotate = () => setRotation((prev) => (prev + 90) % 360);
 
+	// DraggableField component following RCSS pattern
+	function DraggableField({ field }: { field: SignatureField }) {
+		const [isResizing, setIsResizing] = useState(false);
+
+		const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+			id: field.id,
+			data: { field },
+			disabled: isResizing,
+		});
+
+		const style: React.CSSProperties = {
+			transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+			position: "absolute",
+			left: `${field.xPct}%`,
+			top: `${field.yPct}%`,
+			width: `${field.wPct}%`,
+			height: `${field.hPct}%`,
+			zIndex: isDragging || isResizing ? 1000 : 10,
+			opacity: isDragging ? 0.8 : 1,
+		};
+
+		const fieldColor = "border-blue-500 bg-blue-50";
+
+		const handleResizeStart = (e: React.MouseEvent) => {
+			e.stopPropagation();
+			setIsResizing(true);
+
+			const rect = contentRef.current?.getBoundingClientRect();
+			if (!rect) return;
+
+			const startValues = {
+				x: e.clientX,
+				y: e.clientY,
+				wPct: field.wPct,
+				hPct: field.hPct,
+			};
+
+			const handleMouseMove = (e: MouseEvent) => {
+				const deltaX = e.clientX - startValues.x;
+				const deltaY = e.clientY - startValues.y;
+
+				const deltaWPct = (deltaX / rect.width) * 100;
+				const deltaHPct = (deltaY / rect.height) * 100;
+
+				const newWPct = Math.max(5, Math.min(100 - field.xPct, startValues.wPct + deltaWPct));
+				const newHPct = Math.max(3, Math.min(100 - field.yPct, startValues.hPct + deltaHPct));
+
+				onFieldUpdate?.(currentPage, field.id, { wPct: newWPct, hPct: newHPct });
+			};
+
+			const handleMouseUp = () => {
+				setIsResizing(false);
+				document.removeEventListener("mousemove", handleMouseMove);
+				document.removeEventListener("mouseup", handleMouseUp);
+			};
+
+			document.addEventListener("mousemove", handleMouseMove);
+			document.addEventListener("mouseup", handleMouseUp);
+		};
+
+		const getFontFamily = () => {
+			if (field.type === "signature" || field.type === "initial") {
+				const selectedFont = SIGNATURE_FONTS.find((font) => font.id === field.fontId);
+				return selectedFont ? selectedFont.fontFamily : SIGNATURE_FONTS[0].fontFamily;
+			}
+			return "inherit";
+		};
+
+		const getSignatureText = () => {
+			switch (field.type) {
+				case "signature":
+					return field.value || userFullName || "Your Signature";
+				case "initial":
+					return field.value || userInitials || "YI";
+				case "date":
+					return field.value || new Date().toLocaleDateString();
+				case "text":
+					return field.value || "Text";
+				default:
+					return "Signature";
+			}
+		};
+
+		const getDynamicFontSize = () => {
+			const rect = contentRef.current?.getBoundingClientRect();
+			if (!rect) return "12px";
+
+			const pixelHeight = (field.hPct / 100) * rect.height;
+			let sizeFactor = 12;
+
+			switch (field.type) {
+				case "signature":
+					sizeFactor = Math.min(Math.max(pixelHeight * 0.45, 10), 40);
+					break;
+				case "initial":
+					sizeFactor = Math.min(Math.max(pixelHeight * 0.6, 8), 36);
+					break;
+				case "date":
+					sizeFactor = Math.min(Math.max(pixelHeight * 0.35, 8), 18);
+					break;
+				case "text":
+					sizeFactor = Math.min(Math.max(pixelHeight * 0.35, 8), 20);
+					break;
+				default:
+					sizeFactor = Math.min(Math.max(pixelHeight * 0.4, 10), 20);
+			}
+
+			return `${Math.round(sizeFactor)}px`;
+		};
+
+		return (
+			<>
+				{/* Draggable field element */}
+				<div
+					ref={setNodeRef}
+					style={style}
+					{...(!isResizing ? listeners : {})}
+					{...(!isResizing ? attributes : {})}
+					className={`signature-field border-2 border-dashed ${fieldColor} backdrop-blur-sm rounded-lg 
+						flex items-center justify-center hover:shadow-xl transition-all duration-300 ease-out
+						${
+							isDragging || isResizing
+								? "shadow-2xl scale-110 ring-2 ring-blue-400 ring-opacity-50"
+								: "shadow-lg hover:scale-105"
+						}
+						group select-none ${isResizing ? "cursor-se-resize" : "cursor-move"}`}
+				>
+					<div className="flex flex-col items-center justify-center p-3 text-center min-w-0">
+						{(field.type === "signature" || field.type === "initial") &&
+						field.value &&
+						field.value.startsWith("data:image") ? (
+							// eslint-disable-next-line @next/next/no-img-element
+							<img
+								src={field.value}
+								alt="signature"
+								style={{
+									maxWidth: "100%",
+									maxHeight: "100%",
+									objectFit: "contain",
+									display: "block",
+									margin: "0 auto",
+								}}
+							/>
+						) : (
+							<span
+								className="font-semibold text-gray-800 truncate max-w-full"
+								style={{
+									fontFamily: getFontFamily(),
+									fontSize: getDynamicFontSize(),
+									lineHeight: "1.2",
+									fontWeight:
+										field.type === "signature" || field.type === "initial" ? "400" : "600",
+									letterSpacing:
+										field.type === "signature" || field.type === "initial" ? "0.5px" : "normal",
+								}}
+							>
+								{getSignatureText()}
+							</span>
+						)}
+					</div>
+
+					{/* Resize handle - inside the draggable element */}
+					{editable && (
+						<div
+							onMouseDown={handleResizeStart}
+							className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-600 border-2 border-white rounded-full cursor-se-resize opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-blue-700 hover:scale-110 shadow-md"
+							style={{ zIndex: 20 }}
+							title="Drag to resize"
+						>
+							<div className="absolute inset-0 flex items-center justify-center">
+								<div className="grid grid-cols-2 gap-0.5">
+									<div className="w-0.5 h-0.5 bg-white rounded-full"></div>
+									<div className="w-0.5 h-0.5 bg-white rounded-full"></div>
+									<div className="w-0.5 h-0.5 bg-white rounded-full"></div>
+									<div className="w-0.5 h-0.5 bg-white rounded-full"></div>
+								</div>
+							</div>
+						</div>
+					)}
+				</div>
+
+				{/* Action buttons positioned outside the draggable element */}
+				{editable && (
+					<>
+						{/* Delete button */}
+						<button
+							type="button"
+							className={`absolute w-7 h-7 rounded-full bg-red-500 text-white shadow-lg transition-all duration-200 flex items-center justify-center z-10 hover:bg-red-600 pointer-events-auto ${
+								isDragging ? "opacity-0" : "opacity-100"
+							}`}
+							style={{
+								left: `calc(${field.xPct}% + ${field.wPct}% - 14px)`,
+								top: `calc(${field.yPct}% - 12px)`,
+								zIndex: 30,
+							}}
+							onClick={(e) => {
+								e.stopPropagation();
+								onFieldRemove?.(currentPage, field.id);
+							}}
+							title="Delete field"
+						>
+							<Trash2 className="w-3.5 h-3.5" />
+						</button>
+
+						{/* Font selection button */}
+						{(field.type === "signature" || field.type === "initial") && (
+							<button
+								type="button"
+								className={`absolute w-7 h-7 rounded-full bg-purple-600 text-white shadow-lg transition-all duration-200 flex items-center justify-center z-10 hover:bg-purple-700 pointer-events-auto ${
+									isDragging ? "opacity-0" : "opacity-100"
+								}`}
+								style={{
+									left: `calc(${field.xPct}% + ${field.wPct / 2}% - 12px)`,
+									top: `calc(${field.yPct}% - 12px)`,
+									zIndex: 30,
+								}}
+								onClick={(e) => {
+									e.stopPropagation();
+									handleFontChange(field.id);
+								}}
+								title={`Change font style (${
+									SIGNATURE_FONTS.find((font) => font.id === field.fontId)?.name ||
+									SIGNATURE_FONTS[0].name
+								})`}
+							>
+								<Palette className="w-3.5 h-3.5" />
+							</button>
+						)}
+					</>
+				)}
+			</>
+		);
+	}
+
 	const handleCanvasClick = useCallback(
 		(e: React.MouseEvent<HTMLDivElement>) => {
 			if (!editable) return;
+
+			// Don't add field if clicking on an existing field
+			const target = e.target as HTMLElement;
+			if (target.closest(".signature-field")) {
+				return;
+			}
 
 			// Prefer measuring the inner content (which is transformed/scaled). Fallback to currentTarget.
 			const targetRect =
@@ -149,6 +410,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 				yPct: y,
 				wPct: Math.max(5, wPct || 20), // Default width percentage (converted from px)
 				hPct: Math.max(3, hPct || 5), // Default height percentage (converted from px)
+				fontId: SIGNATURE_FONTS[0].id, // Default font for signature fields
 			};
 
 			console.debug(
@@ -159,170 +421,6 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 		},
 		[editable, currentPage, onFieldAdd]
 	);
-
-	const renderSignatureField = (field: SignatureField) => {
-		const style: React.CSSProperties = {
-			position: "absolute",
-			left: `${field.xPct}%`,
-			top: `${field.yPct}%`,
-			width: `${field.wPct}%`,
-			height: `${field.hPct}%`,
-			border: editable ? "2px dashed rgba(59,130,246,0.5)" : "2px dashed rgba(0,0,0,0.2)",
-			backgroundColor: editable ? "rgba(59, 130, 246, 0.08)" : "rgba(255, 255, 255, 0.9)",
-			display: "flex",
-			alignItems: "center",
-			justifyContent: "center",
-			fontSize: "12px",
-			color:
-				field.type === "signature" || field.type === "initial"
-					? "#000000" // Pure black for better visibility
-					: editable
-					? "#1e293b"
-					: "#334155",
-			fontWeight: field.type === "signature" || field.type === "initial" ? 500 : 600,
-			pointerEvents: editable ? "auto" : "none",
-			cursor: editable ? "move" : "default",
-		};
-
-		const fieldTypeLabels = {
-			signature: "SIGN",
-			date: "DATE",
-			initial: "INIT",
-			text: "TEXT",
-		};
-
-		// Drag/resize handlers
-		// ensure dragState object exists
-		const dragState = (dragStateRef.current = dragStateRef.current || {});
-
-		const onFieldMouseDown = (e: React.MouseEvent) => {
-			if (!editable) return;
-			e.stopPropagation();
-			// start dragging
-			dragState.mode = "drag";
-			dragState.fieldId = field.id;
-			dragState.pageNumber = currentPage;
-			dragState.startClientX = e.clientX;
-			dragState.startClientY = e.clientY;
-			dragState.startX = field.xPct;
-			dragState.startY = field.yPct;
-			dragState.startW = field.wPct;
-			dragState.startH = field.hPct;
-			attachWindowListeners();
-		};
-
-		// prevent click inside field from bubbling to canvas (which would add new field)
-		const onFieldClick = (e: React.MouseEvent) => {
-			e.stopPropagation();
-		};
-
-		const onResizeMouseDown = (e: React.MouseEvent) => {
-			if (!editable) return;
-			e.stopPropagation();
-			dragState.mode = "resize";
-			dragState.fieldId = field.id;
-			dragState.pageNumber = currentPage;
-			dragState.startClientX = e.clientX;
-			dragState.startClientY = e.clientY;
-			dragState.startX = field.xPct;
-			dragState.startY = field.yPct;
-			dragState.startW = field.wPct;
-			dragState.startH = field.hPct;
-			attachWindowListeners();
-		};
-
-		return (
-			<div
-				key={field.id}
-				style={style}
-				className="rounded group"
-				onMouseDown={onFieldMouseDown}
-				onClick={onFieldClick}
-				title={
-					editable
-						? "Drag to move. Drag corner to resize. Click X to remove"
-						: fieldTypeLabels[field.type]
-				}
-			>
-				<div className="w-full h-full flex items-center justify-center select-none min-w-0 px-2">
-					{/* Render label or actual signature text styled like RCSS */}
-					<span
-						className="truncate"
-						style={{
-							fontFamily:
-								field.type === "signature" || field.type === "initial"
-									? "var(--font-dancing-script), 'Dancing Script', 'Brush Script MT', cursive"
-									: "inherit",
-							fontSize: (() => {
-								// Compute font size from pixel height if possible
-								const rect = contentRef.current?.getBoundingClientRect();
-								if (!rect) return "12px";
-								const pixelHeight = (field.hPct / 100) * rect.height;
-								let sizeFactor = 12;
-								switch (field.type) {
-									case "signature":
-										sizeFactor = Math.min(Math.max(pixelHeight * 0.45, 10), 40);
-										break;
-									case "initial":
-										sizeFactor = Math.min(Math.max(pixelHeight * 0.6, 8), 36);
-										break;
-									case "date":
-										sizeFactor = Math.min(Math.max(pixelHeight * 0.35, 8), 18);
-										break;
-									case "text":
-										sizeFactor = Math.min(Math.max(pixelHeight * 0.35, 8), 20);
-										break;
-									default:
-										sizeFactor = Math.min(Math.max(pixelHeight * 0.4, 10), 20);
-								}
-								return `${Math.round(sizeFactor)}px`;
-							})(),
-							lineHeight: 1.1,
-							fontWeight: field.type === "signature" || field.type === "initial" ? 400 : 600,
-							letterSpacing:
-								field.type === "signature" || field.type === "initial" ? "0.4px" : "normal",
-						}}
-					>
-						{field.type === "signature" || field.type === "initial"
-							? field.value && field.value.length > 0
-								? field.value
-								: field.type === "initial"
-								? field.value ||
-								  userFullName
-										.split(" ")
-										.map((n) => n[0])
-										.join("") // Use initials
-								: field.value || userFullName
-							: fieldTypeLabels[field.type]}
-					</span>
-				</div>
-
-				{/* Delete button - visible on hover */}
-				{editable && (
-					<button
-						type="button"
-						onClick={(ev) => {
-							ev.stopPropagation();
-							onFieldRemove?.(currentPage, field.id);
-						}}
-						title="Delete field"
-						className="absolute -top-3 -right-3 w-7 h-7 rounded-full bg-red-500 text-white shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-150 flex items-center justify-center z-20 hover:bg-red-600"
-					>
-						<Trash2 className="w-3.5 h-3.5" />
-					</button>
-				)}
-
-				{editable && (
-					<div
-						onMouseDown={onResizeMouseDown}
-						className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-600 border-2 border-white rounded-full cursor-se-resize opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-blue-700 hover:scale-110 shadow-md"
-						style={{ transform: "translate(50%, 50%)", zIndex: 30 }}
-						title="Drag to resize"
-					/>
-				)}
-			</div>
-		);
-	};
 
 	const handlePageLoad = useCallback(
 		(width: number, height: number) => {
@@ -422,30 +520,36 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 								transformOrigin: "top left",
 							}}
 						>
-							<div
-								ref={contentRef}
-								className="relative w-full h-full"
-								style={{
-									transform: `scale(${zoom}) rotate(${rotation}deg)`,
-									transformOrigin: "top left",
-									transition: "transform 0.2s ease-in-out",
-									overflow: "hidden",
-								}}
-								onClick={(e) => handleCanvasClick(e as unknown as React.MouseEvent<HTMLDivElement>)}
-							>
-								{/* PDF Canvas */}
-								<PDFPageCanvas
-									pdfUrl={ensureAbsoluteUrl(template.pdfUrl)}
-									pageNumber={currentPage}
-									zoom={1} // Apply zoom via CSS transform instead
-									rotation={0} // Apply rotation via CSS transform instead
-									onPageLoad={handlePageLoad}
-									className="w-full h-full"
-								/>
+							<DndContext onDragEnd={handleDragEnd}>
+								<div
+									ref={contentRef}
+									className="relative w-full h-full"
+									style={{
+										transform: `scale(${zoom}) rotate(${rotation}deg)`,
+										transformOrigin: "top left",
+										transition: "transform 0.2s ease-in-out",
+										overflow: "hidden",
+									}}
+									onClick={(e) =>
+										handleCanvasClick(e as unknown as React.MouseEvent<HTMLDivElement>)
+									}
+								>
+									{/* PDF Canvas */}
+									<PDFPageCanvas
+										pdfUrl={ensureAbsoluteUrl(template.pdfUrl)}
+										pageNumber={currentPage}
+										zoom={1} // Apply zoom via CSS transform instead
+										rotation={0} // Apply rotation via CSS transform instead
+										onPageLoad={handlePageLoad}
+										className="w-full h-full"
+									/>
 
-								{/* Signature Fields Overlay */}
-								{currentPageFields.map(renderSignatureField)}
-							</div>
+									{/* Signature Fields Overlay - using new DraggableField component */}
+									{currentPageFields.map((field) => (
+										<DraggableField key={field.id} field={field} />
+									))}
+								</div>
+							</DndContext>
 						</div>
 					</div>
 				</div>

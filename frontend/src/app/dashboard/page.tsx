@@ -52,7 +52,7 @@ export default function Dashboard() {
 					{/* Quick Actions */}
 					<div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
 						<Link
-							href="/fomiqsign"
+							href="/fomiqsign/dashboard"
 							className="card hover:scale-105 transition-transform cursor-pointer"
 						>
 							<div className="text-center">

@@ -12,7 +12,7 @@ export default function Home() {
 							<br />
 							<span className="text-gradient-blue">Document Signing</span>
 						</h1>
-						<p className="max-w-3xl mx-auto text-xl text-gray-200 leading-relaxed mb-12 slide-up">
+						<p className="max-w-3xl mx-auto text-xl text-slate-300 leading-relaxed mb-12 slide-up">
 							Experience the future of document management with our secure, fast, and intuitive
 							platform. Sign documents digitally, manage subscriptions, and streamline your workflow
 							with cutting-edge technology.
@@ -31,19 +31,19 @@ export default function Home() {
 						<div className="grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto">
 							<div className="text-center">
 								<div className="text-3xl font-bold text-gradient mb-2">99.9%</div>
-								<div className="text-gray-200 text-sm">Uptime</div>
+								<div className="text-slate-300 text-sm">Uptime</div>
 							</div>
 							<div className="text-center">
 								<div className="text-3xl font-bold text-gradient mb-2">10M+</div>
-								<div className="text-gray-200 text-sm">Documents Signed</div>
+								<div className="text-slate-300 text-sm">Documents Signed</div>
 							</div>
 							<div className="text-center">
 								<div className="text-3xl font-bold text-gradient mb-2">256-bit</div>
-								<div className="text-gray-200 text-sm">Encryption</div>
+								<div className="text-slate-300 text-sm">Encryption</div>
 							</div>
 							<div className="text-center">
 								<div className="text-3xl font-bold text-gradient mb-2">24/7</div>
-								<div className="text-gray-200 text-sm">Support</div>
+								<div className="text-slate-300 text-sm">Support</div>
 							</div>
 						</div>
 					</div>
@@ -57,7 +57,7 @@ export default function Home() {
 						<h2 className="text-3xl sm:text-4xl font-bold mb-4">
 							Powerful Features for Modern Workflows
 						</h2>
-						<p className="text-gray-200 max-w-2xl mx-auto">
+						<p className="text-slate-300 max-w-2xl mx-auto">
 							Everything you need to manage documents and subscriptions in one platform
 						</p>
 					</div>
@@ -80,7 +80,7 @@ export default function Home() {
 								</svg>
 							</div>
 							<h3 className="text-xl font-semibold mb-3">Secure Signatures</h3>
-							<p className="text-gray-200">
+							<p className="text-slate-300">
 								Industry-leading security with 256-bit encryption and legally binding digital
 								signatures.
 							</p>
@@ -103,7 +103,7 @@ export default function Home() {
 								</svg>
 							</div>
 							<h3 className="text-xl font-semibold mb-3">Lightning Fast</h3>
-							<p className="text-gray-200">
+							<p className="text-slate-300">
 								Sign documents in seconds with our optimized platform built for speed and
 								reliability.
 							</p>
@@ -126,7 +126,7 @@ export default function Home() {
 								</svg>
 							</div>
 							<h3 className="text-xl font-semibold mb-3">Flexible Plans</h3>
-							<p className="text-gray-200">
+							<p className="text-slate-300">
 								Choose from various subscription plans that scale with your business needs.
 							</p>
 						</div>
@@ -148,7 +148,7 @@ export default function Home() {
 								</svg>
 							</div>
 							<h3 className="text-xl font-semibold mb-3">Analytics</h3>
-							<p className="text-gray-200">
+							<p className="text-slate-300">
 								Track document status, signing progress, and get insights into your workflow.
 							</p>
 						</div>
@@ -170,7 +170,7 @@ export default function Home() {
 								</svg>
 							</div>
 							<h3 className="text-xl font-semibold mb-3">Team Collaboration</h3>
-							<p className="text-gray-200">
+							<p className="text-slate-300">
 								Seamlessly collaborate with team members and manage permissions efficiently.
 							</p>
 						</div>
@@ -192,7 +192,7 @@ export default function Home() {
 								</svg>
 							</div>
 							<h3 className="text-xl font-semibold mb-3">24/7 Support</h3>
-							<p className="text-gray-200">
+							<p className="text-slate-300">
 								Get help whenever you need it with our dedicated support team available around the
 								clock.
 							</p>
@@ -208,7 +208,7 @@ export default function Home() {
 						<h2 className="text-3xl sm:text-4xl font-bold mb-6">
 							Ready to Transform Your Workflow?
 						</h2>
-						<p className="text-xl text-gray-200 mb-8 max-w-2xl mx-auto">
+						<p className="text-xl text-slate-300 mb-8 max-w-2xl mx-auto">
 							Join thousands of businesses that trust our platform for secure document signing and
 							management.
 						</p>

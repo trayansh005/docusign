@@ -21,14 +21,14 @@ export default function Footer() {
 							</div>
 							<span className="text-xl font-bold text-gradient">FomiqSign Platform</span>
 						</Link>
-						<p className="text-gray-400 max-w-md leading-relaxed">
+						<p className="text-slate-300 max-w-md leading-relaxed">
 							Secure, modern platform for digital document signing and subscription management.
 							Built with cutting-edge technology for seamless user experience.
 						</p>
 						<div className="flex items-center space-x-4 mt-6">
 							<a
 								href="#"
-								className="text-gray-400 hover:text-blue-400 transition-colors duration-200"
+								className="text-slate-300 hover:text-blue-400 transition-colors duration-200"
 							>
 								<svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
 									<path
@@ -40,7 +40,7 @@ export default function Footer() {
 							</a>
 							<a
 								href="#"
-								className="text-gray-400 hover:text-blue-400 transition-colors duration-200"
+								className="text-slate-300 hover:text-blue-400 transition-colors duration-200"
 							>
 								<svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
 									<path d="M6.29 18.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.012-.53A8.348 8.348 0 0020 3.92a8.19 8.19 0 01-2.357.646 4.118 4.118 0 001.804-2.27 8.224 8.224 0 01-2.605.996 4.107 4.107 0 00-6.993 3.743 11.65 11.65 0 01-8.457-4.287 4.106 4.106 0 001.27 5.477A4.073 4.073 0 01.8 7.713v.052a4.105 4.105 0 003.292 4.022 4.095 4.095 0 01-1.853.07 4.108 4.108 0 003.834 2.85A8.233 8.233 0 010 16.407a11.616 11.616 0 006.29 1.84" />
@@ -48,7 +48,7 @@ export default function Footer() {
 							</a>
 							<a
 								href="#"
-								className="text-gray-400 hover:text-blue-400 transition-colors duration-200"
+								className="text-slate-300 hover:text-blue-400 transition-colors duration-200"
 							>
 								<svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
 									<path
@@ -67,8 +67,8 @@ export default function Footer() {
 						<ul className="space-y-3">
 							<li>
 								<Link
-									href="/fomiqsign"
-									className="text-gray-400 hover:text-white transition-colors duration-200"
+									href="/fomiqsign/dashboard"
+									className="text-slate-300 hover:text-white transition-colors duration-200"
 								>
 									Sign Documents
 								</Link>
@@ -76,7 +76,7 @@ export default function Footer() {
 							<li>
 								<Link
 									href="/subscription"
-									className="text-gray-400 hover:text-white transition-colors duration-200"
+									className="text-slate-300 hover:text-white transition-colors duration-200"
 								>
 									Pricing Plans
 								</Link>
@@ -84,7 +84,7 @@ export default function Footer() {
 							<li>
 								<Link
 									href="/login"
-									className="text-gray-400 hover:text-white transition-colors duration-200"
+									className="text-slate-300 hover:text-white transition-colors duration-200"
 								>
 									Sign In
 								</Link>
@@ -92,7 +92,7 @@ export default function Footer() {
 							<li>
 								<Link
 									href="/register"
-									className="text-gray-400 hover:text-white transition-colors duration-200"
+									className="text-slate-300 hover:text-white transition-colors duration-200"
 								>
 									Create Account
 								</Link>
@@ -107,7 +107,7 @@ export default function Footer() {
 							<li>
 								<a
 									href="#"
-									className="text-gray-400 hover:text-white transition-colors duration-200"
+									className="text-slate-300 hover:text-white transition-colors duration-200"
 								>
 									Help Center
 								</a>
@@ -115,7 +115,7 @@ export default function Footer() {
 							<li>
 								<a
 									href="#"
-									className="text-gray-400 hover:text-white transition-colors duration-200"
+									className="text-slate-300 hover:text-white transition-colors duration-200"
 								>
 									Privacy Policy
 								</a>
@@ -123,7 +123,7 @@ export default function Footer() {
 							<li>
 								<a
 									href="#"
-									className="text-gray-400 hover:text-white transition-colors duration-200"
+									className="text-slate-300 hover:text-white transition-colors duration-200"
 								>
 									Terms of Service
 								</a>
@@ -131,7 +131,7 @@ export default function Footer() {
 							<li>
 								<a
 									href="#"
-									className="text-gray-400 hover:text-white transition-colors duration-200"
+									className="text-slate-300 hover:text-white transition-colors duration-200"
 								>
 									Contact Us
 								</a>
@@ -142,15 +142,15 @@ export default function Footer() {
 
 				{/* Bottom Section */}
 				<div className="mt-12 pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center">
-					<p className="text-gray-400 text-sm">
+					<p className="text-slate-300 text-sm">
 						© {currentYear} FomiqSign Platform. Built with modern technology for secure document
 						management.
 					</p>
 					<div className="flex items-center space-x-6 mt-4 md:mt-0">
-						<span className="text-gray-400 text-sm">Powered by</span>
+						<span className="text-slate-300 text-sm">Powered by</span>
 						<div className="flex items-center space-x-2">
 							<span className="text-blue-400 font-semibold text-sm">Next.js</span>
-							<span className="text-gray-400">•</span>
+							<span className="text-slate-300">•</span>
 							<span className="text-cyan-400 font-semibold text-sm">TailwindCSS</span>
 						</div>
 					</div>

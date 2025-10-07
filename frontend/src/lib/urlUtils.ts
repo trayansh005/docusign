@@ -1,5 +1,11 @@
 // Utility functions for URL handling
-export const ensureAbsoluteUrl = (url: string): string => {
+export const ensureAbsoluteUrl = (url: string | undefined | null): string => {
+	// Handle undefined/null URLs
+	if (!url || typeof url !== "string") {
+		console.warn("ensureAbsoluteUrl received invalid URL:", url);
+		return "";
+	}
+
 	// If URL is already absolute (starts with http), return as is
 	if (url.startsWith("http://") || url.startsWith("https://")) {
 		return url;

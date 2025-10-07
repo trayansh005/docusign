@@ -4,8 +4,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useRouter } from "next/navigation";
 import { LoginCredentials, RegisterData, AuthResponse, AuthState, User } from "@/types/auth";
 import { tokenUtils } from "@/lib/tokenUtils";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api/auth";
+import { authAPI } from "@/services/authAPI";
 
 interface AuthContextType extends AuthState {
 	login: (credentials: LoginCredentials) => Promise<AuthResponse>;
@@ -102,127 +101,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 	const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
 		setAuthState((prev) => ({ ...prev, isLoading: true }));
 
-		try {
-			const response = await fetch(`${API_BASE_URL}/login`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(credentials),
+		const result = await authAPI.login(credentials);
+
+		if (result.success && result.token && result.user) {
+			tokenUtils.setTokens(result.token, ""); // Assuming no refresh token in result
+			tokenUtils.setStoredUser(result.user as unknown as Record<string, unknown>);
+
+			setAuthState({
+				user: result.user as User,
+				token: result.token,
+				isLoading: false,
+				isAuthenticated: true,
 			});
-
-			const data = await response.json();
-
-			if (response.ok && data.success && data.data?.token) {
-				const user = data.data.user || {
-					id: data.data.userId || "1",
-					firstName: data.data.firstName || "User",
-					lastName: data.data.lastName || "",
-					email: credentials.email,
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
-				};
-
-				tokenUtils.setTokens(data.data.token, data.data.refreshToken);
-				tokenUtils.setStoredUser(user);
-
-				setAuthState({
-					user: user as User,
-					token: data.data.token,
-					isLoading: false,
-					isAuthenticated: true,
-				});
-
-				return {
-					success: true,
-					message: data.message || "Login successful",
-					token: data.data.token,
-					user,
-				};
-			} else {
-				setAuthState((prev) => ({ ...prev, isLoading: false }));
-				return {
-					success: false,
-					message: data.message || "Login failed",
-				};
-			}
-		} catch (error) {
-			console.error("Login error:", error);
+		} else {
 			setAuthState((prev) => ({ ...prev, isLoading: false }));
-			return {
-				success: false,
-				message: "Network error. Please try again.",
-			};
 		}
+
+		return result;
 	};
 
 	const register = async (userData: RegisterData): Promise<AuthResponse> => {
 		setAuthState((prev) => ({ ...prev, isLoading: true }));
 
-		try {
-			const response = await fetch(`${API_BASE_URL}/register`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					firstName: userData.firstName,
-					lastName: userData.lastName,
-					email: userData.email,
-					password: userData.password,
-					phoneNumber: userData.phoneNumber,
-					company: userData.company,
-				}),
-			});
+		const result = await authAPI.register(userData);
 
-			const data = await response.json();
+		setAuthState((prev) => ({ ...prev, isLoading: false }));
 
-			setAuthState((prev) => ({ ...prev, isLoading: false }));
-
-			if (response.ok) {
-				return {
-					success: true,
-					message: data.message || "Registration successful",
-				};
-			} else {
-				console.error("Registration failed:", data);
-
-				// Handle validation errors specifically
-				if (data.errors && Array.isArray(data.errors)) {
-					const errorMessages = data.errors
-						.map((error: { message: string }) => error.message)
-						.join(", ");
-					return {
-						success: false,
-						message: `Validation failed: ${errorMessages}`,
-					};
-				}
-
-				return {
-					success: false,
-					message: data.message || "Registration failed",
-				};
-			}
-		} catch (error) {
-			console.error("Registration error:", error);
-			setAuthState((prev) => ({ ...prev, isLoading: false }));
-			return {
-				success: false,
-				message: "Network error. Please try again.",
-			};
-		}
+		return result;
 	};
 
 	const logout = async (): Promise<void> => {
 		try {
-			// Call backend logout endpoint
-			await fetch(`${API_BASE_URL}/logout`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				credentials: "include",
-			});
+			await authAPI.logout();
 		} catch (error) {
 			console.error("Logout API error:", error);
 			// Continue with local logout even if API call fails
