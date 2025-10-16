@@ -37,12 +37,10 @@ export const uploadDocument = async (file: File, name?: string): Promise<DocuSig
 	});
 
 	if (!result.success) {
-		// Create error with both message and code
-		const err = new Error(result.message || "Failed to upload document") as Error & { code?: string };
-		if (result.code) {
-			err.code = result.code;
-		}
-		throw err;
+		// Return error response with code - this survives serialization better than Error properties
+		const error = new Error(result.message || "Failed to upload document");
+		(error as unknown as Record<string, string>).code = result.code;
+		throw error;
 	}
 
 	return result.data;

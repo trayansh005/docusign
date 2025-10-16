@@ -3,53 +3,56 @@
 ## How It Now Works (Simplified)
 
 ### Backend Response (upload.controller.js)
+
 ```javascript
 // When user has no subscription and hit limit:
 return res.status(403).json({
-  success: false,
-  code: "FREE_LIMIT_REACHED",
-  message: "Free plan limit reached. Upgrade to upload more documents."
+	success: false,
+	code: "FREE_LIMIT_REACHED",
+	message: "Free plan limit reached. Upgrade to upload more documents.",
 });
 ```
 
 ### Frontend - Server Action (docusignAPI.ts)
+
 ```typescript
 export const uploadDocument = async (file: File) => {
-  const result = await serverApi.post("/docusign/upload", formData);
-  
-  if (!result.success) {
-    // Attach the code to the error for client-side detection
-    const err = new Error(result.message) as Error & { code?: string };
-    if (result.code) {
-      err.code = result.code;  // <- Key: code is attached here
-    }
-    throw err;
-  }
-  
-  return result.data;
+	const result = await serverApi.post("/docusign/upload", formData);
+
+	if (!result.success) {
+		// Attach the code to the error for client-side detection
+		const err = new Error(result.message) as Error & { code?: string };
+		if (result.code) {
+			err.code = result.code; // <- Key: code is attached here
+		}
+		throw err;
+	}
+
+	return result.data;
 };
 ```
 
 ### Frontend - Error Handler (PDFUpload.tsx)
+
 ```typescript
 onError: (err: unknown) => {
-  if (err instanceof Error) {
-    // Check code property
-    const code = (err as unknown as Record<string, unknown>).code;
-    if (code === "FREE_LIMIT_REACHED") {
-      setLimitError("Free plan limit reached. Please upgrade...");
-      return;
-    }
-    
-    // Fallback to message check
-    if (err.message?.includes("Free plan limit")) {
-      setLimitError("Free plan limit reached. Please upgrade...");
-      return;
-    }
-  }
-  
-  setLimitError(null);  // Other errors
-}
+	if (err instanceof Error) {
+		// Check code property
+		const code = (err as unknown as Record<string, unknown>).code;
+		if (code === "FREE_LIMIT_REACHED") {
+			setLimitError("Free plan limit reached. Please upgrade...");
+			return;
+		}
+
+		// Fallback to message check
+		if (err.message?.includes("Free plan limit")) {
+			setLimitError("Free plan limit reached. Please upgrade...");
+			return;
+		}
+	}
+
+	setLimitError(null); // Other errors
+};
 ```
 
 ## The Flow
@@ -73,7 +76,7 @@ code === "FREE_LIMIT_REACHED" → sets limitError state
         ↓
 UI shows:
 ✅ Error icon
-✅ "Upload Failed" 
+✅ "Upload Failed"
 ✅ "Free plan limit reached. Please upgrade..."
 ✅ "Upgrade plan" button
 ```
@@ -89,7 +92,7 @@ UI shows:
 ✅ Backend sends code  
 ✅ Frontend receives code  
 ✅ Error handler detects code  
-✅ User sees correct message with upgrade button  
+✅ User sees correct message with upgrade button
 
 ---
 

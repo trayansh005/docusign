@@ -75,8 +75,14 @@ export async function serverApiClient(endpoint: string, options: ServerApiOption
 				.json()
 				.catch(() => ({ message: "An unknown error occurred" }));
 			console.error(`API Error: ${response.status} ${response.statusText}`, errorData);
+			
+			// Embed code in error message to survive server action serialization
+			const errorMessage = errorData.code 
+				? `[${errorData.code}] ${errorData.message || `HTTP ${response.status}: ${response.statusText}`}`
+				: errorData.message || `HTTP ${response.status}: ${response.statusText}`;
+			
 			throw new ApiError(
-				errorData.message || `HTTP ${response.status}: ${response.statusText}`,
+				errorMessage,
 				errorData.code,
 				errorData
 			);
