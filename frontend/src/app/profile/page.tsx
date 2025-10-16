@@ -268,7 +268,7 @@ export default function Profile() {
 									<form onSubmit={handleProfileSubmit} className="space-y-6">
 										<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 											<div>
-												<label htmlFor="firstName" className="form-label">
+												<label htmlFor="firstName" className="form-label text-white">
 													First Name
 												</label>
 												<input
@@ -283,7 +283,7 @@ export default function Profile() {
 												/>
 											</div>
 											<div>
-												<label htmlFor="lastName" className="form-label">
+												<label htmlFor="lastName" className="form-label text-white">
 													Last Name
 												</label>
 												<input
@@ -300,7 +300,7 @@ export default function Profile() {
 										</div>
 
 										<div>
-											<label htmlFor="email" className="form-label">
+											<label htmlFor="email" className="form-label text-white">
 												Email Address
 											</label>
 											<input
@@ -316,7 +316,7 @@ export default function Profile() {
 										</div>
 
 										<div>
-											<label htmlFor="phoneNumber" className="form-label">
+											<label htmlFor="phoneNumber" className="form-label text-white">
 												Phone Number
 											</label>
 											<input
@@ -331,7 +331,7 @@ export default function Profile() {
 										</div>
 
 										<div>
-											<label htmlFor="company" className="form-label">
+											<label htmlFor="company" className="form-label text-white">
 												Company
 											</label>
 											<input
