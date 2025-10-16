@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuthStore } from "@/stores/authStore";
 
 interface ProfileData {
 	firstName: string;
@@ -18,7 +18,11 @@ interface ProfileData {
 }
 
 export default function Profile() {
-	const { user, updateProfile, changePassword, isLoading } = useAuth();
+	const user = useAuthStore((state) => state.user);
+	const updateProfile = useAuthStore((state) => state.updateProfile);
+	const changePassword = useAuthStore((state) => state.changePassword);
+	const isLoading = useAuthStore((state) => state.isLoading);
+	const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 	const router = useRouter();
 
 	const [formData, setFormData] = useState<ProfileData>({
@@ -34,6 +38,13 @@ export default function Profile() {
 
 	const [activeTab, setActiveTab] = useState<"profile" | "password">("profile");
 	const [isUpdating, setIsUpdating] = useState(false);
+
+	// Auth guard - redirect to login if not authenticated
+	useEffect(() => {
+		if (!isLoading && !isAuthenticated) {
+			router.replace("/login");
+		}
+	}, [isAuthenticated, isLoading, router]);
 
 	useEffect(() => {
 		if (user) {

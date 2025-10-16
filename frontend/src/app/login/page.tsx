@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuthStore } from "@/stores/authStore";
 import { LoginCredentials } from "@/types/auth";
 
 export default function Login() {
@@ -15,7 +15,8 @@ export default function Login() {
 	});
 	const [rememberMe, setRememberMe] = useState(false);
 
-	const { login, isLoading } = useAuth();
+	const login = useAuthStore((state) => state.login);
+	const isLoading = useAuthStore((state) => state.isLoading);
 	const router = useRouter();
 
 	const handleSubmit = async (e: React.FormEvent) => {

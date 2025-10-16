@@ -140,6 +140,14 @@ export default function Pricing() {
 					setModalOpen(true);
 					const planIdFromResp = json.subscription?.planId || json.subscription?.plan || null;
 					if (planIdFromResp) setSubscribedPlanId(String(planIdFromResp));
+
+					// Update current subscription state immediately
+					if (json.subscription) {
+						setCurrentSubscription(json.subscription);
+						const planId = json.subscription.planId?._id || json.subscription.planId || null;
+						setCurrentSubscriptionPlanId(planId ? String(planId) : null);
+					}
+
 					// Revalidate server data / refresh app router
 					router.refresh();
 				} else if (json?.alreadyExists) {

@@ -15,7 +15,7 @@ import {
 } from "next/font/google";
 import "./globals.css";
 import LayoutContent from "./components/LayoutContent";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthInitializer } from "@/components/AuthInitializer";
 import { Providers } from "@/components/Providers";
 
 const inter = Inter({
@@ -126,9 +126,8 @@ export default function RootLayout({
 				<div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent -z-10" />
 
 				<Providers>
-					<AuthProvider>
-						<LayoutContent>{children}</LayoutContent>
-					</AuthProvider>
+					<AuthInitializer />
+					<LayoutContent>{children}</LayoutContent>
 				</Providers>
 
 				{/* Background Elements */}

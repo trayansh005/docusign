@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CheckCircle } from "lucide-react";
 import { DocuSignTemplateData } from "@/types/docusign";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuthStore } from "@/stores/authStore";
 import apiClient from "@/lib/apiClient";
 import { Recipient } from "./types";
 
@@ -27,7 +27,7 @@ export function FinalizePanel({
 	const [limitError, setLimitError] = useState<string | null>(null);
 
 	// Get logged-in user for signature text
-	const { user } = useAuth();
+	const user = useAuthStore((state) => state.user);
 	const userFullName =
 		user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : "Your Signature";
 	const userInitials =

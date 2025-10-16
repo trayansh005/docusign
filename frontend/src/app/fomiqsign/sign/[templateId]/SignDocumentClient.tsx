@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { DocuSignTemplateData, SignatureField } from "@/types/docusign";
 import apiClient from "@/lib/apiClient";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuthStore } from "@/stores/authStore";
 
 // Dynamically import MultiPageTemplateViewer to avoid SSR issues
 const MultiPageTemplateViewer = dynamic(
@@ -27,7 +27,7 @@ const MultiPageTemplateViewer = dynamic(
 export default function SignDocumentClient() {
 	const params = useParams();
 	const router = useRouter();
-	const { user } = useAuth();
+	const user = useAuthStore((state) => state.user);
 	const templateId = params.templateId as string;
 
 	const [template, setTemplate] = useState<DocuSignTemplateData | null>(null);

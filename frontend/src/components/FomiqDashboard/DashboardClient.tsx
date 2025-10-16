@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/stores/authStore";
 import { DocuSignTemplateData } from "@/types/docusign";
 import { TabNavigation } from "./TabNavigation";
 import { DashboardTabs } from "./DashboardTabs";
@@ -12,6 +14,9 @@ import apiClient from "@/lib/apiClient";
 interface DashboardClientProps {}
 
 export default function DashboardClient({}: DashboardClientProps) {
+	const router = useRouter();
+	const isLoading = useAuthStore((state) => state.isLoading);
+	const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 	const [activeTab, setActiveTab] = useState<TabType>("upload");
 	const [selectedTemplate, setSelectedTemplate] = useState<DocuSignTemplateData | null>(null);
 	const [recipients, setRecipients] = useState<Recipient[]>([]);
@@ -23,6 +28,13 @@ export default function DashboardClient({}: DashboardClientProps) {
 		uploads?: { used: number; limit: number };
 		signs?: { used: number; limit: number };
 	} | null>(null);
+
+	// Auth guard - redirect to login if not authenticated
+	useEffect(() => {
+		if (!isLoading && !isAuthenticated) {
+			router.replace("/login");
+		}
+	}, [isAuthenticated, isLoading, router]);
 
 	useEffect(() => {
 		let mounted = true;

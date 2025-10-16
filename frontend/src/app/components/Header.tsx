@@ -3,11 +3,14 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuthStore } from "@/stores/authStore";
 
 export default function Header() {
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
-	const { isAuthenticated, user, logout, isLoading } = useAuth();
+	const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+	const user = useAuthStore((state) => state.user);
+	const logout = useAuthStore((state) => state.logout);
+	const isLoading = useAuthStore((state) => state.isLoading);
 
 	return (
 		<header className="sticky top-0 z-50 w-full border-b border-white/10 bg-black/20 backdrop-blur-xl">

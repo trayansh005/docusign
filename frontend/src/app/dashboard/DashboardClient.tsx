@@ -3,7 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/stores/authStore";
 import { Portal } from "@/components/Portal";
 import { getRecentActivities } from "@/services/activityAPI";
 import { Activity } from "@/types/activity";
@@ -41,7 +42,10 @@ interface SubscriptionData {
 }
 
 export default function DashboardClient() {
-	const { user } = useAuth();
+	const user = useAuthStore((state) => state.user);
+	const isLoading = useAuthStore((state) => state.isLoading);
+	const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+	const router = useRouter();
 	const [stats, setStats] = useState<UserStats | null>({
 		totalDocuments: 0,
 		pendingSignatures: 0,
@@ -54,6 +58,13 @@ export default function DashboardClient() {
 	const [confirmImmediate, setConfirmImmediate] = useState(false);
 	const [loading, setLoading] = useState(true);
 	const [usage, setUsage] = useState<FreeUsage | null>(null);
+
+	// Auth guard - redirect to login if not authenticated
+	useEffect(() => {
+		if (!isLoading && !isAuthenticated) {
+			router.replace("/login");
+		}
+	}, [isAuthenticated, isLoading, router]);
 
 	// Fetch activities using React Query
 	const { data: activitiesData } = useQuery({
@@ -655,8 +666,6 @@ export default function DashboardClient() {
 						</div>
 						<div className="text-orange-400 text-sm font-medium">Edit →</div>
 					</Link>
-
-					
 				</div>
 
 				{/* Recent Activity */}

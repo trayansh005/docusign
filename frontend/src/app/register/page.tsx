@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuthStore } from "@/stores/authStore";
 import { RegisterData } from "@/types/auth";
 
 export default function Register() {
@@ -19,7 +19,8 @@ export default function Register() {
 	const [confirmPassword, setConfirmPassword] = useState("");
 	const [acceptTerms, setAcceptTerms] = useState(false);
 
-	const { register, isLoading } = useAuth();
+	const register = useAuthStore((state) => state.register);
+	const isLoading = useAuthStore((state) => state.isLoading);
 	const router = useRouter();
 
 	const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

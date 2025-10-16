@@ -4,7 +4,6 @@ import type { NextRequest } from "next/server";
 export function middleware(request: NextRequest) {
 	const pathname = request.nextUrl.pathname;
 	const token = request.cookies.get("accessToken")?.value;
-	const refreshToken = request.cookies.get("refreshToken")?.value;
 
 	console.log("🔥 MIDDLEWARE EXECUTING:", pathname);
 	console.log("   Token present:", !!token);
