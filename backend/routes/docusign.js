@@ -37,7 +37,29 @@ router.use(authenticateToken);
 // ===== OPTIMIZED ROUTES =====
 
 // Document Upload and processing (optimized) - supports PDF and Word documents
-router.post("/upload", upload.single("document"), uploadAndProcessDocument);
+router.post(
+	"/upload",
+	(req, res, next) => {
+		// Wrap multer to capture errors like LIMIT_FILE_SIZE
+		const handler = upload.single("document");
+		handler(req, res, function (err) {
+			if (err) {
+				// Multer-specific size limit error
+				if (err.code === "LIMIT_FILE_SIZE") {
+					return res.status(413).json({
+						success: false,
+						code: "PAYLOAD_TOO_LARGE",
+						message: "File is too large. Maximum allowed size is 20 MB.",
+					});
+				}
+				// Other multer errors
+				return res.status(400).json({ success: false, message: err.message });
+			}
+			next();
+		});
+	},
+	uploadAndProcessDocument
+);
 
 // Template management (optimized)
 router.get("/", listTemplates);
