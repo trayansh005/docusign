@@ -8,9 +8,9 @@ const connectDB = async () => {
 			const env = process.env.NODE_ENV || "development";
 			switch (env) {
 				case "production":
-					return process.env.DB_NAME_PROD || "docusign_app_prod";
+					return process.env.DB_NAME || "docusign_app_prod";
 				case "test":
-					return process.env.DB_NAME_TEST || "docusign_app_test";
+					return process.env.DB_NAME || "docusign_app_test";
 				default:
 					return process.env.DB_NAME || "docusign_app_dev";
 			}
