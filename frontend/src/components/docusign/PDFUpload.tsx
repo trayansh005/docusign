@@ -20,6 +20,14 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 	const [limitError, setLimitError] = useState<string | null>(null);
 	const queryClient = useQueryClient();
 
+	// Client-side file size limit: 20 MB (applies to PDF and DOCX/DOC)
+	const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
+
+	const isUnderSizeLimit = useCallback(
+		(file: File) => file.size <= MAX_FILE_SIZE_BYTES,
+		[MAX_FILE_SIZE_BYTES]
+	);
+
 	const uploadMutation = useMutation({
 		mutationFn: async (file: File) => {
 			const formData = new FormData();
@@ -30,6 +38,16 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 				body: formData,
 				credentials: "include",
 			});
+
+			// If Nginx or an upstream returns 413 (Payload Too Large), don't try to parse body
+			if (res.status === 413) {
+				throw Object.assign(
+					new Error(
+						"The file is too large for the server limit (HTTP 413). Please upload a smaller file or contact support to increase the limit."
+					),
+					{ code: "PAYLOAD_TOO_LARGE" }
+				);
+			}
 
 			let data: Record<string, unknown>;
 			try {
@@ -86,6 +104,18 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 				console.log("Error message:", err.message);
 				console.log("Error keys:", Object.keys(err));
 				console.log("Error code property:", (err as unknown as Record<string, unknown>).code);
+			}
+
+			// Check if this is a file size (payload too large) error
+			if (err instanceof Error) {
+				const codeProperty = (err as unknown as Record<string, unknown>).code;
+				if (
+					codeProperty === "PAYLOAD_TOO_LARGE" ||
+					/413|too large|Payload Too Large/i.test(err.message)
+				) {
+					setLimitError("File is too large. Maximum allowed size is 20 MB.");
+					return;
+				}
 			}
 
 			// Check if this is a free plan limit error
@@ -157,20 +187,30 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 			const validFile = files.find((file) => isValidFileType(file));
 
 			if (validFile) {
+				// Client-side size validation (20 MB)
+				if (!isUnderSizeLimit(validFile)) {
+					setLimitError("File is too large. Maximum allowed size is 20 MB.");
+					return;
+				}
 				uploadMutation.mutate(validFile);
 			}
 		},
-		[uploadMutation]
+		[uploadMutation, isUnderSizeLimit]
 	);
 
 	const handleFileSelect = useCallback(
 		(e: React.ChangeEvent<HTMLInputElement>) => {
 			const file = e.target.files?.[0];
 			if (file && isValidFileType(file)) {
+				// Client-side size validation (20 MB)
+				if (!isUnderSizeLimit(file)) {
+					setLimitError("File is too large. Maximum allowed size is 20 MB.");
+					return;
+				}
 				uploadMutation.mutate(file);
 			}
 		},
-		[uploadMutation]
+		[uploadMutation, isUnderSizeLimit]
 	);
 
 	return (
@@ -241,7 +281,9 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 							<div className="text-sm text-gray-200">
 								Drag and drop a PDF or Word document here, or click to select
 							</div>
-							<div className="text-xs text-gray-300">Supports PDF, DOCX, and DOC files</div>
+							<div className="text-xs text-gray-300">
+								Supports PDF, DOCX, and DOC files • Max 20 MB
+							</div>
 						</>
 					)}
 				</div>
