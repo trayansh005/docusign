@@ -379,7 +379,7 @@ export default function DashboardClient() {
 				{/* My Documents (owner) summary - moved outside inbox items */}
 				{stats?.owner && (
 					<div className="card p-6 mb-8">
-						<h3 className="text-lg font-semibold text-white mb-3">My documents (owned by me)</h3>
+						<h3 className="text-lg font-semibold text-white mb-3">My documents</h3>
 						<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 							<div className="bg-gray-800/30 rounded-lg p-4">
 								<p className="text-gray-400 text-sm mb-1">Owned Total</p>

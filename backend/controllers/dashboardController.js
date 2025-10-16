@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import DocuSignTemplate from "../models/DocuSignTemplate.js";
 import Subscription from "../models/Subscription.js";
 import { getFreeTierLimits } from "../utils/freeTierLimits.js";
@@ -10,11 +11,14 @@ export const getUserStats = async (req, res) => {
 
 		if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
 
+		// Convert userId to ObjectId for MongoDB queries
+		const userObjectId = new mongoose.Types.ObjectId(userId);
+
 		// Phase 2 Optimization: Use aggregation pipeline for owner stats (1 query instead of 3)
 		const ownerStatsResult = await DocuSignTemplate.aggregate([
 			{
 				$match: {
-					createdBy: userId,
+					createdBy: userObjectId,
 					isArchived: { $ne: true },
 				},
 			},
@@ -33,7 +37,7 @@ export const getUserStats = async (req, res) => {
 		// Build assigned filter with $or conditions
 		const assignedOrConditions = [
 			{ "signatureFields.recipientId": String(userId) },
-			{ "recipients.userId": userId },
+			{ "recipients.userId": userObjectId },
 			{ "recipients.id": String(userId) },
 		];
 		if (email) {
@@ -134,6 +138,9 @@ export const getInbox = async (req, res) => {
 
 		if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
 
+		// Convert userId to ObjectId for MongoDB queries
+		const userObjectId = new mongoose.Types.ObjectId(userId);
+
 		// Find templates where the user is a recipient
 		const assignedFilter = {
 			isArchived: { $ne: true },
@@ -141,7 +148,7 @@ export const getInbox = async (req, res) => {
 				// Match by signature field recipient ID
 				{ "signatureFields.recipientId": String(userId) },
 				// Match by recipients array - user ID
-				{ "recipients.userId": userId },
+				{ "recipients.userId": userObjectId },
 				// Match by recipients array - recipient ID string
 				{ "recipients.id": String(userId) },
 			],
