@@ -40,6 +40,11 @@ export const uploadDocument = async (file: File, name?: string): Promise<DocuSig
 		// Return error response with code - this survives serialization better than Error properties
 		const error = new Error(result.message || "Failed to upload document");
 		(error as unknown as Record<string, string>).code = result.code;
+		console.log("[uploadDocument] Error thrown:", {
+			message: error.message,
+			code: result.code,
+			errorObject: error,
+		});
 		throw error;
 	}
 

@@ -32,6 +32,8 @@ app.use((err, req, res, next) => {
 	res.status(err.statusCode || 500).json({
 		success: false,
 		message: err.message || "Internal Server Error",
+		// Preserve error code if it exists (for things like FREE_LIMIT_REACHED)
+		...(err.code && { code: err.code }),
 		...(process.env.NODE_ENV === "development" && { stack: err.stack }),
 	});
 });

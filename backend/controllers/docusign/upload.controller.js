@@ -110,6 +110,7 @@ export const uploadAndProcessDocument = async (req, res) => {
 	// Enforce free-tier limit: users without an active subscription can only upload 1 document
 	try {
 		const userId = req.user?.id;
+		console.log("[Upload] User ID:", userId);
 		if (!userId) {
 			return res.status(401).json({ success: false, message: "Authentication required" });
 		}
@@ -122,6 +123,8 @@ export const uploadAndProcessDocument = async (req, res) => {
 			$or: [{ endDate: { $exists: false } }, { endDate: { $gt: now } }],
 		});
 
+		console.log("[Upload] Active subscription found:", !!activeSub);
+
 		if (!activeSub) {
 			// Count existing non-archived templates created by this user
 			const existingCount = await DocuSignTemplate.countDocuments({
@@ -130,7 +133,10 @@ export const uploadAndProcessDocument = async (req, res) => {
 			});
 
 			const { uploadLimit } = getFreeTierLimits();
+			console.log("[Upload] Free tier - Existing count:", existingCount, "Limit:", uploadLimit);
+			
 			if (existingCount >= uploadLimit) {
+				console.log("[Upload] FREE LIMIT REACHED - returning 403");
 				return res.status(403).json({
 					success: false,
 					code: "FREE_LIMIT_REACHED",
