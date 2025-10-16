@@ -2,6 +2,19 @@ import { cookies } from "next/headers";
 
 const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
+// Custom error class to preserve error code and data
+export class ApiError extends Error {
+	public code?: string;
+	public data?: unknown;
+
+	constructor(message: string, code?: string, data?: unknown) {
+		super(message);
+		this.code = code;
+		this.data = data;
+		Object.setPrototypeOf(this, ApiError.prototype);
+	}
+}
+
 interface ServerApiOptions {
 	method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 	body?: unknown;
@@ -62,7 +75,11 @@ export async function serverApiClient(endpoint: string, options: ServerApiOption
 				.json()
 				.catch(() => ({ message: "An unknown error occurred" }));
 			console.error(`API Error: ${response.status} ${response.statusText}`, errorData);
-			throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+			throw new ApiError(
+				errorData.message || `HTTP ${response.status}: ${response.statusText}`,
+				errorData.code,
+				errorData
+			);
 		}
 
 		// Handle empty responses
