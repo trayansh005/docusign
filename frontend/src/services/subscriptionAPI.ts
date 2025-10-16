@@ -1,4 +1,7 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+"use server";
+
+import { serverApi } from "@/lib/serverApiClient";
+import { ApiError } from "@/lib/serverApiClient";
 
 export interface Subscription {
 	_id: string;
@@ -7,66 +10,87 @@ export interface Subscription {
 	status: string;
 }
 
-export const subscriptionAPI = {
-	async getSubscriptions(): Promise<Subscription[]> {
-		try {
-			const response = await fetch(`${API_BASE_URL}/subscription`, {
-				method: "GET",
-				credentials: "include",
-			});
+export interface PricingPlan {
+	_id: string;
+	name: string;
+	price: number;
+	interval: "month" | "year";
+	description: string;
+	features: string[];
+	isActive?: boolean;
+	popular?: boolean;
+	stripePriceId?: string | null;
+}
 
-			if (response.status === 401) {
-				// Not authenticated
-				window.location.href = "/login";
-				throw new Error("Unauthorized");
-			}
+export interface UserSubscription {
+	_id?: string;
+	planId?: { _id?: string; name?: string } | string | null;
+	status?: string;
+	cancelAtPeriodEnd?: boolean;
+	currentPeriodEnd?: string | Date;
+}
 
-			if (!response.ok) {
-				throw new Error(`Failed to load subscriptions: ${response.status}`);
-			}
+export async function getPricingPlans(): Promise<PricingPlan[]> {
+	const result = await serverApi.get("/subscription/plans");
+	const plans = result.plans || [];
 
-			const body = await response.json();
+	// Sort with Professional plan first
+	return plans.sort((a: PricingPlan, b: PricingPlan) => {
+		if (a.name.toLowerCase().includes("professional")) return -1;
+		if (b.name.toLowerCase().includes("professional")) return 1;
+		return 0;
+	});
+}
 
-			// Accept multiple shapes from the API: array directly, { data: [] }, or { subscriptions: [] }
-			let subsArray: Subscription[] = [];
-			if (Array.isArray(body)) subsArray = body;
-			else if (Array.isArray(body.data)) subsArray = body.data;
-			else if (Array.isArray(body.subscriptions)) subsArray = body.subscriptions;
-			else subsArray = [];
-
-			return subsArray;
-		} catch (error) {
-			console.error("Error loading subscriptions:", error);
-			throw error;
+export async function getUserSubscription(): Promise<UserSubscription | null> {
+	try {
+		const result = await serverApi.get("/subscription/me");
+		return result.subscription || null;
+	} catch (error) {
+		if (
+			error instanceof ApiError &&
+			(error.message.includes("401") || error.message.includes("Unauthorized"))
+		) {
+			return null;
 		}
-	},
+		throw error;
+	}
+}
 
-	async createSubscription(
-		plan: string,
-		price: number
-	): Promise<{ success: boolean; message: string }> {
-		try {
-			const response = await fetch(`${API_BASE_URL}/subscription`, {
-				method: "POST",
-				credentials: "include",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ plan, price }),
-			});
+export async function getSubscriptions(): Promise<Subscription[]> {
+	const result = await serverApi.get("/subscription");
 
-			if (response.status === 401) {
-				window.location.href = "/login";
-				throw new Error("Unauthorized");
-			}
+	// Accept multiple shapes from the API: array directly, { data: [] }, or { subscriptions: [] }
+	let subsArray: Subscription[] = [];
+	if (Array.isArray(result)) subsArray = result;
+	else if (Array.isArray(result.data)) subsArray = result.data;
+	else if (Array.isArray(result.subscriptions)) subsArray = result.subscriptions;
+	else subsArray = [];
 
-			const data = await response.json();
+	return subsArray;
+}
 
-			return {
-				success: response.ok,
-				message: response.ok ? "Subscribed!" : data.message,
-			};
-		} catch (error) {
-			console.error("Error creating subscription:", error);
-			throw error;
-		}
-	},
-};
+export async function createSubscription(
+	plan: string,
+	price: number
+): Promise<{ success: boolean; message: string }> {
+	await serverApi.post("/subscription", { plan, price });
+
+	return {
+		success: true,
+		message: "Subscribed!",
+	};
+}
+
+export async function createCheckoutSession(planId: string) {
+	return await serverApi.post("/subscription/checkout", { planId });
+}
+
+export async function verifySession(sessionId: string) {
+	return await serverApi.post("/subscription/verify", { sessionId });
+}
+
+export async function cancelSubscription(subscriptionId: string, cancelImmediately?: boolean) {
+	const body = cancelImmediately ? { cancelImmediately } : undefined;
+	return await serverApi.delete(`/subscription/${subscriptionId}`, { body });
+}
