@@ -27,40 +27,41 @@ export async function convertWordToPdf(wordFilePath, outputDir) {
 
 		console.log(`[WordProcessor] Output PDF path: ${pdfPath}`);
 
-		try {
-			console.log(`[WordProcessor] Starting docx-pdf conversion...`);
-			console.log(`[WordProcessor] Input: ${wordFilePath}`);
-			console.log(`[WordProcessor] Output: ${pdfPath}`);
-			console.log(`[WordProcessor] Input file exists: ${fs.existsSync(wordFilePath)}`);
+		// Decide converter order
+		const preferLibre =
+			(process.env.PREFERRED_WORD_CONVERTER || "").toLowerCase() === "libreoffice" ||
+			process.env.FORCE_LIBREOFFICE === "true" ||
+			process.env.NODE_ENV === "production";
+		const libreAvailable = await isLibreOfficeAvailable();
+		console.log(`[WordProcessor] preferLibre=${preferLibre} libreAvailable=${libreAvailable}`);
 
-			// Convert using docx-pdf (library wrapper)
-			await convertAsync(wordFilePath, pdfPath);
-
-			console.log(`[WordProcessor] Conversion completed, checking output...`);
-			console.log(`[WordProcessor] Output file exists: ${fs.existsSync(pdfPath)}`);
-
-			if (fs.existsSync(pdfPath)) {
-				const stats = fs.statSync(pdfPath);
-				console.log(`[WordProcessor] PDF created successfully: ${pdfPath}`);
-				console.log(`[WordProcessor] PDF file size: ${stats.size} bytes`);
-				return pdfPath;
+		if (preferLibre && libreAvailable) {
+			// Try LibreOffice first, then docx-pdf fallback
+			try {
+				return await convertWithLibreOffice(wordFilePath, outputDir);
+			} catch (loErr) {
+				console.warn(
+					`[WordProcessor] LibreOffice preferred path failed, falling back to docx-pdf:`,
+					loErr?.message || loErr
+				);
+				return await convertWithDocxPdf(wordFilePath, pdfPath);
 			}
-
-			// If file not found, fall through to LibreOffice fallback
-			console.warn(
-				`[WordProcessor] Expected PDF not found after docx-pdf. Falling back to LibreOffice...`
-			);
-		} catch (conversionError) {
-			console.error(
-				`[WordProcessor] docx-pdf conversion failed:`,
-				conversionError?.message || conversionError
-			);
-			console.warn(`[WordProcessor] Falling back to LibreOffice headless conversion...`);
+		} else {
+			// Try docx-pdf first, then LibreOffice fallback if available
+			try {
+				return await convertWithDocxPdf(wordFilePath, pdfPath);
+			} catch (dpErr) {
+				console.error(`[WordProcessor] docx-pdf conversion failed:`, dpErr?.message || dpErr);
+				if (!libreAvailable) {
+					console.warn(`[WordProcessor] LibreOffice not available for fallback.`);
+					throw new Error(
+						`Word to PDF conversion failed and LibreOffice is not available. Install LibreOffice or set PREFERRED_WORD_CONVERTER=libreoffice.`
+					);
+				}
+				console.warn(`[WordProcessor] Falling back to LibreOffice headless conversion...`);
+				return await convertWithLibreOffice(wordFilePath, outputDir);
+			}
 		}
-
-		// Fallback: LibreOffice headless (more reliable on Linux servers)
-		const fallbackPdfPath = await convertWithLibreOffice(wordFilePath, outputDir);
-		return fallbackPdfPath;
 	} catch (error) {
 		console.error(`[WordProcessor] Word to PDF conversion error:`, error);
 		throw error;
@@ -174,18 +175,15 @@ async function convertWithLibreOffice(wordFilePath, outputDir) {
 
 			// Set HOME to a writable folder to avoid profile issues when running as a service
 			const env = { ...process.env };
-			if (!env.HOME) {
-				env.HOME = "/tmp";
-			}
+			if (!env.HOME) env.HOME = "/tmp";
 
 			const { stdout, stderr } = await execFileAsync(bin, args, {
 				env,
 				windowsHide: true,
-				timeout: 120000, // 2 minutes
+				timeout: 120000,
 			});
-			console.log(`[WordProcessor] LibreOffice stdout:`, stdout?.slice?.(0, 2000) || stdout);
-			if (stderr)
-				console.warn(`[WordProcessor] LibreOffice stderr:`, stderr?.slice?.(0, 2000) || stderr);
+			if (stdout) console.log(`[WordProcessor] LibreOffice stdout:`, stdout.slice(0, 2000));
+			if (stderr) console.warn(`[WordProcessor] LibreOffice stderr:`, stderr.slice(0, 2000));
 
 			if (fs.existsSync(expectedPdfPath)) {
 				const stats = fs.statSync(expectedPdfPath);
@@ -211,4 +209,60 @@ async function convertWithLibreOffice(wordFilePath, outputDir) {
 			lastError?.message || lastError
 		}`
 	);
+}
+
+/**
+ * Attempt conversion using docx-pdf wrapper and verify output exists.
+ */
+async function convertWithDocxPdf(wordFilePath, pdfPath) {
+	console.log(`[WordProcessor] Starting docx-pdf conversion...`);
+	console.log(`[WordProcessor] Input: ${wordFilePath}`);
+	console.log(`[WordProcessor] Output: ${pdfPath}`);
+	console.log(`[WordProcessor] Input file exists: ${fs.existsSync(wordFilePath)}`);
+
+	await convertAsync(wordFilePath, pdfPath);
+
+	console.log(`[WordProcessor] Conversion completed, checking output...`);
+	const exists = fs.existsSync(pdfPath);
+	console.log(`[WordProcessor] Output file exists: ${exists}`);
+
+	if (!exists) {
+		throw new Error(`PDF file not found at: ${pdfPath}`);
+	}
+
+	const stats = fs.statSync(pdfPath);
+	console.log(`[WordProcessor] PDF created successfully: ${pdfPath}`);
+	console.log(`[WordProcessor] PDF file size: ${stats.size} bytes`);
+	return pdfPath;
+}
+
+/**
+ * Check if LibreOffice (soffice) is available on this host.
+ */
+async function isLibreOfficeAvailable() {
+	const candidates = getSofficeCandidates();
+	for (const bin of candidates) {
+		try {
+			const { stdout } = await execFileAsync(bin, ["--version"], {
+				windowsHide: true,
+				timeout: 5000,
+			});
+			if (stdout) return true;
+		} catch (_) {
+			// try next
+		}
+	}
+	return false;
+}
+
+function getSofficeCandidates() {
+	return process.platform === "win32"
+		? [process.env.LIBREOFFICE_PATH, "soffice.exe"].filter(Boolean)
+		: [
+				process.env.LIBREOFFICE_PATH,
+				"soffice",
+				"/usr/bin/soffice",
+				"/usr/local/bin/soffice",
+				"/snap/bin/libreoffice",
+		  ].filter(Boolean);
 }
