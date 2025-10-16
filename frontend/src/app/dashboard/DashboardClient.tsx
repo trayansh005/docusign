@@ -76,7 +76,7 @@ export default function DashboardClient() {
 	const [confirmImmediate, setConfirmImmediate] = useState(false);
 	const [loading, setLoading] = useState(true);
 	const [usage, setUsage] = useState<FreeUsage | null>(null);
-	
+
 	// Phase 1 & 2 Optimization: Add inbox state with pagination
 	const [inbox, setInbox] = useState<InboxItem[]>([]);
 	const [inboxPage, setInboxPage] = useState(1);
@@ -104,7 +104,9 @@ export default function DashboardClient() {
 			// Fetch all data in parallel
 			const [statsRes, inboxRes, subscriptionRes] = await Promise.all([
 				fetch("/api/dashboard/stats", { credentials: "include" }),
-				fetch(`/api/dashboard/inbox?page=${pageNum}&limit=${INBOX_LIMIT}`, { credentials: "include" }),
+				fetch(`/api/dashboard/inbox?page=${pageNum}&limit=${INBOX_LIMIT}`, {
+					credentials: "include",
+				}),
 				fetch("/api/subscription/me", { credentials: "include" }),
 			]);
 
@@ -410,122 +412,122 @@ export default function DashboardClient() {
 					{inbox && inbox.length > 0 ? (
 						<>
 							<ul className="space-y-3">
-							{inbox.map((item) => (
-								<li
-									key={item.id}
-									className="flex items-center justify-between p-4 bg-gray-800/30 rounded-lg hover:bg-gray-800/50 transition-colors"
-								>
-									<div className="flex-1">
-										<div className="font-medium text-white">{item.name}</div>
-										<div className="flex items-center gap-3 mt-1">
-											<div className="text-xs text-gray-400">
-												Status:{" "}
-												<span
-													className={
-														item.status === "final"
-															? "text-green-400"
-															: item.status === "active"
-															? "text-yellow-400"
-															: "text-blue-400"
-													}
-												>
-													{item.status}
-												</span>
-											</div>
-
-											{item.sender && (
-												<div className="text-xs text-gray-400">From: {item.sender}</div>
-											)}
-											{item.myRecipientInfo?.signatureStatus && (
+								{inbox.map((item) => (
+									<li
+										key={item.id}
+										className="flex items-center justify-between p-4 bg-gray-800/30 rounded-lg hover:bg-gray-800/50 transition-colors"
+									>
+										<div className="flex-1">
+											<div className="font-medium text-white">{item.name}</div>
+											<div className="flex items-center gap-3 mt-1">
 												<div className="text-xs text-gray-400">
-													Your status:{" "}
+													Status:{" "}
 													<span
 														className={
-															item.myRecipientInfo.signatureStatus === "signed"
+															item.status === "final"
 																? "text-green-400"
-																: "text-yellow-400"
+																: item.status === "active"
+																? "text-yellow-400"
+																: "text-blue-400"
 														}
 													>
-														{item.myRecipientInfo.signatureStatus}
+														{item.status}
 													</span>
+												</div>
+
+												{item.sender && (
+													<div className="text-xs text-gray-400">From: {item.sender}</div>
+												)}
+												{item.myRecipientInfo?.signatureStatus && (
+													<div className="text-xs text-gray-400">
+														Your status:{" "}
+														<span
+															className={
+																item.myRecipientInfo.signatureStatus === "signed"
+																	? "text-green-400"
+																	: "text-yellow-400"
+															}
+														>
+															{item.myRecipientInfo.signatureStatus}
+														</span>
+													</div>
+												)}
+											</div>
+											{item.message?.subject && (
+												<div className="text-xs text-gray-400 mt-1">📧 {item.message.subject}</div>
+											)}
+										</div>
+										<div className="flex gap-2">
+											{item.finalPdfUrl && (
+												<a
+													href={getAbsolutePdfUrl(item.finalPdfUrl)}
+													target="_blank"
+													rel="noreferrer"
+													className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
+												>
+													View PDF
+												</a>
+											)}
+											{item.myRecipientInfo?.signatureStatus !== "signed" ? (
+												<Link
+													href={`/fomiqsign/sign/${item.id}`}
+													className="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors"
+												>
+													Sign Document
+												</Link>
+											) : (
+												<div className="px-3 py-1 text-sm bg-gray-600 text-white rounded-md cursor-not-allowed opacity-50">
+													✅ Signed
 												</div>
 											)}
 										</div>
-										{item.message?.subject && (
-											<div className="text-xs text-gray-400 mt-1">📧 {item.message.subject}</div>
-										)}
+									</li>
+								))}
+							</ul>
+
+							{/* Phase 2 Optimization: Add pagination controls */}
+							{inboxPages > 1 && (
+								<div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-700">
+									<div className="text-sm text-gray-400">
+										Showing {(inboxPage - 1) * INBOX_LIMIT + 1} to{" "}
+										{Math.min(inboxPage * INBOX_LIMIT, inboxTotal)} of {inboxTotal} documents
 									</div>
 									<div className="flex gap-2">
-										{item.finalPdfUrl && (
-											<a
-												href={getAbsolutePdfUrl(item.finalPdfUrl)}
-												target="_blank"
-												rel="noreferrer"
-												className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
-											>
-												View PDF
-											</a>
-										)}
-										{item.myRecipientInfo?.signatureStatus !== "signed" ? (
-											<Link
-												href={`/fomiqsign/sign/${item.id}`}
-												className="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors"
-											>
-												Sign Document
-											</Link>
-										) : (
-											<div className="px-3 py-1 text-sm bg-gray-600 text-white rounded-md cursor-not-allowed opacity-50">
-												✅ Signed
-											</div>
-										)}
+										<button
+											onClick={() => loadDashboardData(Math.max(1, inboxPage - 1))}
+											disabled={inboxPage === 1}
+											className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md text-sm transition-colors"
+										>
+											Previous
+										</button>
+										<div className="flex items-center gap-1">
+											{Array.from({ length: Math.min(5, inboxPages) }, (_, i) => {
+												const pageNum = i + 1;
+												return (
+													<button
+														key={pageNum}
+														onClick={() => loadDashboardData(pageNum)}
+														className={`px-3 py-1 rounded-md text-sm transition-colors ${
+															inboxPage === pageNum
+																? "bg-blue-600 text-white"
+																: "bg-gray-700 hover:bg-gray-600 text-white"
+														}`}
+													>
+														{pageNum}
+													</button>
+												);
+											})}
+										</div>
+										<button
+											onClick={() => loadDashboardData(Math.min(inboxPages, inboxPage + 1))}
+											disabled={inboxPage === inboxPages}
+											className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md text-sm transition-colors"
+										>
+											Next
+										</button>
 									</div>
-								</li>
-							))}
-						</ul>
-						
-						{/* Phase 2 Optimization: Add pagination controls */}
-						{inboxPages > 1 && (
-							<div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-700">
-								<div className="text-sm text-gray-400">
-									Showing {(inboxPage - 1) * INBOX_LIMIT + 1} to{" "}
-									{Math.min(inboxPage * INBOX_LIMIT, inboxTotal)} of {inboxTotal} documents
 								</div>
-								<div className="flex gap-2">
-									<button
-										onClick={() => loadDashboardData(Math.max(1, inboxPage - 1))}
-										disabled={inboxPage === 1}
-										className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md text-sm transition-colors"
-									>
-										Previous
-									</button>
-									<div className="flex items-center gap-1">
-										{Array.from({ length: Math.min(5, inboxPages) }, (_, i) => {
-											const pageNum = i + 1;
-											return (
-												<button
-													key={pageNum}
-													onClick={() => loadDashboardData(pageNum)}
-													className={`px-3 py-1 rounded-md text-sm transition-colors ${
-														inboxPage === pageNum
-															? "bg-blue-600 text-white"
-															: "bg-gray-700 hover:bg-gray-600 text-white"
-													}`}
-												>
-													{pageNum}
-												</button>
-											);
-										})}
-									</div>
-									<button
-										onClick={() => loadDashboardData(Math.min(inboxPages, inboxPage + 1))}
-										disabled={inboxPage === inboxPages}
-										className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md text-sm transition-colors"
-									>
-										Next
-									</button>
-								</div>
-							</div>
-						)}
+							)}
 						</>
 					) : (
 						<div className="text-center py-8">
