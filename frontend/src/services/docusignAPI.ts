@@ -32,36 +32,20 @@ export const uploadDocument = async (file: File, name?: string): Promise<DocuSig
 	formData.append("document", file);
 	if (name) formData.append("name", name);
 
-	try {
-		const result = await serverApi.post("/docusign/upload", formData, {
-			headers: { "Content-Type": "multipart/form-data" },
-		});
+	const result = await serverApi.post("/docusign/upload", formData, {
+		headers: { "Content-Type": "multipart/form-data" },
+	});
 
-		if (!result.success) {
-			throw new Error(result.message || "Failed to upload document");
-		}
-
-		return result.data;
-	} catch (error) {
-		// Extract error details and throw with code if available
-		let message = "Failed to upload document";
-		let code: string | undefined;
-
-		if (error instanceof Error) {
-			message = error.message;
-			// Check for custom error properties
-			if ("code" in error) {
-				code = (error as Record<string, unknown>).code as string | undefined;
-			}
-		}
-
-		// Create error with code as property so it survives server action serialization
-		const err = new Error(message) as Error & { code?: string };
-		if (code) {
-			err.code = code;
+	if (!result.success) {
+		// Create error with both message and code
+		const err = new Error(result.message || "Failed to upload document") as Error & { code?: string };
+		if (result.code) {
+			err.code = result.code;
 		}
 		throw err;
 	}
+
+	return result.data;
 };
 
 // Keep the old function name for backward compatibility

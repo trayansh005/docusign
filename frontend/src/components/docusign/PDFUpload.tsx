@@ -29,26 +29,24 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 			onUploadSuccess?.(data);
 		},
 		onError: (err: unknown) => {
-			// Extract error message and code
-			let message = "";
-			let code = "";
-
-			// Handle ApiError with code property
+			// Check if this is a free plan limit error
 			if (err instanceof Error) {
-				message = err.message;
-				// Check if it's an ApiError with code property
-				if ("code" in err && typeof (err as Record<string, unknown>).code === "string") {
-					code = (err as Record<string, unknown>).code as string;
+				// Check for code property first (most reliable)
+				const code = (err as unknown as Record<string, unknown>).code;
+				if (code === "FREE_LIMIT_REACHED") {
+					setLimitError("Free plan limit reached. Please upgrade to upload more documents.");
+					return;
+				}
+				
+				// Fallback: check message
+				if (err.message?.includes("Free plan limit")) {
+					setLimitError("Free plan limit reached. Please upgrade to upload more documents.");
+					return;
 				}
 			}
-
-			// Check if this is a free plan limit error
-			// Backend sends both message and code for FREE_LIMIT_REACHED
-			if (code === "FREE_LIMIT_REACHED" || /Free plan limit|FREE_LIMIT_REACHED/i.test(message)) {
-				setLimitError("Free plan limit reached. Please upgrade to upload more documents.");
-			} else {
-				setLimitError(null);
-			}
+			
+			// Not a limit error, clear it
+			setLimitError(null);
 		},
 	});
 
