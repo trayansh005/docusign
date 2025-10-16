@@ -32,23 +32,34 @@ export const uploadDocument = async (file: File, name?: string): Promise<DocuSig
 	formData.append("document", file);
 	if (name) formData.append("name", name);
 
-	const result = await serverApi.post("/docusign/upload", formData, {
-		headers: { "Content-Type": "multipart/form-data" },
-	});
-
-	if (!result.success) {
-		// Return error response with code - this survives serialization better than Error properties
-		const error = new Error(result.message || "Failed to upload document");
-		(error as unknown as Record<string, string>).code = result.code;
-		console.log("[uploadDocument] Error thrown:", {
-			message: error.message,
-			code: result.code,
-			errorObject: error,
+	try {
+		const result = await serverApi.post("/docusign/upload", formData, {
+			headers: { "Content-Type": "multipart/form-data" },
 		});
+
+		if (!result.success) {
+			// Create error message with embedded code that survives serialization
+			// Format: "ERROR:CODE:message" so we can parse it on the client
+			const errorMsg = `ERROR:${result.code || "UNKNOWN"}:${result.message || "Upload failed"}`;
+			console.log("[uploadDocument] Throwing error:", errorMsg);
+			throw new Error(errorMsg);
+		}
+
+		return result.data;
+	} catch (error) {
+		// If it's already our formatted error, re-throw as-is
+		if (error instanceof Error && error.message.startsWith("ERROR:")) {
+			throw error;
+		}
+		// If it's an ApiError from serverApi, wrap it with our format
+		if (error instanceof Error) {
+			const code = (error as unknown as Record<string, string>).code || "UNKNOWN";
+			const errorMsg = `ERROR:${code}:${error.message}`;
+			console.log("[uploadDocument] Wrapping error:", errorMsg);
+			throw new Error(errorMsg);
+		}
 		throw error;
 	}
-
-	return result.data;
 };
 
 // Keep the old function name for backward compatibility

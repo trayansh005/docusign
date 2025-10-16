@@ -45,9 +45,19 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
 			// Check if this is a free plan limit error
 			if (err instanceof Error) {
+				// Check for code in new error message format
+				// Format: "ERROR:CODE:message"
+				const match = err.message.match(/^ERROR:([A-Z_]+):/);
+				if (match && match[1] === "FREE_LIMIT_REACHED") {
+					console.log("[PDFUpload] Free limit error detected from message");
+					setLimitError("Free plan limit reached. Please upgrade to upload more documents.");
+					return;
+				}
+
 				// Check for code property first (might work in dev)
 				const codeProperty = (err as unknown as Record<string, unknown>).code;
 				if (codeProperty === "FREE_LIMIT_REACHED") {
+					console.log("[PDFUpload] Free limit error detected from code property");
 					setLimitError("Free plan limit reached. Please upgrade to upload more documents.");
 					return;
 				}
@@ -56,12 +66,14 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 				// Error message format: "[FREE_LIMIT_REACHED] message text"
 				const codeMatch = err.message.match(/^\[([A-Z_]+)\]/);
 				if (codeMatch && codeMatch[1] === "FREE_LIMIT_REACHED") {
+					console.log("[PDFUpload] Free limit error detected from bracket format");
 					setLimitError("Free plan limit reached. Please upgrade to upload more documents.");
 					return;
 				}
 
 				// Fallback: check message content
 				if (err.message?.includes("Free plan limit")) {
+					console.log("[PDFUpload] Free limit error detected from message content");
 					setLimitError("Free plan limit reached. Please upgrade to upload more documents.");
 					return;
 				}
