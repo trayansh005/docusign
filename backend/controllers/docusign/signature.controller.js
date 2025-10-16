@@ -2,9 +2,10 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
-import sharp from "sharp";
 import { PDFDocument as PDFLibDocument } from "pdf-lib";
 import DocuSignTemplate from "../../models/DocuSignTemplate.js";
+import Subscription from "../../models/Subscription.js";
+import { getFreeTierLimits } from "../../utils/freeTierLimits.js";
 import DocuSignDocument from "../../models/DocuSignDocument.js";
 import { logDocuSignActivity } from "../../services/ActivityService.js";
 import { TemplateValidator } from "../../validators/TemplateValidator.js";
@@ -364,7 +365,7 @@ async function applySignaturesPdfLib(template, fields, signatureMap, viewport) {
 export const applySignatures = async (req, res) => {
 	try {
 		const { templateId } = req.params;
-		const { signatures, fields: incomingFields, viewport } = req.body;
+		const { signatures, fields: incomingFields, viewport, recipients, message } = req.body;
 
 		if (!TemplateValidator.isValidObjectId(templateId)) {
 			return res.status(400).json({ success: false, message: "Invalid template ID" });
@@ -373,6 +374,87 @@ export const applySignatures = async (req, res) => {
 		const template = await DocuSignTemplate.findById(templateId);
 		if (!template) {
 			return res.status(404).json({ success: false, message: "Template not found" });
+		}
+
+		// Enforce free-tier signing limit: if the current user is the owner and has no active subscription,
+		// allow only one signed document total (status === 'final'). If already signed one, block further signing.
+		try {
+			const userId = req.user?.id;
+			if (userId && String(template.createdBy) === String(userId)) {
+				const now = new Date();
+				const activeSub = await Subscription.findOne({
+					userId,
+					status: "active",
+					$or: [{ endDate: { $exists: false } }, { endDate: { $gt: now } }],
+				});
+
+				if (!activeSub) {
+					const signedCount = await DocuSignTemplate.countDocuments({
+						createdBy: userId,
+						status: "final",
+						isArchived: { $ne: true },
+					});
+
+					const { signedLimit } = getFreeTierLimits();
+					// If this template is already final we shouldn't block; otherwise enforce limit
+					if (signedCount >= signedLimit && template.status !== "final") {
+						return res.status(403).json({
+							success: false,
+							code: "FREE_SIGN_LIMIT_REACHED",
+							message: "Free plan signing limit reached. Upgrade your plan to sign more documents.",
+						});
+					}
+				}
+			}
+		} catch (limitErr) {
+			console.error("Free-tier sign limit check failed:", limitErr);
+			// Continue without blocking on limit check failure
+		}
+
+		// Process and save recipients if provided
+		if (recipients && Array.isArray(recipients) && recipients.length > 0) {
+			const User = (await import("../../models/User.js")).default;
+
+			// Enrich recipients with user IDs where possible
+			const enrichedRecipients = await Promise.all(
+				recipients.map(async (recipient) => {
+					const recipientData = {
+						id: recipient.id || `${Date.now()}-${Math.random()}`,
+						name: recipient.name,
+						email: recipient.email,
+						signatureStatus: "pending",
+						notifiedAt: new Date(),
+					};
+
+					// Try to find matching user by email or ID
+					if (recipient.email) {
+						const user = await User.findOne({ email: recipient.email });
+						if (user) {
+							recipientData.userId = user._id;
+						}
+					} else if (recipient.id) {
+						const user = await User.findById(recipient.id).catch(() => null);
+						if (user) {
+							recipientData.userId = user._id;
+							recipientData.email = user.email;
+						}
+					}
+
+					return recipientData;
+				})
+			);
+
+			template.recipients = enrichedRecipients;
+			console.log(`[Signature] Saved ${enrichedRecipients.length} recipients to template`);
+		}
+
+		// Save message if provided
+		if (message) {
+			template.message = {
+				subject: message.subject || "",
+				body: message.body || "",
+			};
+			console.log(`[Signature] Saved message: ${message.subject}`);
 		}
 
 		const signatureMap = processSignatureData(signatures || []);
@@ -394,32 +476,50 @@ export const applySignatures = async (req, res) => {
 
 		await template.save();
 
-		// Persist final signed PDF as a DocuSignDocument
+		// Update the existing DocuSignDocument with final signed PDF info (instead of creating a new one)
 		try {
 			const finalBuf = fs.readFileSync(outPath);
 			const finalHash = crypto.createHash("sha256").update(finalBuf).digest("hex");
 
-			let finalDoc = await DocuSignDocument.findOne({ fileHash: finalHash });
-			if (!finalDoc) {
+			// Find the existing document linked to this template
+			let finalDoc = null;
+			if (template.metadata?.document) {
+				finalDoc = await DocuSignDocument.findById(template.metadata.document);
+			}
+
+			if (finalDoc) {
+				// Update the existing document with final PDF information
+				finalDoc.finalPdfPath = template.finalPdfUrl;
+				finalDoc.finalPdfHash = finalHash;
+				finalDoc.finalPdfSize = finalBuf.length;
+				finalDoc.status = "signed";
+				await finalDoc.save();
+
+				console.log(`[Signature] Updated existing DocuSignDocument ${finalDoc._id} with final PDF`);
+			} else {
+				// Fallback: create a new document if none exists (shouldn't happen in normal flow)
+				console.warn("[Signature] No existing DocuSignDocument found, creating new one");
 				finalDoc = await DocuSignDocument.create({
 					fileId: `${template._id}-final`,
 					filename: `${template._id}-final.pdf`,
 					mimeType: "application/pdf",
 					fileSize: finalBuf.length,
-					originalPdfPath: template.finalPdfUrl,
-					fileHash: finalHash,
-					status: "ready",
+					originalPdfPath: template.metadata?.originalPdfPath || "",
+					finalPdfPath: template.finalPdfUrl,
+					fileHash: template.metadata?.fileHash,
+					finalPdfHash: finalHash,
+					finalPdfSize: finalBuf.length,
+					status: "signed",
+					template: template._id,
 				});
-			} else {
-				finalDoc.originalPdfPath = template.finalPdfUrl;
-				await finalDoc.save();
-			}
 
-			template.metadata = template.metadata || {};
-			template.metadata.finalDocument = finalDoc._id;
-			await template.save();
+				// Update template reference
+				template.metadata = template.metadata || {};
+				template.metadata.document = finalDoc._id;
+				await template.save();
+			}
 		} catch (err) {
-			console.warn("Failed to persist final DocuSignDocument:", err.message);
+			console.warn("Failed to update DocuSignDocument with final PDF:", err.message);
 		}
 
 		await logDocuSignActivity(
@@ -429,6 +529,40 @@ export const applySignatures = async (req, res) => {
 			{ templateId: template._id, name: template.name, signatureCount: signatures?.length || 0 },
 			req
 		);
+
+		// Send notifications to recipients if they exist
+		if (template.recipients && template.recipients.length > 0) {
+			try {
+				const User = (await import("../../models/User.js")).default;
+				const { notifyAllRecipients } = await import("../../services/NotificationService.js");
+
+				// Get sender name
+				const sender = await User.findById(req.user?.id);
+				const senderName = sender
+					? `${sender.firstName || ""} ${sender.lastName || ""}`.trim() || sender.email
+					: "Someone";
+
+				// Get app base URL from environment or request
+				const appBaseUrl =
+					process.env.FRONTEND_URL ||
+					process.env.NEXT_PUBLIC_APP_URL ||
+					`${req.protocol}://${req.get("host")}`;
+
+				// Send notifications
+				const notificationResult = await notifyAllRecipients({
+					template,
+					senderName,
+					appBaseUrl,
+				});
+
+				console.log(
+					`[Signature] Sent ${notificationResult.notified} notification(s) to recipients`
+				);
+			} catch (notifyError) {
+				// Don't fail the request if notifications fail
+				console.error("[Signature] Failed to send notifications:", notifyError.message);
+			}
+		}
 
 		return res.status(200).json({
 			success: true,

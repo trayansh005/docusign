@@ -5,11 +5,22 @@ import { customValidations } from "../middlewares/validation.js";
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + "_refresh";
 
-// Cookie configuration
+// Cookie configuration (env-overridable for cross-site deployments)
+// If your frontend and backend are on different domains, set:
+// COOKIE_SAMESITE=none and COOKIE_SECURE=true (requires HTTPS)
 const cookieConfig = {
 	httpOnly: true,
-	secure: process.env.NODE_ENV === "production",
-	sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+	secure:
+		process.env.COOKIE_SECURE !== undefined
+			? String(process.env.COOKIE_SECURE).toLowerCase() === "true"
+			: process.env.NODE_ENV === "production",
+	sameSite:
+		process.env.COOKIE_SAMESITE !== undefined
+			? process.env.COOKIE_SAMESITE
+			: process.env.NODE_ENV === "production"
+			? "strict"
+			: "lax",
+	...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
 	path: "/",
 };
 
@@ -135,7 +146,7 @@ export const register = async (req, res) => {
 			firstName: user.firstName,
 			lastName: user.lastName,
 			email: user.email,
-			userType: 'user',
+			userType: "user",
 		};
 
 		// Generate tokens
@@ -446,13 +457,22 @@ export const logout = async (req, res) => {
 	try {
 		const { refreshToken: token } = req.cookies || req.body;
 
-		if (token && req.user) {
-			// Remove refresh token from database
-			const user = await User.findById(req.user.id);
-			if (user) {
-				user.refreshTokens =
-					user.refreshTokens?.filter((tokenObj) => tokenObj.token !== token) || [];
-				await user.save();
+		if (token) {
+			try {
+				// Try via authenticated user first
+				let user = req.user ? await User.findById(req.user.id) : null;
+				// Fallback: decode refresh token to identify user
+				if (!user) {
+					const decoded = jwt.verify(token, JWT_REFRESH_SECRET);
+					user = await User.findById(decoded.id);
+				}
+				if (user) {
+					user.refreshTokens =
+						user.refreshTokens?.filter((tokenObj) => tokenObj.token !== token) || [];
+					await user.save();
+				}
+			} catch (e) {
+				// Ignore decoding errors here; we'll still clear cookies below
 			}
 		}
 

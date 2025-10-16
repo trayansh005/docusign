@@ -54,6 +54,43 @@ const signatureFieldSchema = new mongoose.Schema(
 	{ _id: false }
 );
 
+// Recipient schema - users who need to sign the document
+const recipientSchema = new mongoose.Schema(
+	{
+		id: {
+			type: String,
+			required: true,
+		},
+		name: {
+			type: String,
+			required: true,
+		},
+		email: {
+			type: String,
+		},
+		// Reference to User model if the recipient is a registered user
+		userId: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "User",
+		},
+		// Status of this recipient's signature
+		signatureStatus: {
+			type: String,
+			enum: ["pending", "signed", "declined"],
+			default: "pending",
+		},
+		// When the recipient signed
+		signedAt: {
+			type: Date,
+		},
+		// Notification tracking
+		notifiedAt: {
+			type: Date,
+		},
+	},
+	{ _id: false }
+);
+
 const templateSchema = new mongoose.Schema(
 	{
 		name: {
@@ -81,6 +118,13 @@ const templateSchema = new mongoose.Schema(
 			min: 1,
 		},
 		signatureFields: [signatureFieldSchema],
+		// Recipients - users who need to sign the document
+		recipients: [recipientSchema],
+		// Message sent with the document
+		message: {
+			subject: { type: String, default: "" },
+			body: { type: String, default: "" },
+		},
 		status: {
 			type: String,
 			enum: ["draft", "active", "final", "archived", "processing", "failed"],

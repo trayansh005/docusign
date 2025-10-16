@@ -2,7 +2,7 @@ import express from "express";
 import { authenticateToken } from "../middleware/auth.js";
 
 // Import optimized controllers
-import { upload, uploadAndProcessPDF } from "../controllers/docusign/upload.controller.js";
+import { upload, uploadAndProcessDocument } from "../controllers/docusign/upload.controller.js";
 import {
 	listTemplates,
 	getTemplate,
@@ -19,6 +19,7 @@ import {
 	applySignatures,
 	getSignedDocument,
 } from "../controllers/docusign/signature.controller.js";
+import { recipientSignDocument } from "../controllers/docusign/recipient-sign.controller.js";
 import {
 	updateTemplateStatus,
 	getTemplateStatusHistory,
@@ -26,6 +27,7 @@ import {
 	getSignatureTracking,
 	getStatusStatistics,
 } from "../controllers/docusign/status.controller.js";
+import { migrateTemplates } from "../controllers/docusign/migration.controller.js";
 
 const router = express.Router();
 
@@ -34,8 +36,8 @@ router.use(authenticateToken);
 
 // ===== OPTIMIZED ROUTES =====
 
-// PDF Upload and processing (optimized)
-router.post("/upload", upload.single("pdf"), uploadAndProcessPDF);
+// Document Upload and processing (optimized) - supports PDF and Word documents
+router.post("/upload", upload.single("document"), uploadAndProcessDocument);
 
 // Template management (optimized)
 router.get("/", listTemplates);
@@ -53,6 +55,9 @@ router.delete("/:templateId/fields/:fieldId", deleteSignatureField);
 
 // ===== SIGNATURE ROUTES =====
 
+// Recipient signing (user signs document sent to them)
+router.post("/:templateId/sign", recipientSignDocument);
+
 // Signature application (optimized with pdf-lib)
 router.post("/:templateId/apply-signatures", applySignatures);
 router.get("/:templateId/signed", getSignedDocument);
@@ -67,5 +72,10 @@ router.get("/status/statistics", getStatusStatistics);
 
 // Signature tracking (optimized)
 router.get("/:templateId/signature-tracking", getSignatureTracking);
+
+// ===== MIGRATION ROUTES =====
+
+// Migrate old templates to new format
+router.post("/migrate", migrateTemplates);
 
 export default router;

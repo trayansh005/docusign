@@ -91,15 +91,15 @@ export default function Register() {
 	};
 
 	return (
-		<div className="min-h-screen bg-gradient-main flex items-center justify-center px-4">
-			<div className="card w-full max-w-md">
-				<div className="p-8">
-					<div className="text-center mb-8">
-						<h1 className="text-3xl font-bold text-white mb-2">Create Account</h1>
-						<p className="text-white/70">Join DocuSign Integration Platform</p>
+		<div className="min-h-screen flex items-center justify-center px-4 py-12">
+			<div className="card w-full max-w-md mx-auto shadow-2xl border-2 border-white/10 bg-slate-800/50">
+				<div className="p-6">
+					<div className="text-center mb-6">
+						<h1 className="text-2xl font-bold text-white mb-2">Create Account</h1>
+						<p className="text-white/70 text-sm">Join DocuSign Integration Platform</p>
 					</div>
 
-					<form onSubmit={handleSubmit} className="space-y-6">
+					<form onSubmit={handleSubmit} className="space-y-4">
 						<div className="grid grid-cols-2 gap-4">
 							<div>
 								<input
@@ -216,8 +216,8 @@ export default function Register() {
 						</button>
 					</form>
 
-					<div className="mt-6 text-center">
-						<p className="text-white/70">
+					<div className="mt-4 text-center">
+						<p className="text-white/70 text-sm">
 							Already have an account?{" "}
 							<Link href="/login" className="text-blue-400 hover:text-blue-300 font-medium">
 								Sign In

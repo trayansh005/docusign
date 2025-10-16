@@ -27,9 +27,9 @@ function buildUrl(endpoint: string, params?: Record<string, unknown>): string {
 }
 
 // Template Management
-export const uploadPDF = async (file: File, name?: string): Promise<DocuSignTemplateData> => {
+export const uploadDocument = async (file: File, name?: string): Promise<DocuSignTemplateData> => {
 	const formData = new FormData();
-	formData.append("pdf", file);
+	formData.append("document", file);
 	if (name) formData.append("name", name);
 
 	const result = await serverApi.post("/docusign/upload", formData, {
@@ -37,11 +37,14 @@ export const uploadPDF = async (file: File, name?: string): Promise<DocuSignTemp
 	});
 
 	if (!result.success) {
-		throw new Error(result.message || "Failed to upload PDF");
+		throw new Error(result.message || "Failed to upload document");
 	}
 
 	return result.data;
 };
+
+// Keep the old function name for backward compatibility
+export const uploadPDF = uploadDocument;
 
 export const getTemplates = async (params?: {
 	page?: number;

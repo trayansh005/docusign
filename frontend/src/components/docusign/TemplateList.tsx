@@ -183,11 +183,11 @@ export const TemplateList: React.FC<TemplateListProps> = ({
 						<div className="text-slate-600 mb-6">
 							{searchTerm || statusFilter !== "all"
 								? "Try adjusting your search or filters to find what you're looking for"
-								: "Get started by uploading a PDF to create your first template"}
+								: "Get started by uploading a PDF or Word document to create your first template"}
 						</div>
 						{!searchTerm && statusFilter === "all" && (
 							<button className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
-								Upload PDF
+								Upload Document
 							</button>
 						)}
 					</div>

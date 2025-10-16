@@ -121,20 +121,20 @@ export default function Footer() {
 								</a>
 							</li>
 							<li>
-								<a
-									href="#"
+								<Link
+									href="/terms-of-service"
 									className="text-slate-300 hover:text-white transition-colors duration-200"
 								>
 									Terms of Service
-								</a>
+								</Link>
 							</li>
 							<li>
-								<a
-									href="#"
+								<Link
+									href="/contact"
 									className="text-slate-300 hover:text-white transition-colors duration-200"
 								>
 									Contact Us
-								</a>
+								</Link>
 							</li>
 						</ul>
 					</div>
@@ -147,11 +147,9 @@ export default function Footer() {
 						management.
 					</p>
 					<div className="flex items-center space-x-6 mt-4 md:mt-0">
-						<span className="text-slate-300 text-sm">Powered by</span>
+						<span className="text-slate-300 text-sm">Maintained by</span>
 						<div className="flex items-center space-x-2">
-							<span className="text-blue-400 font-semibold text-sm">Next.js</span>
-							<span className="text-slate-300">•</span>
-							<span className="text-cyan-400 font-semibold text-sm">TailwindCSS</span>
+							<span className="text-blue-400 font-semibold text-sm">RSSC Technologies</span>
 						</div>
 					</div>
 				</div>

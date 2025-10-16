@@ -67,7 +67,6 @@ html {
 
 body {
 	background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #000000 100%);
-	color: #e2e8f0;
 	font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
 	line-height: 1.6;
 	min-height: 100vh;

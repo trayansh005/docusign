@@ -53,6 +53,9 @@ export interface TemplateMetadata {
 	fileSize: number;
 	document?: string; // ObjectId reference to DocuSignDocument
 	originalPdfPath: string;
+	// If the original upload was a Word document, backend may set these
+	originalWordFile?: string;
+	convertedFromWord?: boolean;
 	pageWidth?: number;
 	pageHeight?: number;
 }

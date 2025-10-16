@@ -10,11 +10,13 @@ import {
 	RotateCw,
 	Trash2,
 	Palette,
+	PenTool,
 } from "lucide-react";
 import { DndContext, useDraggable, DragEndEvent } from "@dnd-kit/core";
 import { ensureAbsoluteUrl } from "@/lib/urlUtils";
 import { DocuSignTemplateData, SignatureField } from "@/types/docusign";
 import { useAuth } from "@/contexts/AuthContext";
+import { SignaturePad } from "./SignaturePad";
 
 // Available signature fonts
 const SIGNATURE_FONTS = [
@@ -57,11 +59,13 @@ const PDFPageCanvas = dynamic(
 		ssr: false,
 		loading: () => (
 			<div className="flex items-center justify-center p-8 min-h-[600px] bg-gray-100">
-				<div className="text-gray-600">Loading PDF viewer...</div>
+				<div className="text-gray-600">Loading document viewer...</div>
 			</div>
 		),
 	}
 );
+
+// Removed Word document viewer - now using PDF viewer for all documents
 
 interface MultiPageTemplateViewerProps {
 	template: DocuSignTemplateData;
@@ -70,6 +74,8 @@ interface MultiPageTemplateViewerProps {
 	onFieldUpdate?: (pageNumber: number, fieldId: string, patch: Partial<SignatureField>) => void;
 	editable?: boolean;
 	className?: string;
+	activeSignatureField?: SignatureField | null;
+	setActiveSignatureField?: (field: SignatureField | null) => void;
 }
 
 export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = ({
@@ -79,11 +85,19 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 	onFieldUpdate,
 	editable = false,
 	className = "",
+	activeSignatureField: externalActiveField,
+	setActiveSignatureField: externalSetActiveField,
 }) => {
 	const [currentPage, setCurrentPage] = useState(1);
 	const [zoom, setZoom] = useState(1);
 	const [rotation, setRotation] = useState(0);
 	const contentRef = useRef<HTMLDivElement | null>(null);
+
+	// Use external state if provided, otherwise use internal state
+	const [internalActiveField, setInternalActiveField] = useState<SignatureField | null>(null);
+	const activeSignatureField =
+		externalActiveField !== undefined ? externalActiveField : internalActiveField;
+	const setActiveSignatureField = externalSetActiveField || setInternalActiveField;
 
 	// Get logged-in user
 	const { user } = useAuth();
@@ -94,6 +108,35 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 
 	const userInitials =
 		user?.firstName && user?.lastName ? `${user.firstName[0]}${user.lastName[0]}` : "YI";
+
+	// Handle signature field click (for recipients to fill in)
+	const handleFieldClick = useCallback(
+		(field: SignatureField, e: React.MouseEvent) => {
+			e.stopPropagation();
+			// Check if this field belongs to the current user
+			const userId = (user as { id?: string })?.id || "";
+			const isMyField = user && (field.recipientId === user.email || field.recipientId === userId);
+
+			if (isMyField && !field.value) {
+				// Open signature pad for this field
+				setActiveSignatureField(field);
+			}
+		},
+		[user, setActiveSignatureField]
+	);
+
+	// Handle signature completion from SignaturePad
+	const handleSignatureComplete = useCallback(
+		(fieldId: string, signatureData: string) => {
+			// Signature captured for field
+			if (onFieldUpdate) {
+				onFieldUpdate(currentPage, fieldId, { value: signatureData });
+				// Field updated with signature
+			}
+			setActiveSignatureField(null);
+		},
+		[onFieldUpdate, currentPage, setActiveSignatureField]
+	);
 
 	// Handle font change for signature fields
 	const handleFontChange = useCallback(
@@ -163,7 +206,9 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 			opacity: isDragging ? 0.8 : 1,
 		};
 
-		const fieldColor = "border-blue-500 bg-blue-50";
+		// Change color based on whether field has actual signature value
+		const hasSigned = field.value && field.value.trim() !== "";
+		const fieldColor = hasSigned ? "border-green-500 bg-green-50" : "border-blue-400 bg-blue-50";
 
 		const handleResizeStart = (e: React.MouseEvent) => {
 			e.stopPropagation();
@@ -234,19 +279,19 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 
 			switch (field.type) {
 				case "signature":
-					sizeFactor = Math.min(Math.max(pixelHeight * 0.45, 10), 40);
+					sizeFactor = Math.min(Math.max(pixelHeight * 0.35, 8), 24);
 					break;
 				case "initial":
-					sizeFactor = Math.min(Math.max(pixelHeight * 0.6, 8), 36);
+					sizeFactor = Math.min(Math.max(pixelHeight * 0.45, 8), 20);
 					break;
 				case "date":
-					sizeFactor = Math.min(Math.max(pixelHeight * 0.35, 8), 18);
+					sizeFactor = Math.min(Math.max(pixelHeight * 0.3, 8), 14);
 					break;
 				case "text":
-					sizeFactor = Math.min(Math.max(pixelHeight * 0.35, 8), 20);
+					sizeFactor = Math.min(Math.max(pixelHeight * 0.3, 8), 16);
 					break;
 				default:
-					sizeFactor = Math.min(Math.max(pixelHeight * 0.4, 10), 20);
+					sizeFactor = Math.min(Math.max(pixelHeight * 0.35, 8), 16);
 			}
 
 			return `${Math.round(sizeFactor)}px`;
@@ -267,7 +312,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 								? "shadow-2xl scale-110 ring-2 ring-blue-400 ring-opacity-50"
 								: "shadow-lg hover:scale-105"
 						}
-						group select-none ${isResizing ? "cursor-se-resize" : "cursor-move"}`}
+						group select-none ${isResizing ? "cursor-se-resize" : editable ? "cursor-move" : "cursor-pointer"}`}
 				>
 					<div className="flex flex-col items-center justify-center p-3 text-center min-w-0">
 						{(field.type === "signature" || field.type === "initial") &&
@@ -303,7 +348,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 						)}
 					</div>
 
-					{/* Resize handle - inside the draggable element */}
+					{/* Resize handle - bottom right corner */}
 					{editable && (
 						<div
 							onMouseDown={handleResizeStart}
@@ -311,6 +356,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 							style={{ zIndex: 20 }}
 							title="Drag to resize"
 						>
+							{/* Resize icon - small grip lines */}
 							<div className="absolute inset-0 flex items-center justify-center">
 								<div className="grid grid-cols-2 gap-0.5">
 									<div className="w-0.5 h-0.5 bg-white rounded-full"></div>
@@ -354,7 +400,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 									isDragging ? "opacity-0" : "opacity-100"
 								}`}
 								style={{
-									left: `calc(${field.xPct}% + ${field.wPct / 2}% - 12px)`,
+									left: `calc(${field.xPct}% + ${field.wPct / 2}% - 24px)`,
 									top: `calc(${field.yPct}% - 12px)`,
 									zIndex: 30,
 								}}
@@ -368,6 +414,28 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 								})`}
 							>
 								<Palette className="w-3.5 h-3.5" />
+							</button>
+						)}
+
+						{/* Sign/Draw button - Opens signature pad */}
+						{(field.type === "signature" || field.type === "initial") && (
+							<button
+								type="button"
+								className={`absolute w-7 h-7 rounded-full bg-green-600 text-white shadow-lg transition-all duration-200 flex items-center justify-center z-10 hover:bg-green-700 pointer-events-auto ${
+									isDragging ? "opacity-0" : "opacity-100"
+								}`}
+								style={{
+									left: `calc(${field.xPct}% + ${field.wPct / 2}% + 12px)`,
+									top: `calc(${field.yPct}% - 12px)`,
+									zIndex: 30,
+								}}
+								onClick={(e) => {
+									e.stopPropagation();
+									handleFieldClick(field, e);
+								}}
+								title="Click to sign this field"
+							>
+								<PenTool className="w-3.5 h-3.5" />
 							</button>
 						)}
 					</>
@@ -422,22 +490,15 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 		[editable, currentPage, onFieldAdd]
 	);
 
-	const handlePageLoad = useCallback(
-		(width: number, height: number) => {
-			console.log("[MultiPageTemplateViewer] Page loaded:", { width, height, page: currentPage });
-		},
-		[currentPage]
-	);
+	const handlePageLoad = useCallback(() => {
+		// Page loaded
+	}, []);
 
-	// Debug: Log PDF URL
-	console.log("[MultiPageTemplateViewer] Rendering with:", {
-		templateId: template._id,
-		templateName: template.name,
-		pdfUrl: template.pdfUrl,
-		absoluteUrl: ensureAbsoluteUrl(template.pdfUrl),
-		currentPage,
-		numPages: template.numPages,
-	});
+	// Debug: Log document info
+	// Use finalPdfUrl if available (signed document), otherwise use original pdfUrl
+	const pdfUrlToUse = template.finalPdfUrl || template.pdfUrl || template.metadata?.originalPdfPath;
+
+	// Rendering viewer with computed PDF URL
 
 	return (
 		<div className={`space-y-4 ${className}`}>
@@ -503,54 +564,55 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 			{/* Viewer */}
 			<div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
 				<div
-					className="relative overflow-auto bg-gray-50"
+					className="relative overflow-auto bg-gray-100 flex items-start justify-center"
 					style={{
 						cursor: editable ? "crosshair" : "default",
 						minHeight: "600px",
+						padding: "20px",
 					}}
 				>
-					<div className="relative inline-block w-full max-w-4xl mx-auto">
-						{/* A4 aspect-ratio wrapper */}
-						<div
-							className="relative bg-white"
-							style={{
-								aspectRatio: "1 / 1.4142",
-								width: "100%",
-								maxWidth: "100%",
-								transformOrigin: "top left",
-							}}
-						>
-							<DndContext onDragEnd={handleDragEnd}>
-								<div
-									ref={contentRef}
-									className="relative w-full h-full"
-									style={{
-										transform: `scale(${zoom}) rotate(${rotation}deg)`,
-										transformOrigin: "top left",
-										transition: "transform 0.2s ease-in-out",
-										overflow: "hidden",
-									}}
-									onClick={(e) =>
-										handleCanvasClick(e as unknown as React.MouseEvent<HTMLDivElement>)
-									}
-								>
-									{/* PDF Canvas */}
+					<div className="relative" style={{ maxWidth: "850px", width: "100%" }}>
+						<DndContext onDragEnd={handleDragEnd}>
+							<div
+								ref={contentRef}
+								className="relative w-full"
+								style={{
+									transform: `scale(${zoom}) rotate(${rotation}deg)`,
+									transformOrigin: "center top",
+									transition: "transform 0.2s ease-in-out",
+								}}
+								onClick={(e) => handleCanvasClick(e as unknown as React.MouseEvent<HTMLDivElement>)}
+							>
+								{/* Viewer - Always use PDF (Word docs are converted to PDF on backend) */}
+								{/* Use finalPdfUrl if available (signed document with fields), otherwise original PDF */}
+								{pdfUrlToUse ? (
 									<PDFPageCanvas
-										pdfUrl={ensureAbsoluteUrl(template.pdfUrl)}
+										pdfUrl={ensureAbsoluteUrl(pdfUrlToUse)}
 										pageNumber={currentPage}
 										zoom={1} // Apply zoom via CSS transform instead
 										rotation={0} // Apply rotation via CSS transform instead
 										onPageLoad={handlePageLoad}
-										className="w-full h-full"
+										className="w-full"
 									/>
+								) : (
+									<div className="flex items-center justify-center w-full min-h-[600px] bg-red-50 border border-red-200 rounded-lg">
+										<div className="text-center p-8">
+											<p className="text-red-600 font-medium mb-2">
+												No PDF available for this template
+											</p>
+											<p className="text-red-500 text-sm">
+												This template may need to be re-uploaded
+											</p>
+										</div>
+									</div>
+								)}
 
-									{/* Signature Fields Overlay - using new DraggableField component */}
-									{currentPageFields.map((field) => (
-										<DraggableField key={field.id} field={field} />
-									))}
-								</div>
-							</DndContext>
-						</div>
+								{/* Signature Fields Overlay - using new DraggableField component */}
+								{currentPageFields.map((field) => (
+									<DraggableField key={field.id} field={field} />
+								))}
+							</div>
+						</DndContext>
 					</div>
 				</div>
 			</div>
@@ -577,6 +639,19 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 					</div>
 				)}
 			</div>
+
+			{/* Signature Pad Modal for recipient signing */}
+			{activeSignatureField && (
+				<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+					<div className="bg-white rounded-lg shadow-xl max-w-2xl w-full">
+						<SignaturePad
+							field={activeSignatureField}
+							onSignatureComplete={handleSignatureComplete}
+							onClose={() => setActiveSignatureField(null)}
+						/>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 };

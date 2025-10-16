@@ -21,6 +21,12 @@ const docSchema = new mongoose.Schema(
 		fileSize: Number,
 		// Path to the original PDF on disk or remote URL
 		originalPdfPath: String,
+		// Path to the final signed PDF (when signatures are applied)
+		finalPdfPath: { type: String },
+		// Hash for the final signed PDF (for deduplication)
+		finalPdfHash: { type: String, sparse: true },
+		// Size of the final signed PDF
+		finalPdfSize: { type: Number },
 		// New: file/pdf hash for deduplication of original uploads (preferred).
 		fileHash: { type: String, sparse: true },
 		// Number of pages in the PDF
@@ -30,7 +36,7 @@ const docSchema = new mongoose.Schema(
 		// Processing status for ingestion/thumbnailing
 		status: {
 			type: String,
-			enum: ["pending", "processing", "ready", "failed"],
+			enum: ["pending", "processing", "ready", "signed", "failed"],
 			default: "pending",
 		},
 		// Link back to a template (one-to-one) if the document is attached to a template

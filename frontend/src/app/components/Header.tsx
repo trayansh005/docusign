@@ -29,7 +29,7 @@ export default function Header() {
 					</Link>
 
 					{/* Desktop Navigation */}
-					<nav className="hidden md:flex items-center space-x-1">
+					<nav className="hidden md:flex items-center space-x-1 text-white">
 						{isLoading ? (
 							<div className="flex items-center space-x-2">
 								<div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
@@ -39,6 +39,9 @@ export default function Header() {
 							<>
 								{!isAuthenticated ? (
 									<>
+										<Link href="/subscription" className="nav-link">
+											Pricing
+										</Link>
 										<Link href="/login" className="nav-link">
 											Sign In
 										</Link>
@@ -53,6 +56,9 @@ export default function Header() {
 									<>
 										<Link href="/subscription" className="nav-link">
 											Plans
+										</Link>
+										<Link href="/dashboard" className="nav-link">
+											Dashboard
 										</Link>
 										<Link href="/fomiqsign/dashboard" className="nav-link">
 											Sign Document
@@ -146,6 +152,13 @@ export default function Header() {
 								{!isAuthenticated ? (
 									<>
 										<Link
+											href="/subscription"
+											className="nav-link text-center"
+											onClick={() => setIsMenuOpen(false)}
+										>
+											Pricing
+										</Link>
+										<Link
 											href="/login"
 											className="nav-link text-center"
 											onClick={() => setIsMenuOpen(false)}
@@ -193,6 +206,13 @@ export default function Header() {
 											onClick={() => setIsMenuOpen(false)}
 										>
 											Plans
+										</Link>
+										<Link
+											href="/dashboard"
+											className="nav-link text-center"
+											onClick={() => setIsMenuOpen(false)}
+										>
+											Dashboard
 										</Link>
 										<Link
 											href="/fomiqsign/dashboard"

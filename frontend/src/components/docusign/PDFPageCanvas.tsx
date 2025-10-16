@@ -34,7 +34,7 @@ export const PDFPageCanvas: React.FC<PDFPageCanvasProps> = ({
 	React.useEffect(() => {
 		const updateWidth = () => {
 			if (containerRef.current) {
-				// Set width to container width (responsive)
+				// Use full container width for responsive display
 				const containerWidth = containerRef.current.offsetWidth;
 				setPageWidth(containerWidth > 0 ? containerWidth : 800);
 			}
@@ -59,8 +59,21 @@ export const PDFPageCanvas: React.FC<PDFPageCanvasProps> = ({
 
 	console.log("[PDFPageCanvas] Rendering PDF from:", pdfUrl, "page:", pageNumber);
 
+	// Handle empty or invalid PDF URL
+	if (!pdfUrl || pdfUrl.trim() === '') {
+		return (
+			<div className={className} style={{ width: "100%", maxWidth: "1200px" }}>
+				<div className="flex items-center justify-center p-8 min-h-[600px] bg-red-900/20 border border-red-500/30 rounded-lg">
+					<div className="text-red-400 font-medium">
+						No PDF URL provided. Please re-upload the document.
+					</div>
+				</div>
+			</div>
+		);
+	}
+
 	return (
-		<div ref={containerRef} className={className} style={{ width: "100%", maxWidth: "1200px" }}>
+		<div ref={containerRef} className={className} style={{ width: "100%", height: "100%" }}>
 			<Document
 				file={fileObject}
 				onLoadSuccess={onDocumentLoadSuccess}

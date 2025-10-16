@@ -34,7 +34,7 @@ export default function Login() {
 			toast.success("Login Successful", {
 				description: "Welcome back! Redirecting to your dashboard.",
 			});
-			setTimeout(() => router.push("/home"), 1500);
+			setTimeout(() => router.push("/dashboard"), 1500);
 		} else {
 			toast.error("Login Failed", {
 				description: result.message,
@@ -49,7 +49,7 @@ export default function Login() {
 	return (
 		<div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
 			<div className="max-w-md w-full">
-				<div className="card fade-in">
+				<div className="card fade-in shadow-2xl border-2 border-white/10 bg-slate-800/50">
 					<div className="text-center mb-8">
 						<div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center mx-auto mb-4">
 							<svg
@@ -72,7 +72,7 @@ export default function Login() {
 
 					<form onSubmit={handleSubmit} className="space-y-6">
 						<div>
-							<label htmlFor="email" className="form-label">
+							<label htmlFor="email" className="form-label text-white">
 								Email Address
 							</label>
 							<input
@@ -90,7 +90,7 @@ export default function Login() {
 						</div>
 
 						<div>
-							<label htmlFor="password" className="form-label">
+							<label htmlFor="password" className="form-label text-white">
 								Password
 							</label>
 							<input

@@ -20,9 +20,9 @@ export default function Home() {
 
 						<div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
 							<Link href="/register" className="btn btn-primary px-8 py-4 text-lg glow">
-								Get Started Free
+								Get Started
 							</Link>
-							<Link href="/FomiqSign" className="btn btn-outline px-8 py-4 text-lg">
+							<Link href="/fomiqsign/dashboard" className="btn btn-outline px-8 py-4 text-lg">
 								Sign Document
 							</Link>
 						</div>
@@ -54,7 +54,7 @@ export default function Home() {
 			<section className="py-24 relative">
 				<div className="container mx-auto px-4 sm:px-6 lg:px-8">
 					<div className="text-center mb-16">
-						<h2 className="text-3xl sm:text-4xl font-bold mb-4">
+						<h2 className="text-3xl sm:text-4xl font-bold mb-4 text-white">
 							Powerful Features for Modern Workflows
 						</h2>
 						<p className="text-slate-300 max-w-2xl mx-auto">
@@ -79,7 +79,7 @@ export default function Home() {
 									/>
 								</svg>
 							</div>
-							<h3 className="text-xl font-semibold mb-3">Secure Signatures</h3>
+							<h3 className="text-xl font-semibold mb-3 text-white">Secure Signatures</h3>
 							<p className="text-slate-300">
 								Industry-leading security with 256-bit encryption and legally binding digital
 								signatures.
@@ -102,7 +102,7 @@ export default function Home() {
 									/>
 								</svg>
 							</div>
-							<h3 className="text-xl font-semibold mb-3">Lightning Fast</h3>
+							<h3 className="text-xl font-semibold mb-3 text-white">Lightning Fast</h3>
 							<p className="text-slate-300">
 								Sign documents in seconds with our optimized platform built for speed and
 								reliability.
@@ -125,7 +125,7 @@ export default function Home() {
 									/>
 								</svg>
 							</div>
-							<h3 className="text-xl font-semibold mb-3">Flexible Plans</h3>
+							<h3 className="text-xl font-semibold mb-3 text-white">Flexible Plans</h3>
 							<p className="text-slate-300">
 								Choose from various subscription plans that scale with your business needs.
 							</p>
@@ -147,7 +147,7 @@ export default function Home() {
 									/>
 								</svg>
 							</div>
-							<h3 className="text-xl font-semibold mb-3">Analytics</h3>
+							<h3 className="text-xl font-semibold mb-3 text-white">Analytics</h3>
 							<p className="text-slate-300">
 								Track document status, signing progress, and get insights into your workflow.
 							</p>
@@ -169,7 +169,7 @@ export default function Home() {
 									/>
 								</svg>
 							</div>
-							<h3 className="text-xl font-semibold mb-3">Team Collaboration</h3>
+							<h3 className="text-xl font-semibold mb-3 text-white">Team Collaboration</h3>
 							<p className="text-slate-300">
 								Seamlessly collaborate with team members and manage permissions efficiently.
 							</p>
@@ -191,7 +191,7 @@ export default function Home() {
 									/>
 								</svg>
 							</div>
-							<h3 className="text-xl font-semibold mb-3">24/7 Support</h3>
+							<h3 className="text-xl font-semibold mb-3 text-white">24/7 Support</h3>
 							<p className="text-slate-300">
 								Get help whenever you need it with our dedicated support team available around the
 								clock.
@@ -205,7 +205,7 @@ export default function Home() {
 			<section className="py-24 relative">
 				<div className="container mx-auto px-4 sm:px-6 lg:px-8">
 					<div className="max-w-4xl mx-auto text-center glass rounded-2xl p-12">
-						<h2 className="text-3xl sm:text-4xl font-bold mb-6">
+						<h2 className="text-3xl sm:text-4xl font-bold mb-6 text-white">
 							Ready to Transform Your Workflow?
 						</h2>
 						<p className="text-xl text-slate-300 mb-8 max-w-2xl mx-auto">
@@ -214,7 +214,7 @@ export default function Home() {
 						</p>
 						<div className="flex flex-col sm:flex-row gap-4 justify-center">
 							<Link href="/register" className="btn btn-primary px-8 py-4 text-lg">
-								Start Free Trial
+								Get Started
 							</Link>
 							<Link href="/subscription" className="btn btn-secondary px-8 py-4 text-lg">
 								View Pricing

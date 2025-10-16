@@ -1,29 +1,38 @@
 import express from "express";
-import Subscription from "../models/Subscription.js";
 import { authenticate } from "../middleware/auth.js";
+import {
+	getPlans,
+	getUserSubscription,
+	createSubscription,
+	cancelSubscription,
+} from "../controllers/subscriptionController.js";
+import {
+	createCheckoutSession,
+	verifySession,
+	stripeWebhook,
+} from "../controllers/stripeController.js";
 
 const router = express.Router();
 
-// Get user subscriptions
-router.get("/", authenticate, async (req, res) => {
-	try {
-		const subscriptions = await Subscription.find({ user: req.user.id }).populate("user");
-		res.json(subscriptions);
-	} catch (err) {
-		res.status(500).json({ message: err.message });
-	}
-});
+// Plans
+router.get("/plans", getPlans);
 
-// Create subscription
-router.post("/", authenticate, async (req, res) => {
-	try {
-		const { plan, price } = req.body;
-		const subscription = new Subscription({ user: req.user.id, plan, price });
-		await subscription.save();
-		res.status(201).json(subscription);
-	} catch (err) {
-		res.status(400).json({ message: err.message });
-	}
-});
+// User subscription
+router.get("/me", authenticate, getUserSubscription);
+
+// Create (manual) subscription
+router.post("/", authenticate, createSubscription);
+
+// Cancel
+router.post("/cancel", authenticate, cancelSubscription);
+
+// Stripe checkout creation
+router.post("/checkout", authenticate, createCheckoutSession);
+
+// Verify session (manual / fallback)
+router.post("/verify", authenticate, verifySession);
+
+// Webhook - needs raw body when mounted; Wire expects express.json by default in server.js
+router.post("/webhook", express.raw({ type: "application/json" }), stripeWebhook);
 
 export default router;

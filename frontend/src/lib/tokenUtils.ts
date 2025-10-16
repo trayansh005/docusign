@@ -26,7 +26,7 @@ export const tokenUtils = {
 			localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, refreshToken);
 		}
 
-		// Also set cookies for server-side middleware
+		// Also set non-httpOnly cookies for Next middleware checks (backend also sets httpOnly cookies)
 		document.cookie = `${TOKEN_STORAGE_KEY}=${accessToken}; path=/; max-age=${
 			15 * 60
 		}; SameSite=lax`;

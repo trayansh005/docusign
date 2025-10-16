@@ -3,12 +3,16 @@ import path from "path";
 import authRoutes from "./auth.js";
 import docusignRoutes from "./docusign.js";
 import subscriptionRoutes from "./subscription.js";
+import contactRoutes from "./contact.js";
+import dashboardRoutes from "./dashboard.js";
 
 export const configureRoutes = (app, __dirname) => {
 	// API Routes
 	app.use("/api/auth", authRoutes);
 	app.use("/api/docusign", docusignRoutes);
 	app.use("/api/subscriptions", subscriptionRoutes);
+	app.use("/api/contact", contactRoutes);
+	app.use("/api/dashboard", dashboardRoutes);
 
 	// Static file serving for uploads
 	app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
@@ -53,6 +57,13 @@ export const configureRoutes = (app, __dirname) => {
 				},
 				subscriptions: {
 					// Add subscription endpoints here
+				},
+				dashboard: {
+					stats: "GET /api/dashboard/stats",
+					inbox: "GET /api/dashboard/inbox",
+				},
+				contact: {
+					submit: "POST /api/contact",
 				},
 			},
 		});

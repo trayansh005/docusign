@@ -76,9 +76,8 @@ export default function StatusTrackerClient() {
 			// Handle download - open final PDF in new tab or trigger download
 			if (data.finalPdfUrl) {
 				const link = document.createElement("a");
-				link.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${
-					data.finalPdfUrl
-				}`;
+				link.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${data.finalPdfUrl
+					}`;
 				link.target = "_blank";
 				link.download = `signed-document-${data.template.name}.pdf`;
 				document.body.appendChild(link);
@@ -172,18 +171,16 @@ export default function StatusTrackerClient() {
 							<button
 								key={status}
 								onClick={() => setStatusFilter(status)}
-								className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-									isActive
-										? "bg-blue-600 text-white"
-										: "bg-gray-700 text-gray-300 hover:bg-gray-600"
-								}`}
+								className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive
+									? "bg-blue-600 text-white"
+									: "bg-gray-700 text-gray-300 hover:bg-gray-600"
+									}`}
 							>
 								<Icon className="h-4 w-4" />
 								<span>{config.label}</span>
 								<span
-									className={`px-2 py-0.5 rounded-full text-xs ${
-										isActive ? "bg-blue-500" : "bg-gray-600"
-									}`}
+									className={`px-2 py-0.5 rounded-full text-xs ${isActive ? "bg-blue-500" : "bg-gray-600"
+										}`}
 								>
 									{count}
 								</span>

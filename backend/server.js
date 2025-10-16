@@ -13,6 +13,9 @@ import authRoutes from "./routes/auth.js";
 import subscriptionRoutes from "./routes/subscription.js";
 import activityRoutes from "./routes/activity.js";
 import docusignRoutes from "./routes/docusign.js";
+import signatureRoutes from "./routes/signature.js";
+import userRoutes from "./routes/user.js";
+import dashboardRoutes from "./routes/dashboard.js";
 import uploadsStatic from "./middleware/uploadsStatic.js";
 
 dotenv.config();
@@ -78,13 +81,22 @@ app.use("/api/uploads", (req, res, next) => {
 	res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
 	next();
 });
-app.use("/api/uploads", express.static("uploads"));
+app.use("/api/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 // Mount API routes
 app.use("/api/auth", authRateLimit, authRoutes);
 app.use("/api/subscription", subscriptionRoutes);
 app.use("/api/activity", activityRoutes);
 app.use("/api/docusign", docusignRoutes);
+app.use("/api/signatures", signatureRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+
+// Test routes (only in development)
+if (process.env.NODE_ENV !== "production") {
+	const testRoutes = await import("./routes/test.js");
+	app.use("/api/test", testRoutes.default);
+}
 
 connectDB();
 

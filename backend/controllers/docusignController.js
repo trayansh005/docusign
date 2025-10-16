@@ -1,14 +1,13 @@
 import fs from "fs";
+import multer from "multer";
 import path from "path";
+import sharp from "sharp";
 import { fileURLToPath } from "url";
 import { v4 as uuidv4 } from "uuid";
-import crypto from "crypto";
-import { fromPath as pdf2picFromPath } from "pdf2pic";
-import sharp from "sharp";
-import DocuSignTemplate from "../models/DocuSignTemplate.js";
 import Activity from "../models/Activity.js";
+import DocuSignTemplate from "../models/DocuSignTemplate.js";
 import ipLocationService from "../services/ipLocationService.js";
-import multer from "multer";
+import Signature from "../models/Signature.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -85,193 +84,6 @@ export const upload = multer({
 	limits: { fileSize: 50 * 1024 * 1024 },
 });
 
-
-
-export const uploadAndProcessPDF = async (req, res) => {
-	if (!req.file) return res.status(400).json({ success: false, message: "No PDF file uploaded" });
-
-	const { name, type = "document" } = req.body;
-	const userId = req.user?.id;
-	let template;
-
-	try {
-		const initialTemplateData = {
-			name: name || `Processing ${path.parse(req.file.originalname).name}`,
-			type,
-			status: "processing",
-			createdBy: userId,
-			metadata: { filename: req.file.originalname },
-		};
-
-		template = new DocuSignTemplate(initialTemplateData);
-		await template.save();
-
-		const templateId = template._id.toString();
-		const templateDir = path.join(TEMPLATES_DIR, templateId);
-		if (!fs.existsSync(templateDir)) fs.mkdirSync(templateDir, { recursive: true });
-
-		const safeOriginalName = path.basename(req.file.originalname).replace(/[^a-zA-Z0-9._-]/g, "_");
-		const storedPdfName = `${templateId}_${safeOriginalName}`;
-		const newPdfPath = path.join(templateDir, storedPdfName);
-
-		fs.renameSync(req.file.path, newPdfPath);
-
-		// Enhanced GraphicsMagick and Ghostscript detection for Windows
-		let gmDirectory = null;
-		try {
-			if (process.platform === "win32") {
-				const programFiles = process.env["ProgramFiles"] || "C:\\Program Files";
-				const gmRootCandidates = fs
-					.readdirSync(programFiles, { withFileTypes: true })
-					.filter((d) => d.isDirectory() && d.name.toLowerCase().startsWith("graphicsmagick"))
-					.map((d) => path.join(programFiles, d.name));
-
-				for (const gmRoot of gmRootCandidates) {
-					const candidate = path.join(gmRoot, "gm.exe");
-					if (fs.existsSync(candidate)) {
-						gmDirectory = gmRoot;
-						process.env.PATH = `${gmRoot};${process.env.PATH}`;
-						break;
-					}
-				}
-
-				const gsRoot = path.join(programFiles, "gs");
-				if (fs.existsSync(gsRoot)) {
-					const versions = fs
-						.readdirSync(gsRoot, { withFileTypes: true })
-						.filter((d) => d.isDirectory())
-						.map((d) => path.join(gsRoot, d.name, "bin"))
-						.filter((p) => fs.existsSync(p));
-
-					if (versions.length > 0) process.env.PATH = `${versions[0]};${process.env.PATH}`;
-				}
-			}
-		} catch { }
-
-		const converter = pdf2picFromPath(newPdfPath, {
-			density: 300,
-			saveFilename: "page",
-			savePath: templateDir,
-			format: "png",
-			width: 2480,
-			height: 3508,
-			preserveAspectRatio: true,
-			quality: 100,
-		});
-
-		if (gmDirectory) console.log(`GraphicsMagick directory added to PATH: ${gmDirectory}`);
-		let results = [];
-		try {
-			results = await converter.bulk(-1, { responseType: "image" });
-		} catch (e) {
-			console.error("pdf2pic bulk error", e);
-		}
-
-		let numPages = Array.isArray(results) ? results.length : 0;
-		if (numPages === 0) {
-			const filesInDir = fs.readdirSync(templateDir);
-			numPages = filesInDir.filter((f) => /^page.*\.png$/.test(f)).length;
-		}
-
-		if (numPages === 0)
-			throw new Error("No pages were converted from the PDF. Ensure GraphicsMagick and Ghostscript are installed.");
-
-		const pages = [];
-		for (let i = 0; i < numPages; i++) {
-			const pageNumber = i + 1;
-			try {
-				const candidates = [
-					`page_${pageNumber}.png`,
-					`page.${pageNumber}.png`,
-					`page-${pageNumber}.png`,
-					`page${pageNumber}.png`,
-					`page-${String(pageNumber).padStart(3, '0')}.png`, // pdf-poppler format
-					`page-${String(pageNumber).padStart(2, '0')}.png`, // pdf-poppler format
-				];
-				let imagePath = null;
-				for (const n of candidates) {
-					const p = path.join(templateDir, n);
-					if (fs.existsSync(p)) {
-						imagePath = p;
-						break;
-					}
-				}
-				if (!imagePath) continue;
-				const standardPath = path.join(templateDir, `page_${pageNumber}.png`);
-				if (imagePath !== standardPath) fs.renameSync(imagePath, standardPath);
-				const tempPath = path.join(templateDir, `temp_page_${pageNumber}.png`);
-				await sharp(standardPath)
-					.png({ quality: 95, compressionLevel: 6, palette: false })
-					.resize(1920, null, { withoutEnlargement: true, kernel: sharp.kernel.lanczos3 })
-					.toFile(tempPath);
-				fs.unlinkSync(standardPath);
-				fs.renameSync(tempPath, standardPath);
-				const imageBuffer = fs.readFileSync(standardPath);
-				const imageHash = crypto.createHash("sha256").update(imageBuffer).digest("hex");
-				const imageUrl = `/uploads/signatures/templates/${templateId}/page_${pageNumber}.png`;
-				let meta;
-				try {
-					meta = await sharp(standardPath).metadata();
-				} catch {
-					meta = {};
-				}
-				pages.push({
-					pageNumber,
-					imageUrl,
-					imageHash,
-					fileSize: imageBuffer.length,
-					width: meta?.width || undefined,
-					height: meta?.height || undefined,
-				});
-			} catch (pageErr) {
-				console.error(`Process page ${pageNumber} failed`, pageErr);
-			}
-		}
-		if (pages.length === 0) throw new Error("No pages were successfully processed.");
-
-		template.name = name || path.parse(req.file.originalname).name;
-		template.imageUrl = pages[0]?.imageUrl || "";
-		template.numPages = pages.length;
-		template.status = "draft";
-		template.metadata = {
-			...template.metadata,
-			fileId: templateId,
-			imageHash: pages[0]?.imageHash || "",
-			mimeType: "image/png",
-			fileSize: pages.reduce((t, p) => t + p.fileSize, 0),
-			pages,
-			originalPdfPath: `/uploads/signatures/templates/${templateId}/${storedPdfName}`,
-		};
-		template.markModified("metadata");
-		await template.save();
-
-		// Log activity
-		await logDocuSignActivity(
-			userId,
-			"DOCUSIGN_TEMPLATE_CREATED",
-			`Created DocuSign template: ${template.name}`,
-			{ templateId: template._id, name: template.name, type: template.type }
-		);
-
-		return res.status(201).json({
-			success: true,
-			data: { ...template.toObject(), pages },
-			message: "PDF processed successfully",
-		});
-	} catch (error) {
-		console.error("uploadAndProcessPDF error:", error);
-		if (template) {
-			template.status = "failed";
-			template.metadata.error = error.message;
-			template.markModified("metadata");
-			await template.save();
-		}
-		return res
-			.status(500)
-			.json({ success: false, message: error.message || "Failed to process PDF" });
-	}
-};
-
 // Get template page metadata
 export const getTemplatePage = async (req, res) => {
 	try {
@@ -291,7 +103,7 @@ export const getTemplatePage = async (req, res) => {
 			data: {
 				templateId: template._id,
 				pageNumber: page,
-				imageUrl: `${process.env.API_BASE_URL || 'http://localhost:5000'}${pageData.imageUrl}`,
+				imageUrl: `${process.env.API_BASE_URL || "http://localhost:5000"}${pageData.imageUrl}`,
 				imageHash: pageData.imageHash,
 				fileSize: pageData.fileSize,
 				width: pageData.width,
@@ -349,35 +161,35 @@ export const updateTemplatePageFields = async (req, res) => {
 		// Backward compatibility: if incoming fields omit pageNumber, assign from URL param
 		const mapped = Array.isArray(signatureFields)
 			? signatureFields.map((f) => {
-				const pn = Number(f?.pageNumber ?? page);
-				const vp = viewport?.[pn] || viewport?.[String(pn)] || {};
+					const pn = Number(f?.pageNumber ?? page);
+					const vp = viewport?.[pn] || viewport?.[String(pn)] || {};
 
-				// Smart viewport detection: if no viewport provided, assume common UI canvas sizes
-				let baseW = f.viewportWidth || f.uiWidth || vp?.width;
-				let baseH = f.viewportHeight || f.uiHeight || vp?.height;
+					// Smart viewport detection: if no viewport provided, assume common UI canvas sizes
+					let baseW = f.viewportWidth || f.uiWidth || vp?.width;
+					let baseH = f.viewportHeight || f.uiHeight || vp?.height;
 
-				if (!baseW || !baseH) {
-					const pageData = template.metadata?.pages?.find((p) => p.pageNumber === pn);
-					const pageAspectRatio =
-						pageData?.width && pageData?.height ? pageData.width / pageData.height : 1.33;
+					if (!baseW || !baseH) {
+						const pageData = template.metadata?.pages?.find((p) => p.pageNumber === pn);
+						const pageAspectRatio =
+							pageData?.width && pageData?.height ? pageData.width / pageData.height : 1.33;
 
-					if (pageAspectRatio > 1.5) {
-						baseW = 1000;
-						baseH = Math.round(1000 / pageAspectRatio);
-					} else {
-						baseW = 800;
-						baseH = Math.round(800 / pageAspectRatio);
+						if (pageAspectRatio > 1.5) {
+							baseW = 1000;
+							baseH = Math.round(1000 / pageAspectRatio);
+						} else {
+							baseW = 800;
+							baseH = Math.round(800 / pageAspectRatio);
+						}
 					}
-				}
 
-				const xPct = f.xPct != null ? f.xPct : baseW && f.x != null ? f.x / baseW : undefined;
-				const yPct = f.yPct != null ? f.yPct : baseH && f.y != null ? f.y / baseH : undefined;
-				const wPct =
-					f.wPct != null ? f.wPct : baseW && f.width != null ? f.width / baseW : undefined;
-				const hPct =
-					f.hPct != null ? f.hPct : baseH && f.height != null ? f.height / baseH : undefined;
-				return { ...f, pageNumber: pn, xPct, yPct, wPct, hPct };
-			})
+					const xPct = f.xPct != null ? f.xPct : baseW && f.x != null ? f.x / baseW : undefined;
+					const yPct = f.yPct != null ? f.yPct : baseH && f.y != null ? f.y / baseH : undefined;
+					const wPct =
+						f.wPct != null ? f.wPct : baseW && f.width != null ? f.width / baseW : undefined;
+					const hPct =
+						f.hPct != null ? f.hPct : baseH && f.height != null ? f.height / baseH : undefined;
+					return { ...f, pageNumber: pn, xPct, yPct, wPct, hPct };
+			  })
 			: [];
 		const pageFields = mapped.filter((f) => Number(f.pageNumber) === page);
 
@@ -493,6 +305,22 @@ export const applySignatures = async (req, res) => {
 				try {
 					let buf = null;
 					const raw = s.signatureImageBuffer || s.image || s.dataUrl || s.dataURL;
+
+					// If caller provided only an existing signature id, try to resolve from DB
+					if (!raw && s.id) {
+						try {
+							const sigDoc = await Signature.findById(s.id);
+							if (sigDoc) {
+								// read file into buffer
+								const filePath = path.join(__dirname, "..", sigDoc.filename.replace(/^[\\/]+/, ""));
+								if (fs.existsSync(filePath)) {
+									buf = await fs.promises.readFile(filePath);
+								}
+							}
+						} catch (e) {
+							// ignore resolution errors, fallback to other data methods
+						}
+					}
 					if (typeof raw === "string") {
 						// Data URL (base64)
 						const trimmed = raw.trim();
@@ -525,7 +353,7 @@ export const applySignatures = async (req, res) => {
 						if (key1) providedById.set(key1, buf);
 						providedById.set(key2, buf);
 					}
-				} catch { }
+				} catch {}
 			}
 		}
 
@@ -596,7 +424,9 @@ export const applySignatures = async (req, res) => {
 		}
 
 		const signedPages = [];
-		console.log(`[DEBUG] Processing ${template.metadata.pages.length} pages for template ${templateId}`);
+		console.log(
+			`[DEBUG] Processing ${template.metadata.pages.length} pages for template ${templateId}`
+		);
 
 		for (const pageData of template.metadata.pages) {
 			const pageNumber = pageData.pageNumber;
@@ -607,7 +437,9 @@ export const applySignatures = async (req, res) => {
 			console.log(`[DEBUG] Original image exists: ${fs.existsSync(originalImagePath)}`);
 
 			if (!fs.existsSync(originalImagePath)) {
-				console.warn(`[WARN] Original image not found for page ${pageNumber}: ${originalImagePath}`);
+				console.warn(
+					`[WARN] Original image not found for page ${pageNumber}: ${originalImagePath}`
+				);
 
 				// List all files in the template directory to debug
 				try {
@@ -627,12 +459,13 @@ export const applySignatures = async (req, res) => {
 							width: 1920,
 							height: 2715, // A4 aspect ratio
 							channels: 3,
-							background: { r: 255, g: 255, b: 255 }
-						}
+							background: { r: 255, g: 255, b: 255 },
+						},
 					})
 						.png()
-						.composite([{
-							input: Buffer.from(`
+						.composite([
+							{
+								input: Buffer.from(`
 							<svg width="1920" height="2715">
 								<rect width="100%" height="100%" fill="white" stroke="#ddd" stroke-width="2"/>
 								<text x="960" y="1200" text-anchor="middle" font-family="Arial" font-size="48" fill="#666">
@@ -646,14 +479,18 @@ export const applySignatures = async (req, res) => {
 								</text>
 							</svg>
 						`),
-							top: 0,
-							left: 0
-						}])
+								top: 0,
+								left: 0,
+							},
+						])
 						.toFile(originalImagePath);
 
 					console.log(`[DEBUG] Created placeholder image: ${originalImagePath}`);
 				} catch (placeholderError) {
-					console.error(`[ERROR] Failed to create placeholder image for page ${pageNumber}:`, placeholderError);
+					console.error(
+						`[ERROR] Failed to create placeholder image for page ${pageNumber}:`,
+						placeholderError
+					);
 					continue;
 				}
 			}
@@ -665,7 +502,7 @@ export const applySignatures = async (req, res) => {
 					const meta = await sharp(originalImagePath).metadata();
 					pageWidth = meta.width || pageWidth;
 					pageHeight = meta.height || pageHeight;
-				} catch { }
+				} catch {}
 			}
 
 			const overlays = [];
@@ -707,26 +544,26 @@ export const applySignatures = async (req, res) => {
 						field.xPct != null
 							? field.xPct
 							: baseW && field.x != null
-								? field.x / baseW
-								: undefined;
+							? field.x / baseW
+							: undefined;
 					const yPct =
 						field.yPct != null
 							? field.yPct
 							: baseH && field.y != null
-								? field.y / baseH
-								: undefined;
+							? field.y / baseH
+							: undefined;
 					const wPct =
 						field.wPct != null
 							? field.wPct
 							: baseW && field.width != null
-								? field.width / baseW
-								: undefined;
+							? field.width / baseW
+							: undefined;
 					const hPct =
 						field.hPct != null
 							? field.hPct
 							: baseH && field.height != null
-								? field.height / baseH
-								: undefined;
+							? field.height / baseH
+							: undefined;
 
 					// Normalize percentage values: callers may send percentages as 0..1 or 0..100
 					const normalizePct = (v) => (v != null ? (v > 1 ? v / 100 : v) : v);
@@ -755,7 +592,7 @@ export const applySignatures = async (req, res) => {
 					let overlayBuffer;
 					const providedBuf = field.id
 						? providedById.get(field.id) ||
-						providedById.get(`${pageNumber}:${field.recipientId}:${field.type}`)
+						  providedById.get(`${pageNumber}:${field.recipientId}:${field.type}`)
 						: providedById.get(`${pageNumber}:${field.recipientId}:${field.type}`);
 
 					if (providedBuf && providedBuf.length > 0) {
@@ -806,7 +643,8 @@ export const applySignatures = async (req, res) => {
 						let fontStyle = "normal";
 						switch (field.type) {
 							case "signature":
-								fontFamily = "'Dancing Script', 'Great Vibes', 'Allura', 'Brush Script MT', cursive";
+								fontFamily =
+									"'Dancing Script', 'Great Vibes', 'Allura', 'Brush Script MT', cursive";
 								fontWeight = "400";
 								fontStyle = "italic";
 								break;
@@ -846,10 +684,7 @@ export const applySignatures = async (req, res) => {
 								maxSize = 18;
 						}
 
-						const fontSize = Math.min(
-							Math.max(targetH * baseFactor, minSize),
-							maxSize
-						);
+						const fontSize = Math.min(Math.max(targetH * baseFactor, minSize), maxSize);
 						const svg = `<svg width="${targetW}" height="${targetH}" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="white" fill-opacity="0" /><text x="8" y="${Math.max(
 							1,
 							Math.round(fontSize)
@@ -870,11 +705,12 @@ export const applySignatures = async (req, res) => {
 					// Log per-field errors to aid debugging
 					try {
 						console.error(
-							`[ERROR] overlay generation failed for template=${templateId} page=${pageNumber} field=${field && (field.id || field.type || "unknown")
+							`[ERROR] overlay generation failed for template=${templateId} page=${pageNumber} field=${
+								field && (field.id || field.type || "unknown")
 							}:`,
 							err && (err.stack || err.message || err)
 						);
-					} catch (e) { }
+					} catch (e) {}
 				}
 			}
 
@@ -898,7 +734,7 @@ export const applySignatures = async (req, res) => {
 				// Fallback - copy original so endpoint still returns something
 				try {
 					fs.copyFileSync(originalImagePath, signedImagePath);
-				} catch (e) { }
+				} catch (e) {}
 			}
 
 			signedPages.push({
@@ -914,8 +750,9 @@ export const applySignatures = async (req, res) => {
 			const location = await ipLocationService.getLocationFromIP(clientIP);
 
 			template.forceAuditTrail = true;
-			template.auditDetails = `Document signed from ${location.city || "Unknown"}, ${location.country || "Unknown"
-				}`;
+			template.auditDetails = `Document signed from ${location.city || "Unknown"}, ${
+				location.country || "Unknown"
+			}`;
 			template.auditContext = {
 				action: "signed",
 				ipAddress: clientIP,
@@ -937,7 +774,10 @@ export const applySignatures = async (req, res) => {
 		await template.save();
 
 		console.log(`[DEBUG] Generated ${signedPages.length} signed pages for template ${templateId}`);
-		console.log(`[DEBUG] Signed pages:`, signedPages.map(p => ({ pageNumber: p.pageNumber, url: p.signedImageUrl })));
+		console.log(
+			`[DEBUG] Signed pages:`,
+			signedPages.map((p) => ({ pageNumber: p.pageNumber, url: p.signedImageUrl }))
+		);
 
 		// Log activity with IP tracking
 		await logDocuSignActivity(
