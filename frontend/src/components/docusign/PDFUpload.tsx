@@ -3,7 +3,8 @@
 import React, { useState, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Upload, FileText, AlertCircle, CheckCircle } from "lucide-react";
-import { uploadDocument } from "@/services/docusignAPI";
+// We'll call the local Next.js API route instead of a server action to avoid error serialization issues
+// import { uploadDocument } from "@/services/docusignAPI";
 import { DocuSignTemplateData } from "@/types/docusign";
 
 interface DocumentUploadProps {
@@ -21,7 +22,23 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
 	const uploadMutation = useMutation({
 		mutationFn: async (file: File) => {
-			return uploadDocument(file);
+			const formData = new FormData();
+			formData.append("document", file);
+
+			const res = await fetch("/api/docusign/upload", {
+				method: "POST",
+				body: formData,
+				credentials: "include",
+			});
+
+			const data = await res.json();
+			if (!res.ok || !data?.success) {
+				const err = new Error(data?.message || "Upload failed") as Error & { code?: string };
+				if (data?.code) err.code = data.code;
+				throw err;
+			}
+
+			return data.data as DocuSignTemplateData;
 		},
 		onSuccess: (data) => {
 			setLimitError(null);
