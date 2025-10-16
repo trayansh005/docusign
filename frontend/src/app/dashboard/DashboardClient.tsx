@@ -93,6 +93,14 @@ export default function DashboardClient() {
 	// Phase 1 Optimization: Reuse server-prefetched activities (remove duplicate fetch)
 	const { data: activitiesData } = useQuery({
 		queryKey: ["activities"],
+		queryFn: async () => {
+			// This queryFn is never called because enabled: false
+			// But it's required by React Query even when disabled
+			const res = await fetch("/api/activity", { credentials: "include" });
+			if (!res.ok) throw new Error("Failed to fetch activities");
+			const data = await res.json();
+			return data.data || [];
+		},
 		enabled: false, // Don't refetch - use hydrated cache from server
 		gcTime: 5 * 60 * 1000, // Cache for 5 minutes
 	});

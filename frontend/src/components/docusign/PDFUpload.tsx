@@ -33,17 +33,29 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 
 			let data: Record<string, unknown>;
 			try {
-				data = await res.json();
-			} catch (parseErr) {
-				const responseText = await res.text();
-				console.error("[PDFUpload] JSON parse error. Response status:", res.status);
-				console.error("[PDFUpload] Response text:", responseText.substring(0, 500));
-				const err = new Error(
-					`Invalid response format from server: ${
-						parseErr instanceof Error ? parseErr.message : "Unknown error"
-					}`
-				);
-				throw err;
+				// Clone the response to allow multiple reads
+				const responseText = await res.clone().text();
+
+				// Try to parse as JSON
+				try {
+					data = JSON.parse(responseText);
+				} catch (jsonErr) {
+					console.error("[PDFUpload] JSON parse error. Response status:", res.status);
+					console.error("[PDFUpload] Response text:", responseText.substring(0, 500));
+					const err = new Error(
+						`Invalid response format from server: ${
+							jsonErr instanceof Error ? jsonErr.message : "Unknown error"
+						}`
+					);
+					throw err;
+				}
+			} catch (err) {
+				// If cloning or text reading fails, throw error
+				if (err instanceof Error && err.message.includes("Invalid response format")) {
+					throw err; // Re-throw JSON parse errors
+				}
+				console.error("[PDFUpload] Unexpected error reading response:", err);
+				throw new Error("Failed to process server response");
 			}
 
 			if (!res.ok || !data?.success) {
