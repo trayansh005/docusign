@@ -15,7 +15,7 @@ import {
 import { DndContext, useDraggable, DragEndEvent } from "@dnd-kit/core";
 import { ensureAbsoluteUrl } from "@/lib/urlUtils";
 import { DocuSignTemplateData, SignatureField } from "@/types/docusign";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuthStore } from "@/stores/authStore";
 import { SignaturePad } from "./SignaturePad";
 
 // Available signature fonts
@@ -100,7 +100,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 	const setActiveSignatureField = externalSetActiveField || setInternalActiveField;
 
 	// Get logged-in user
-	const { user } = useAuth();
+	const user = useAuthStore((state) => state.user);
 
 	// Get user's full name for signature fields
 	const userFullName =

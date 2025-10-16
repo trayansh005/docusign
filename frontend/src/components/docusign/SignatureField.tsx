@@ -3,7 +3,7 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Trash2, Move } from "lucide-react";
 import { SignatureField as SignatureFieldType } from "@/types/docusign";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuthStore } from "@/stores/authStore";
 
 interface SignatureFieldProps {
     field: SignatureFieldType;
@@ -36,7 +36,7 @@ export const SignatureField: React.FC<SignatureFieldProps> = ({
     onSelect,
     isSelected,
 }) => {
-    const { user } = useAuth();
+    const user = useAuthStore((state) => state.user);
     const [isHovered, setIsHovered] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const dragState = useRef<DragState>({

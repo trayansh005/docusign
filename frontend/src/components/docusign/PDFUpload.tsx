@@ -31,10 +31,21 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 				credentials: "include",
 			});
 
-			const data = await res.json();
+			let data: Record<string, unknown>;
+			try {
+				data = await res.json();
+			} catch (parseErr) {
+				const responseText = await res.text();
+				console.error("[PDFUpload] JSON parse error. Response status:", res.status);
+				console.error("[PDFUpload] Response text:", responseText.substring(0, 500));
+				const err = new Error(`Invalid response format from server: ${parseErr instanceof Error ? parseErr.message : 'Unknown error'}`);
+				throw err;
+			}
+
 			if (!res.ok || !data?.success) {
-				const err = new Error(data?.message || "Upload failed") as Error & { code?: string };
-				if (data?.code) err.code = data.code;
+				const errorMessage = (data?.message && typeof data.message === 'string' ? data.message : "Upload failed");
+				const err = new Error(errorMessage) as Error & { code?: string };
+				if (data?.code && typeof data.code === 'string') err.code = data.code;
 				throw err;
 			}
 

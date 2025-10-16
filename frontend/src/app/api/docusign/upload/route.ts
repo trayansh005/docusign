@@ -24,12 +24,39 @@ export async function POST(req: NextRequest) {
 
 		const contentType = res.headers.get("content-type");
 		const isJson = contentType?.includes("application/json");
-		const data = isJson ? await res.json() : await res.text();
+		
+		let data: string | Record<string, unknown>;
+		try {
+			data = isJson ? await res.json() : await res.text();
+		} catch (parseErr) {
+			console.error(`[Upload Route] Failed to parse response as ${isJson ? 'JSON' : 'text'}:`, parseErr);
+			return NextResponse.json(
+				{ 
+					success: false, 
+					message: `Invalid response format from backend: ${isJson ? 'JSON parse error' : 'unexpected content'}`,
+					contentType
+				}, 
+				{ status: 502 }
+			);
+		}
 
 		if (!res.ok) {
-			const message = (isJson ? data?.message : undefined) || `HTTP ${res.status}`;
-			const code = isJson ? data?.code : undefined;
+			const message = (isJson && typeof data === 'object' ? data?.message : undefined) || `HTTP ${res.status}`;
+			const code = (isJson && typeof data === 'object' ? data?.code : undefined);
 			return NextResponse.json({ success: false, message, code }, { status: res.status });
+		}
+
+		// Ensure data is an object for JSON responses
+		if (isJson && typeof data === 'string') {
+			try {
+				data = JSON.parse(data);
+			} catch (parseErr) {
+				console.error('[Upload Route] Failed to parse string as JSON:', parseErr);
+				return NextResponse.json(
+					{ success: false, message: 'Invalid JSON response from backend' }, 
+					{ status: 502 }
+				);
+			}
 		}
 
 		// Pass through JSON success response
