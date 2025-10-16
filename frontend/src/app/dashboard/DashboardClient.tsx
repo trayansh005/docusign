@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
 import { Portal } from "@/components/Portal";
-import { getRecentActivities } from "@/services/activityAPI";
 import { Activity } from "@/types/activity";
 
 interface UserStats {
@@ -41,6 +40,25 @@ interface SubscriptionData {
 	cancelAtPeriodEnd?: boolean;
 }
 
+// Phase 1 & 2 Optimization: Add interface for inbox items
+interface InboxItem {
+	id: string;
+	name: string;
+	status: string;
+	createdAt?: string;
+	updatedAt?: string;
+	finalPdfUrl?: string;
+	sender?: string;
+	message?: {
+		subject?: string;
+		body?: string;
+	};
+	myRecipientInfo?: {
+		signatureStatus?: string;
+		signedAt?: string;
+	};
+}
+
 export default function DashboardClient() {
 	const user = useAuthStore((state) => state.user);
 	const isLoading = useAuthStore((state) => state.isLoading);
@@ -58,6 +76,13 @@ export default function DashboardClient() {
 	const [confirmImmediate, setConfirmImmediate] = useState(false);
 	const [loading, setLoading] = useState(true);
 	const [usage, setUsage] = useState<FreeUsage | null>(null);
+	
+	// Phase 1 & 2 Optimization: Add inbox state with pagination
+	const [inbox, setInbox] = useState<InboxItem[]>([]);
+	const [inboxPage, setInboxPage] = useState(1);
+	const [inboxTotal, setInboxTotal] = useState(0);
+	const [inboxPages, setInboxPages] = useState(0);
+	const INBOX_LIMIT = 10;
 
 	// Auth guard - redirect to login if not authenticated
 	useEffect(() => {
@@ -66,63 +91,68 @@ export default function DashboardClient() {
 		}
 	}, [isAuthenticated, isLoading, router]);
 
-	// Fetch activities using React Query
+	// Phase 1 Optimization: Reuse server-prefetched activities (remove duplicate fetch)
 	const { data: activitiesData } = useQuery({
 		queryKey: ["activities"],
-		queryFn: getRecentActivities,
+		enabled: false, // Don't refetch - use hydrated cache from server
+		gcTime: 5 * 60 * 1000, // Cache for 5 minutes
 	});
 
-	const loadUserStats = useCallback(async () => {
+	// Phase 1 Optimization: Parallelize API calls with Promise.all
+	const loadDashboardData = useCallback(async (pageNum: number = 1) => {
 		try {
-			let fetchedSubscription: SubscriptionData | null = null;
+			// Fetch all data in parallel
+			const [statsRes, inboxRes, subscriptionRes] = await Promise.all([
+				fetch("/api/dashboard/stats", { credentials: "include" }),
+				fetch(`/api/dashboard/inbox?page=${pageNum}&limit=${INBOX_LIMIT}`, { credentials: "include" }),
+				fetch("/api/subscription/me", { credentials: "include" }),
+			]);
 
-			// Fetch subscription data
-			try {
-				const subscriptionRes = await fetch("/api/subscription/me", {
-					method: "GET",
-					credentials: "include",
-				});
-				if (subscriptionRes.ok) {
-					const subscriptionData = await subscriptionRes.json();
-					fetchedSubscription = subscriptionData.subscription;
-					setSubscription(fetchedSubscription);
+			// Process stats response
+			if (statsRes.ok) {
+				const json = await statsRes.json();
+				if (json?.success && json?.data) {
+					setStats({
+						totalDocuments: json.data.owner?.total || 0,
+						pendingSignatures: json.data.assigned?.pending || 0,
+						completedSignatures: json.data.assigned?.completed || 0,
+						subscriptionStatus: "Free Plan",
+						owner: json.data.owner,
+						assigned: json.data.assigned,
+					});
+					if (json.data.usage) {
+						setUsage(json.data.usage as FreeUsage);
+					}
 				}
-			} catch (subError) {
-				console.error("Failed to load subscription:", subError);
 			}
 
-			// Fetch user-scoped stats from backend
-			try {
-				const statsRes = await fetch("/api/dashboard/stats", { credentials: "include" });
-				if (statsRes.ok) {
-					const json = await statsRes.json();
-					if (json && json.success && json.data) {
-						setStats({
-							totalDocuments: json.data.totalDocuments || 0,
-							pendingSignatures: json.data.pendingSignatures || 0,
-							completedSignatures: json.data.completedSignatures || 0,
-							subscriptionStatus: fetchedSubscription
-								? fetchedSubscription.planId.name
-								: "Free Plan",
-							owner: json.data.owner || undefined,
-							assigned: json.data.assigned || undefined,
-						});
-						if (json.data.usage) {
-							setUsage(json.data.usage as FreeUsage);
-						}
+			// Process inbox response
+			if (inboxRes.ok) {
+				const json = await inboxRes.json();
+				if (json?.success && Array.isArray(json.data)) {
+					setInbox(json.data);
+					if (json.pagination) {
+						setInboxPage(json.pagination.current);
+						setInboxTotal(json.pagination.total);
+						setInboxPages(json.pagination.pages);
 					}
-				} else {
-					// fallback
-					setStats((s) => ({
-						...s!,
-						subscriptionStatus: fetchedSubscription ? fetchedSubscription.planId.name : "Free Plan",
+				}
+			}
+
+			// Process subscription response
+			if (subscriptionRes.ok) {
+				const subscriptionData = await subscriptionRes.json();
+				if (subscriptionData?.subscription) {
+					setSubscription(subscriptionData.subscription);
+					// Update stats subscription status
+					setStats((prev) => ({
+						...prev!,
+						subscriptionStatus: subscriptionData.subscription?.planId?.name || "Free Plan",
 					}));
 				}
-			} catch (statErr) {
-				console.error("Failed to fetch dashboard stats:", statErr);
 			}
 		} catch (error) {
-			console.error("Failed to load user stats:", error);
+			console.error("Failed to load dashboard data:", error);
 			setStats({
 				totalDocuments: 0,
 				pendingSignatures: 0,
@@ -134,52 +164,10 @@ export default function DashboardClient() {
 		}
 	}, []);
 
-	// Inbox loader
-	const [inbox, setInbox] = useState<
-		Array<{
-			id: string;
-			name: string;
-			status: string;
-			createdAt?: string;
-			updatedAt?: string;
-			finalPdfUrl?: string;
-			sender?: string;
-			message?: {
-				subject?: string;
-				body?: string;
-			};
-			myRecipientInfo?: {
-				signatureStatus?: string;
-				signedAt?: string;
-			};
-		}>
-	>([]);
+	// Phase 1 Optimization: Single useEffect that calls parallel loader
 	useEffect(() => {
-		const loadInbox = async () => {
-			try {
-				console.log("Loading inbox...");
-				const res = await fetch("/api/dashboard/inbox", { credentials: "include" });
-				console.log("Inbox response status:", res.status);
-				if (res.ok) {
-					const json = await res.json();
-					console.log("Inbox data:", json);
-					if (json && json.success && Array.isArray(json.data)) {
-						console.log("Setting inbox with", json.data.length, "items");
-						setInbox(json.data);
-					}
-				} else {
-					console.error("Inbox response not OK:", res.status, await res.text());
-				}
-			} catch (e) {
-				console.error("Failed to load inbox", e);
-			}
-		};
-		loadInbox();
-	}, []);
-
-	useEffect(() => {
-		loadUserStats();
-	}, [loadUserStats]);
+		loadDashboardData();
+	}, [loadDashboardData]);
 
 	// Helper to convert backend path to absolute URL
 	const getAbsolutePdfUrl = (pdfPath: string | undefined) => {
@@ -420,7 +408,8 @@ export default function DashboardClient() {
 						)}
 					</div>
 					{inbox && inbox.length > 0 ? (
-						<ul className="space-y-3">
+						<>
+							<ul className="space-y-3">
 							{inbox.map((item) => (
 								<li
 									key={item.id}
@@ -493,6 +482,51 @@ export default function DashboardClient() {
 								</li>
 							))}
 						</ul>
+						
+						{/* Phase 2 Optimization: Add pagination controls */}
+						{inboxPages > 1 && (
+							<div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-700">
+								<div className="text-sm text-gray-400">
+									Showing {(inboxPage - 1) * INBOX_LIMIT + 1} to{" "}
+									{Math.min(inboxPage * INBOX_LIMIT, inboxTotal)} of {inboxTotal} documents
+								</div>
+								<div className="flex gap-2">
+									<button
+										onClick={() => loadDashboardData(Math.max(1, inboxPage - 1))}
+										disabled={inboxPage === 1}
+										className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md text-sm transition-colors"
+									>
+										Previous
+									</button>
+									<div className="flex items-center gap-1">
+										{Array.from({ length: Math.min(5, inboxPages) }, (_, i) => {
+											const pageNum = i + 1;
+											return (
+												<button
+													key={pageNum}
+													onClick={() => loadDashboardData(pageNum)}
+													className={`px-3 py-1 rounded-md text-sm transition-colors ${
+														inboxPage === pageNum
+															? "bg-blue-600 text-white"
+															: "bg-gray-700 hover:bg-gray-600 text-white"
+													}`}
+												>
+													{pageNum}
+												</button>
+											);
+										})}
+									</div>
+									<button
+										onClick={() => loadDashboardData(Math.min(inboxPages, inboxPage + 1))}
+										disabled={inboxPage === inboxPages}
+										className="px-3 py-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md text-sm transition-colors"
+									>
+										Next
+									</button>
+								</div>
+							</div>
+						)}
+						</>
 					) : (
 						<div className="text-center py-8">
 							<div className="text-gray-400 mb-2">

@@ -10,63 +10,91 @@ export const getUserStats = async (req, res) => {
 
 		if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
 
-		// Owner-scope: documents owned by user
-		const ownerFilter = { createdBy: userId, isArchived: { $ne: true } };
-		const totalDocuments = await DocuSignTemplate.countDocuments(ownerFilter);
-		const ownerPending = await DocuSignTemplate.countDocuments({
-			...ownerFilter,
-			status: { $ne: "final" },
-		});
-		const ownerCompleted = await DocuSignTemplate.countDocuments({
-			...ownerFilter,
-			status: "final",
-		});
+		// Phase 2 Optimization: Use aggregation pipeline for owner stats (1 query instead of 3)
+		const ownerStatsResult = await DocuSignTemplate.aggregate([
+			{
+				$match: {
+					createdBy: userId,
+					isArchived: { $ne: true },
+				},
+			},
+			{
+				$group: {
+					_id: null,
+					total: { $sum: 1 },
+					pending: { $sum: { $cond: [{ $ne: ["$status", "final"] }, 1, 0] } },
+					completed: { $sum: { $cond: [{ $eq: ["$status", "final"] }, 1, 0] } },
+				},
+			},
+		]);
 
-		// Templates assigned to this user (by signatureFields.recipientId or recipients list)
-		const assignedFilter = {
-			isArchived: { $ne: true },
-			$or: [{ "signatureFields.recipientId": String(userId) }, { "recipients.id": String(userId) }],
-		};
+		const ownerStats = ownerStatsResult[0] || { total: 0, pending: 0, completed: 0 };
+
+		// Build assigned filter with $or conditions
+		const assignedOrConditions = [
+			{ "signatureFields.recipientId": String(userId) },
+			{ "recipients.userId": userId },
+			{ "recipients.id": String(userId) },
+		];
 		if (email) {
-			// also match recipients by email if present
-			assignedFilter.$or.push({ "recipients.email": email });
+			assignedOrConditions.push({ "recipients.email": email });
 		}
 
-		const pendingSignatures = await DocuSignTemplate.countDocuments({
-			...assignedFilter,
-			status: { $ne: "final" },
-		});
+		// Phase 2 Optimization: Use aggregation pipeline for assigned stats (1 query instead of 3)
+		const assignedStatsResult = await DocuSignTemplate.aggregate([
+			{
+				$match: {
+					isArchived: { $ne: true },
+					$or: assignedOrConditions,
+				},
+			},
+			{
+				$group: {
+					_id: null,
+					total: { $sum: 1 },
+					pending: { $sum: { $cond: [{ $ne: ["$status", "final"] }, 1, 0] } },
+					completed: { $sum: { $cond: [{ $eq: ["$status", "final"] }, 1, 0] } },
+				},
+			},
+		]);
 
-		const completedSignatures = await DocuSignTemplate.countDocuments({
-			...assignedFilter,
-			status: "final",
-		});
+		const assignedStats = assignedStatsResult[0] || { total: 0, pending: 0, completed: 0 };
 
-		const assignedTotal = await DocuSignTemplate.countDocuments(assignedFilter);
-
-		// Determine free usage if no active subscription
+		// Check subscription status
 		const now = new Date();
 		const activeSub = await Subscription.findOne({
 			userId,
 			status: "active",
 			$or: [{ endDate: { $exists: false } }, { endDate: { $gt: now } }],
-		});
+		}).select("_id");
 
 		let usage = null;
 		if (!activeSub) {
 			const { uploadLimit, signedLimit } = getFreeTierLimits();
-			// Uploads used = number of non-archived templates owned by user
-			const uploadsUsed = totalDocuments;
-			// Signed used = number of owned templates that are in final status
-			const signUsed = await DocuSignTemplate.countDocuments({
-				createdBy: userId,
-				isArchived: { $ne: true },
-				status: "final",
-			});
+
+			// Phase 2 Optimization: Get usage stats with aggregation (replaces 2 more queries)
+			const usageResult = await DocuSignTemplate.aggregate([
+				{
+					$match: {
+						createdBy: userId,
+						isArchived: { $ne: true },
+					},
+				},
+				{
+					$group: {
+						_id: null,
+						uploadsUsed: { $sum: 1 },
+						signUsed: { $sum: { $cond: [{ $eq: ["$status", "final"] }, 1, 0] } },
+					},
+				},
+			]);
+
+			const usageData = usageResult[0] || { uploadsUsed: 0, signUsed: 0 };
+
 			usage = {
 				hasActiveSubscription: false,
-				uploads: { used: uploadsUsed, limit: uploadLimit },
-				signs: { used: signUsed, limit: signedLimit },
+				uploads: { used: usageData.uploadsUsed, limit: uploadLimit },
+				signs: { used: usageData.signUsed, limit: signedLimit },
 			};
 		} else {
 			usage = { hasActiveSubscription: true };
@@ -75,20 +103,15 @@ export const getUserStats = async (req, res) => {
 		return res.status(200).json({
 			success: true,
 			data: {
-				// Backward compatible flat fields used by existing UI cards
-				totalDocuments, // owner total
-				pendingSignatures, // assigned pending
-				completedSignatures, // assigned completed
-				// New grouped stats for Option C rendering
 				owner: {
-					total: totalDocuments,
-					pending: ownerPending,
-					completed: ownerCompleted,
+					total: ownerStats.total,
+					pending: ownerStats.pending,
+					completed: ownerStats.completed,
 				},
 				assigned: {
-					total: assignedTotal,
-					pending: pendingSignatures,
-					completed: completedSignatures,
+					total: assignedStats.total,
+					pending: assignedStats.pending,
+					completed: assignedStats.completed,
 				},
 				usage,
 			},
@@ -102,10 +125,13 @@ export const getUserStats = async (req, res) => {
 };
 
 // GET /api/dashboard/inbox
+// Phase 2 Optimization: Add pagination support
 export const getInbox = async (req, res) => {
 	try {
 		const userId = req.user?.id || req.user?._id;
 		const email = req.user?.email;
+		const { page = 1, limit = 10 } = req.query;
+
 		if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
 
 		// Find templates where the user is a recipient
@@ -126,9 +152,16 @@ export const getInbox = async (req, res) => {
 			assignedFilter.$or.push({ "recipients.email": email });
 		}
 
+		// Phase 2 Optimization: Calculate pagination
+		const skip = (parseInt(page) - 1) * parseInt(limit);
+		const total = await DocuSignTemplate.countDocuments(assignedFilter);
+
+		// Phase 2 Optimization: Fetch only needed fields and paginated results
 		const templates = await DocuSignTemplate.find(assignedFilter)
 			.sort({ updatedAt: -1 })
-			.select("name status createdAt updatedAt finalPdfUrl metadata recipients message")
+			.skip(skip)
+			.limit(parseInt(limit))
+			.select("name status createdAt updatedAt finalPdfUrl metadata recipients message createdBy")
 			.populate("createdBy", "firstName lastName email")
 			.lean();
 
@@ -153,7 +186,16 @@ export const getInbox = async (req, res) => {
 				) || null,
 		}));
 
-		return res.status(200).json({ success: true, data: items });
+		return res.status(200).json({
+			success: true,
+			data: items,
+			pagination: {
+				current: parseInt(page),
+				total,
+				pages: Math.ceil(total / parseInt(limit)),
+				limit: parseInt(limit),
+			},
+		});
 	} catch (error) {
 		console.error("getInbox error", error);
 		return res

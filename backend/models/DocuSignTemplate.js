@@ -175,6 +175,13 @@ templateSchema.index({ status: 1 });
 templateSchema.index({ isArchived: 1 });
 templateSchema.index({ type: 1, status: 1 });
 
+// Compound indexes for dashboard queries (Phase 1 optimization)
+templateSchema.index({ createdBy: 1, isArchived: 1 });
+templateSchema.index({ createdBy: 1, status: 1, isArchived: 1 });
+templateSchema.index({ "signatureFields.recipientId": 1, isArchived: 1, status: 1 });
+templateSchema.index({ "recipients.email": 1, isArchived: 1, status: 1 });
+templateSchema.index({ updatedAt: -1, isArchived: 1 });
+
 // Virtual field for frontend compatibility - provides pdfUrl
 templateSchema.virtual("pdfUrl").get(function () {
 	return this.metadata?.originalPdfPath || "";
