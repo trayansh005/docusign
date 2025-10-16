@@ -74,7 +74,6 @@ export default function DashboardClient() {
 	const [showCancelModal, setShowCancelModal] = useState(false);
 	const [cancelling, setCancelling] = useState(false);
 	const [confirmImmediate, setConfirmImmediate] = useState(false);
-	const [loading, setLoading] = useState(true);
 	const [usage, setUsage] = useState<FreeUsage | null>(null);
 
 	// Phase 1 & 2 Optimization: Add inbox state with pagination
@@ -161,8 +160,6 @@ export default function DashboardClient() {
 				completedSignatures: 0,
 				subscriptionStatus: "Free Plan",
 			});
-		} finally {
-			setLoading(false);
 		}
 	}, []);
 
@@ -227,7 +224,7 @@ export default function DashboardClient() {
 		}
 	};
 
-	if (loading) {
+	if (isLoading || !isAuthenticated) {
 		return (
 			<div className="min-h-screen flex items-center justify-center">
 				<div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
