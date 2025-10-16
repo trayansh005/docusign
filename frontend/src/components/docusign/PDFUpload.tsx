@@ -29,13 +29,20 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 			onUploadSuccess?.(data);
 		},
 		onError: (err: unknown) => {
-			console.log("Upload error:", err, "Type:", typeof err, "instanceof Error:", err instanceof Error);
+			console.log(
+				"Upload error:",
+				err,
+				"Type:",
+				typeof err,
+				"instanceof Error:",
+				err instanceof Error
+			);
 			if (err instanceof Error) {
 				console.log("Error message:", err.message);
 				console.log("Error keys:", Object.keys(err));
 				console.log("Error code property:", (err as unknown as Record<string, unknown>).code);
 			}
-			
+
 			// Check if this is a free plan limit error
 			if (err instanceof Error) {
 				// Check for code property first (might work in dev)

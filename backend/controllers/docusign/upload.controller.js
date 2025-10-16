@@ -134,7 +134,7 @@ export const uploadAndProcessDocument = async (req, res) => {
 
 			const { uploadLimit } = getFreeTierLimits();
 			console.log("[Upload] Free tier - Existing count:", existingCount, "Limit:", uploadLimit);
-			
+
 			if (existingCount >= uploadLimit) {
 				console.log("[Upload] FREE LIMIT REACHED - returning 403");
 				return res.status(403).json({

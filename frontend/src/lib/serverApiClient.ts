@@ -83,7 +83,12 @@ export async function serverApiClient(endpoint: string, options: ServerApiOption
 				  }`
 				: errorData.message || `HTTP ${response.status}: ${response.statusText}`;
 
-			console.log("[serverApiClient] Error message constructed:", errorMessage, "Code:", errorData.code);
+			console.log(
+				"[serverApiClient] Error message constructed:",
+				errorMessage,
+				"Code:",
+				errorData.code
+			);
 			throw new ApiError(errorMessage, errorData.code, errorData);
 		}
 
