@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
 import { Portal } from "@/components/Portal";
 import { Activity } from "@/types/activity";
+import { SigningProgressWidget } from "@/components/docusign/SigningProgressWidget";
+import { getTemplates } from "@/services/docusignAPI";
 
 interface UserStats {
 	totalDocuments: number;
@@ -82,6 +84,10 @@ export default function DashboardClient() {
 	const [inboxTotal, setInboxTotal] = useState(0);
 	const [inboxPages, setInboxPages] = useState(0);
 	const INBOX_LIMIT = 10;
+
+	// Signing progress state
+	const [documentsWithRecipients, setDocumentsWithRecipients] = useState<any[]>([]);
+	const [loadingDocuments, setLoadingDocuments] = useState(false);
 
 	// Auth guard - redirect to login if not authenticated
 	useEffect(() => {
@@ -171,10 +177,39 @@ export default function DashboardClient() {
 		}
 	}, []);
 
+	// Load documents with recipients for signing progress
+	const loadDocumentsWithRecipients = useCallback(async () => {
+		try {
+			setLoadingDocuments(true);
+			const response = await getTemplates({ limit: 10 });
+
+			console.log("=== Dashboard loadDocumentsWithRecipients Debug ===");
+			console.log("Total documents:", response.data.length);
+			response.data.forEach((doc, index) => {
+				console.log(`Doc ${index + 1}: ${doc.name}`);
+				console.log("  - Recipients:", doc.recipients);
+				console.log("  - Recipients count:", doc.recipients?.length || 0);
+			});
+
+			// Filter documents that have recipients
+			const docsWithRecipients = response.data.filter(doc =>
+				doc.recipients && doc.recipients.length > 0
+			);
+
+			console.log("Documents with recipients:", docsWithRecipients.length);
+			setDocumentsWithRecipients(docsWithRecipients);
+		} catch (error) {
+			console.error("Failed to load documents with recipients:", error);
+		} finally {
+			setLoadingDocuments(false);
+		}
+	}, []);
+
 	// Phase 1 Optimization: Single useEffect that calls parallel loader
 	useEffect(() => {
 		loadDashboardData();
-	}, [loadDashboardData]);
+		loadDocumentsWithRecipients();
+	}, [loadDashboardData, loadDocumentsWithRecipients]);
 
 	// Helper to convert backend path to absolute URL
 	const getAbsolutePdfUrl = (pdfPath: string | undefined) => {
@@ -432,8 +467,8 @@ export default function DashboardClient() {
 															item.status === "final"
 																? "text-green-400"
 																: item.status === "active"
-																? "text-yellow-400"
-																: "text-blue-400"
+																	? "text-yellow-400"
+																	: "text-blue-400"
 														}
 													>
 														{item.status}
@@ -512,11 +547,10 @@ export default function DashboardClient() {
 													<button
 														key={pageNum}
 														onClick={() => loadDashboardData(pageNum)}
-														className={`px-3 py-1 rounded-md text-sm transition-colors ${
-															inboxPage === pageNum
-																? "bg-blue-600 text-white"
-																: "bg-gray-700 hover:bg-gray-600 text-white"
-														}`}
+														className={`px-3 py-1 rounded-md text-sm transition-colors ${inboxPage === pageNum
+															? "bg-blue-600 text-white"
+															: "bg-gray-700 hover:bg-gray-600 text-white"
+															}`}
 													>
 														{pageNum}
 													</button>
@@ -585,13 +619,12 @@ export default function DashboardClient() {
 							<div className="bg-gray-800/30 rounded-lg p-4">
 								<p className="text-gray-400 text-sm mb-1">Status</p>
 								<p
-									className={`font-semibold ${
-										subscription.status === "active"
-											? "text-green-400"
-											: subscription.status === "canceled"
+									className={`font-semibold ${subscription.status === "active"
+										? "text-green-400"
+										: subscription.status === "canceled"
 											? "text-red-400"
 											: "text-yellow-400"
-									}`}
+										}`}
 								>
 									{subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
 								</p>
@@ -708,6 +741,47 @@ export default function DashboardClient() {
 						<div className="text-orange-400 text-sm font-medium">Edit →</div>
 					</Link>
 				</div>
+
+				{/* Signing Progress Section */}
+				{documentsWithRecipients.length > 0 && (
+					<div className="mb-8">
+						<div className="flex items-center justify-between mb-6">
+							<h2 className="text-2xl font-bold text-white">Document Signing Progress</h2>
+							<Link
+								href="/dashboard/signing-progress"
+								className="text-blue-400 hover:text-blue-300 text-sm font-medium"
+							>
+								View All →
+							</Link>
+						</div>
+						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+							{documentsWithRecipients.slice(0, 3).map((doc) => (
+								<div key={doc._id} className="card p-4">
+									<div className="mb-3">
+										<h3 className="text-lg font-semibold text-white truncate">
+											{doc.name}
+										</h3>
+										<p className="text-sm text-gray-400">
+											Created {new Date(doc.createdAt).toLocaleDateString()}
+										</p>
+									</div>
+									<SigningProgressWidget
+										recipients={doc.recipients}
+										templateId={doc._id}
+										onViewDetails={() => router.push(`/dashboard/signing-progress`)}
+										className="bg-gray-800/30 border-gray-700"
+									/>
+								</div>
+							))}
+						</div>
+						{loadingDocuments && (
+							<div className="text-center py-4">
+								<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-400 mx-auto"></div>
+								<p className="text-gray-400 text-sm mt-2">Loading signing progress...</p>
+							</div>
+						)}
+					</div>
+				)}
 
 				{/* Recent Activity */}
 				<div className="card p-6">

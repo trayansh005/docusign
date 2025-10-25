@@ -115,6 +115,46 @@ export function FinalizePanel({
 		setLoading(true);
 		setLimitError(null);
 		try {
+			// Get sender's signature fields and placeholder fields
+			const senderSignatureFields = template.signatureFields.filter((field) =>
+				!field.placeholder && // Exclude placeholder fields
+				(field.type === "signature" || field.type === "initial") && // Only signature/initial fields
+				(field.recipientId === user?.email || field.recipientId?.includes("current-user") || !field.recipientId)
+			);
+
+			const placeholderFields = template.signatureFields.filter(field => field.placeholder);
+			const hasPlaceholders = placeholderFields.length > 0;
+			const hasRecipients = recipients && recipients.length > 0;
+
+			// Validation 1: If there are placeholder fields, recipients must be selected
+			if (hasPlaceholders && !hasRecipients) {
+				setLimitError("You have marked places for recipients to sign, but no recipients are selected. Please add recipients or remove the marked places.");
+				setLoading(false);
+				return;
+			}
+
+			// Validation 2: If no placeholders and no recipients, sender must have signed
+			if (!hasPlaceholders && !hasRecipients) {
+				// For now, if sender signature fields exist, assume they're signed
+				// TODO: Fix the signature value saving issue
+				if (senderSignatureFields.length === 0) {
+					setLimitError("You must sign the document first. Please click the green pen icon to add your signature, or add recipients if you want them to sign.");
+					setLoading(false);
+					return;
+				}
+			}
+
+			// Validation 3: If sending to recipients, sender must sign first (mandatory)
+			if (hasRecipients) {
+				// For now, if sender signature fields exist, assume they're signed
+				// TODO: Fix the signature value saving issue
+				if (senderSignatureFields.length === 0) {
+					setLimitError("You must sign the document before sending it to recipients. Please click the green pen icon to add your signature.");
+					setLoading(false);
+					return;
+				}
+			}
+
 			// Try to fetch user's saved signatures and prefer the default one if present.
 			let defaultSignature: { _id?: string; isDefault?: boolean } | null = null;
 			try {
@@ -134,51 +174,69 @@ export function FinalizePanel({
 				const msg = e instanceof Error ? e.message : String(e);
 				console.debug("Could not fetch saved signatures, falling back to generated images", msg);
 			}
-			// Generate signature images for each field
-			const signaturePromises = template.signatureFields
-				.filter((field) => field.type === "signature" || field.type === "initial")
-				.map(async (field) => {
-					// Use the same logic as the field display:
-					// 1. If field.value exists, use it
-					// 2. Else if initial field, use userInitials
-					// 3. Else (signature field), use userFullName
-					const text =
-						field.value && field.value.length > 0
-							? field.value
-							: field.type === "initial"
-							? userInitials
-							: userFullName;
+			// Generate signature images for sender's own fields (not placeholders)
+			const senderFields = template.signatureFields.filter((field) =>
+				!field.placeholder && // Exclude placeholder fields
+				(field.type === "signature" || field.type === "initial") && // Only signature/initial fields
+				(field.recipientId === user?.email || field.recipientId?.includes("current-user") || !field.recipientId)
+			);
 
-					const fontFamily = getFontFamily(field.fontId);
-					const width = Math.round((field.wPct / 100) * 800); // Assume 800px viewport width
-					const height = Math.round((field.hPct / 100) * 1131); // Assume A4 aspect ratio
-
-					// If user has a saved default signature, prefer sending its id to the backend
-					// Backend will resolve the stored file and resize/render it appropriately.
-					if (defaultSignature && defaultSignature._id) {
-						return {
-							id: defaultSignature._id,
-							fieldId: field.id,
-							recipientId: field.recipientId,
-							type: field.type,
-							pageNumber: field.pageNumber,
-							index: template.signatureFields.indexOf(field),
-						};
-					}
-
-					const imageDataUrl = await generateSignatureImage(text, fontFamily, width, height);
-
+			const signaturePromises = senderFields.map(async (field) => {
+				// Check if field has a signature pad value (base64 image data)
+				if (field.value && field.value.startsWith('data:image/')) {
 					return {
 						id: field.id,
 						fieldId: field.id,
 						recipientId: field.recipientId,
 						type: field.type,
 						pageNumber: field.pageNumber,
-						signatureImageBuffer: imageDataUrl,
-						image: imageDataUrl,
+						signatureImageBuffer: field.value, // Use the pad signature directly
+						image: field.value,
 						index: template.signatureFields.indexOf(field),
 					};
-				});
+				}
+
+				// Use the same logic as the field display for text-based signatures:
+				// 1. If field.value exists (but not image data), use it as text
+				// 2. Else if initial field, use userInitials
+				// 3. Else (signature field), use userFullName
+				const text =
+					field.value && field.value.length > 0 && !field.value.startsWith('data:image/')
+						? field.value
+						: field.type === "initial"
+							? userInitials
+							: userFullName;
+
+				const fontFamily = getFontFamily(field.fontId);
+				const width = Math.round((field.wPct / 100) * 800); // Assume 800px viewport width
+				const height = Math.round((field.hPct / 100) * 1131); // Assume A4 aspect ratio
+
+				// If user has a saved default signature, prefer sending its id to the backend
+				// Backend will resolve the stored file and resize/render it appropriately.
+				if (defaultSignature && defaultSignature._id) {
+					return {
+						id: defaultSignature._id,
+						fieldId: field.id,
+						recipientId: field.recipientId,
+						type: field.type,
+						pageNumber: field.pageNumber,
+						index: template.signatureFields.indexOf(field),
+					};
+				}
+
+				const imageDataUrl = await generateSignatureImage(text, fontFamily, width, height);
+
+				return {
+					id: field.id,
+					fieldId: field.id,
+					recipientId: field.recipientId,
+					type: field.type,
+					pageNumber: field.pageNumber,
+					signatureImageBuffer: imageDataUrl,
+					image: imageDataUrl,
+					index: template.signatureFields.indexOf(field),
+				};
+			});
 
 			const signatures = await Promise.all(signaturePromises);
 
@@ -196,7 +254,44 @@ export function FinalizePanel({
 
 			console.log(`Sending ${signatures.length} signature images to backend`);
 
-			const res = await apiClient.post(`/docusign/${template._id}/apply-signatures`, payload);
+			// Get placeholder fields for recipients
+			const recipientPlaceholderFields = template.signatureFields.filter(field => field.placeholder);
+
+			// Use the unified signing endpoint that works for both senders and recipients
+			const unifiedPayload = {
+				signatures: signatures.map((sig) => ({
+					pageNumber: sig.pageNumber || 1,
+					xPct: template.signatureFields?.find(f => f.id === sig.fieldId)?.xPct || 0,
+					yPct: template.signatureFields?.find(f => f.id === sig.fieldId)?.yPct || 0,
+					wPct: template.signatureFields?.find(f => f.id === sig.fieldId)?.wPct || 20,
+					hPct: template.signatureFields?.find(f => f.id === sig.fieldId)?.hPct || 5,
+					signatureImageBuffer: sig.signatureImageBuffer || sig.image,
+					recipientId: sig.recipientId || "current-user",
+					type: sig.type || "signature",
+					fieldId: sig.fieldId || sig.id,
+				})).filter(sig => sig.signatureImageBuffer), // Only include signatures with actual data
+
+				// Include placeholder fields for recipients to fill
+				placeholderFields: recipientPlaceholderFields.map(field => ({
+					id: field.id,
+					type: field.type,
+					pageNumber: field.pageNumber,
+					xPct: field.xPct,
+					yPct: field.yPct,
+					wPct: field.wPct,
+					hPct: field.hPct,
+					placeholderText: field.placeholderText,
+					required: field.required || false,
+				})),
+
+				// Include recipients and message
+				recipients: recipients || [],
+				message: { subject: subject || "", body: body || "" },
+			};
+
+
+
+			const res = await apiClient.post(`/docusign/${template._id}/sign`, unifiedPayload);
 
 			// Detect free sign limit errors coming from the backend (often 403 with { success:false, code, message })
 			if (res && typeof res === "object") {
@@ -226,19 +321,26 @@ export function FinalizePanel({
 				const baseWithoutApi = backendBase.replace(/\/api$/, "");
 				const cleanPath = url.startsWith("/") ? url : `/${url}`;
 				return `${baseWithoutApi}/api${cleanPath}`;
-			}; // Prefer new shape: { success, data: { finalPdfUrl } }
+			};
+
+			// Handle unified sign endpoint response
 			if (res && typeof res === "object") {
 				const r = res as Record<string, unknown>;
 				const data = (r.data as Record<string, unknown>) || {};
-				// Prefer direct finalPdfUrl; also accept nested data.finalPdf.url
-				const finalPdf = (data.finalPdf as Record<string, unknown>) || {};
+				const template = (data.template as Record<string, unknown>) || {};
+
+				// Check for finalPdfUrl in various locations (unified endpoint puts it in template.finalPdfUrl)
 				const finalPdfUrl =
+					(typeof template.finalPdfUrl === "string" && template.finalPdfUrl) ||
 					(typeof data.finalPdfUrl === "string" && data.finalPdfUrl) ||
-					(typeof finalPdf.url === "string" && finalPdf.url) ||
 					(r.finalPdfUrl as string) ||
 					"";
+
+
+
 				if (typeof finalPdfUrl === "string" && finalPdfUrl.length > 0) {
 					const absoluteUrl = toAbsoluteUrl(finalPdfUrl);
+
 					setResultUrls([absoluteUrl]);
 					onSuccess?.([absoluteUrl]);
 				} else if (Array.isArray(data.signedPages)) {
@@ -273,12 +375,20 @@ export function FinalizePanel({
 				} else if (Array.isArray(res)) {
 					setResultUrls((res as string[]).map(toAbsoluteUrl));
 				} else {
-					setResultUrls([]);
+					// No valid response format found
+					console.error("Invalid response format:", res);
+					setLimitError("Failed to process the signed document. Please try again or contact support.");
+					setLoading(false);
+					return;
 				}
 			} else if (Array.isArray(res)) {
 				setResultUrls((res as string[]).map(toAbsoluteUrl));
 			} else {
-				setResultUrls([]);
+				// Unexpected response format
+				console.error("Unexpected response format:", res);
+				setLimitError("Received an unexpected response from the server. Please try again.");
+				setLoading(false);
+				return;
 			}
 		} catch (err) {
 			// show basic error in console for now
@@ -303,7 +413,9 @@ export function FinalizePanel({
 			{limitError && (
 				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
 					<div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-						<h3 className="text-lg font-semibold text-gray-900">Upgrade to continue</h3>
+						<h3 className="text-lg font-semibold text-gray-900">
+							{limitError.includes("must sign") ? "Signature Required" : "Upgrade to continue"}
+						</h3>
 						<p className="mt-2 text-sm text-gray-700">{limitError}</p>
 						<div className="mt-4 flex items-center justify-end gap-3">
 							<button
@@ -312,12 +424,6 @@ export function FinalizePanel({
 							>
 								Close
 							</button>
-							<a
-								href="/subscription"
-								className="px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
-							>
-								See plans
-							</a>
 						</div>
 					</div>
 				</div>
@@ -327,11 +433,24 @@ export function FinalizePanel({
 				onClick={generate}
 				disabled={loading}
 			>
-				{loading ? "Generating..." : "Finalize & Generate"}
+				{loading
+					? "Processing..."
+					: recipients.length > 0
+						? "Send for Signature"
+						: "Sign Document"
+				}
 			</button>
 			<div className="mt-2">
 				{resultUrls === null ? null : resultUrls.length === 0 ? (
-					<div className="text-sm text-yellow-300">No signed pages returned.</div>
+					<div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
+						No signed document was generated. This usually means:
+						<ul className="mt-1 ml-4 list-disc text-xs">
+							<li>You haven't signed the document yet</li>
+							<li>There was an error processing your signature</li>
+							<li>The document format is not supported</li>
+						</ul>
+						Please try signing the document again or contact support.
+					</div>
 				) : (
 					<div className="rounded-lg border border-green-200 bg-green-50 p-4">
 						<div className="flex items-start gap-3">

@@ -55,7 +55,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 	const [isDrawing, setIsDrawing] = useState(false);
 	const [hasDrawing, setHasDrawing] = useState(false);
 	const [textValue, setTextValue] = useState<string>("");
-	const [signatureMode, setSignatureMode] = useState<"draw" | "type">("draw");
+	const [signatureMode, setSignatureMode] = useState<"draw" | "type" | "custom">("draw");
 	const [selectedFontId, setSelectedFontId] = useState<string>(SIGNATURE_FONTS[0].id);
 
 	// Initialize canvas
@@ -148,8 +148,8 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 				} else {
 					console.warn("[SignaturePad] No drawing to save!");
 				}
-			} else {
-				// For type mode, render text into an image so backend can embed it
+			} else if (signatureMode === "type") {
+				// For type mode, render text into an image with signature fonts
 				if (textValue.trim()) {
 					const text = textValue.trim();
 					const width = 600;
@@ -167,6 +167,39 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 						"'Dancing Script', cursive";
 					let fontSize = 100;
 					const minSize = 18;
+					while (fontSize > minSize) {
+						ctx.font = `${fontSize}px ${fontFamily}`;
+						const metrics = ctx.measureText(text);
+						if (metrics.width <= width - pad * 2) break;
+						fontSize -= 2;
+					}
+					ctx.font = `${fontSize}px ${fontFamily}`;
+					ctx.fillStyle = "#000000";
+					ctx.textBaseline = "middle";
+					ctx.textAlign = "center";
+					ctx.fillText(text, width / 2, height / 2);
+					const dataUrl = off.toDataURL("image/png");
+					onSignatureComplete(field.id, dataUrl);
+				} else {
+					console.warn("[SignaturePad] No text to save!");
+				}
+			} else if (signatureMode === "custom") {
+				// For custom mode, render text with normal font
+				if (textValue.trim()) {
+					const text = textValue.trim();
+					const width = 600;
+					const height = 200;
+					const pad = 20;
+					const off = document.createElement("canvas");
+					off.width = width;
+					off.height = height;
+					const ctx = off.getContext("2d");
+					if (!ctx) return;
+					// Keep transparent background in exported PNG
+					// Use normal Arial font for custom text
+					const fontFamily = "Arial, sans-serif";
+					let fontSize = 80;
+					const minSize = 16;
 					while (fontSize > minSize) {
 						ctx.font = `${fontSize}px ${fontFamily}`;
 						const metrics = ctx.measureText(text);
@@ -212,6 +245,14 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 				return "Date";
 			case "text":
 				return "Text";
+			case "name":
+				return "Full Name";
+			case "email":
+				return "Email Address";
+			case "phone":
+				return "Phone Number";
+			case "address":
+				return "Address";
 			default:
 				return "Signature";
 		}
@@ -234,7 +275,8 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 				<div className="flex gap-3">
 					<button
 						onClick={() => {
-							console.log("Applying date for field:", field.id, "Value:", today);
+							console.log("Sending plain text date for field:", field.id, "Value:", today);
+							// Send plain text date - let backend handle PDF rendering
 							onSignatureComplete(field.id, today);
 						}}
 						className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
@@ -260,19 +302,27 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 						Enter text for this field:
 					</label>
 					<input
-						type="text"
+						type={field.type === "email" ? "email" : field.type === "phone" ? "tel" : "text"}
 						value={textValue}
 						onChange={(e) => setTextValue(e.target.value)}
-						placeholder="Enter text..."
+						placeholder={`Enter ${getFieldLabel().toLowerCase()}...`}
 						className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 						autoFocus
 					/>
 				</div>
+				{/* Preview */}
+				{textValue.trim() && (
+					<div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+						<p className="text-xs text-gray-500 mb-2">Preview:</p>
+						<p className="text-lg font-medium text-gray-900">{textValue.trim()}</p>
+					</div>
+				)}
 				<div className="flex gap-3">
 					<button
 						onClick={() => {
 							if (textValue.trim()) {
-								console.log("Applying text for field:", field.id, "Value:", textValue.trim());
+								console.log("Sending plain text for field:", field.id, "Value:", textValue.trim());
+								// Send plain text directly - let backend handle PDF rendering
 								onSignatureComplete(field.id, textValue.trim());
 							}
 						}}
@@ -304,7 +354,8 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 		);
 	}
 
-	if (field.type === "text") {
+	// Text-based fields: text, name, email, phone, address
+	if (field.type === "text" || field.type === "name" || field.type === "email" || field.type === "phone" || field.type === "address") {
 		return (
 			<div className={`bg-white rounded-lg shadow-lg p-6 ${className}`}>
 				<div className="flex items-center gap-2 mb-4">
@@ -339,23 +390,39 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 			<div className="flex gap-2 mb-4 border-b border-gray-200">
 				<button
 					onClick={() => setSignatureMode("draw")}
-					className={`flex items-center gap-2 px-4 py-2 font-medium transition-colors border-b-2 ${
-						signatureMode === "draw"
-							? "border-blue-600 text-blue-600"
-							: "border-transparent text-gray-500 hover:text-gray-700"
-					}`}
+					className={`flex items-center gap-2 px-4 py-2 font-medium transition-colors border-b-2 ${signatureMode === "draw"
+						? "border-blue-600 text-blue-600"
+						: "border-transparent text-gray-500 hover:text-gray-700"
+						}`}
 					style={{ color: signatureMode === "draw" ? "#2563eb" : "#6b7280" }}
 				>
 					<PenTool className="h-4 w-4" />
 					Draw
 				</button>
 				<button
+					onClick={() => setSignatureMode("custom")}
+					className={`flex items-center gap-2 px-4 py-2 font-medium transition-colors border-b-2 ${signatureMode === "custom"
+						? "border-blue-600 text-blue-600"
+						: "border-transparent text-gray-500 hover:text-gray-700"
+						}`}
+					style={{ color: signatureMode === "custom" ? "#2563eb" : "#6b7280" }}
+				>
+					<svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path
+							strokeLinecap="round"
+							strokeLinejoin="round"
+							strokeWidth={2}
+							d="M4 6h16M4 12h16M4 18h16"
+						/>
+					</svg>
+					Custom
+				</button>
+				<button
 					onClick={() => setSignatureMode("type")}
-					className={`flex items-center gap-2 px-4 py-2 font-medium transition-colors border-b-2 ${
-						signatureMode === "type"
-							? "border-blue-600 text-blue-600"
-							: "border-transparent text-gray-500 hover:text-gray-700"
-					}`}
+					className={`flex items-center gap-2 px-4 py-2 font-medium transition-colors border-b-2 ${signatureMode === "type"
+						? "border-blue-600 text-blue-600"
+						: "border-transparent text-gray-500 hover:text-gray-700"
+						}`}
 					style={{ color: signatureMode === "type" ? "#2563eb" : "#6b7280" }}
 				>
 					<svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -426,11 +493,10 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 								<button
 									key={font.id}
 									onClick={() => setSelectedFontId(font.id)}
-									className={`p-3 border-2 rounded-lg transition-all text-left ${
-										selectedFontId === font.id
-											? "border-blue-600 bg-blue-50 shadow-md"
-											: "border-gray-200 hover:border-gray-300 hover:shadow"
-									}`}
+									className={`p-3 border-2 rounded-lg transition-all text-left ${selectedFontId === font.id
+										? "border-blue-600 bg-blue-50 shadow-md"
+										: "border-gray-200 hover:border-gray-300 hover:shadow"
+										}`}
 								>
 									<p
 										className="text-2xl truncate"
@@ -469,6 +535,50 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 				</div>
 			)}
 
+			{/* Custom Mode */}
+			{signatureMode === "custom" && (
+				<div className="space-y-4">
+					<div>
+						<label
+							className="block text-sm font-medium text-gray-700 mb-2"
+							style={{ color: "#374151" }}
+						>
+							Enter custom text for your {field.type}:
+						</label>
+						<input
+							type="text"
+							value={textValue}
+							onChange={(e) => setTextValue(e.target.value)}
+							placeholder="Enter any text (e.g., initials, name, title, etc.)"
+							className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+							style={{ color: "#111827" }}
+							autoFocus
+						/>
+						<p className="text-xs text-gray-500 mt-1" style={{ color: "#6b7280" }}>
+							This will appear as plain text without any special font styling.
+						</p>
+					</div>
+
+					{/* Preview */}
+					{textValue && (
+						<div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+							<p className="text-xs text-gray-500 mb-2" style={{ color: "#6b7280" }}>
+								Preview:
+							</p>
+							<p
+								className="text-2xl text-center font-normal"
+								style={{
+									fontFamily: "Arial, sans-serif",
+									color: "#111827",
+								}}
+							>
+								{textValue}
+							</p>
+						</div>
+					)}
+				</div>
+			)}
+
 			{/* Action Buttons */}
 			<div className="flex gap-3 mt-6">
 				<button
@@ -481,7 +591,13 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 				</button>
 				<button
 					onClick={handleSaveSignature}
-					disabled={signatureMode === "draw" ? !hasDrawing : !textValue.trim()}
+					disabled={
+						signatureMode === "draw"
+							? !hasDrawing
+							: (signatureMode === "type" || signatureMode === "custom")
+								? !textValue.trim()
+								: false
+					}
 					className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 					style={{ color: "#ffffff" }}
 				>

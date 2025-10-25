@@ -68,11 +68,16 @@ async function applySignaturesToPdf(template, signatures) {
 				let targetHeight = 0;
 
 				if (sig.xPct != null && sig.yPct != null && sig.wPct != null && sig.hPct != null) {
-					// A) Percentage-based
-					targetLeft = (Number(sig.xPct) / 100) * pageWidth;
-					targetTop = (Number(sig.yPct) / 100) * pageHeight;
-					targetWidth = (Number(sig.wPct) / 100) * pageWidth;
-					targetHeight = (Number(sig.hPct) / 100) * pageHeight;
+					// A) Percentage-based - check if values are already decimals (0-1) or percentages (0-100)
+					const xPct = Number(sig.xPct) > 1 ? Number(sig.xPct) / 100 : Number(sig.xPct);
+					const yPct = Number(sig.yPct) > 1 ? Number(sig.yPct) / 100 : Number(sig.yPct);
+					const wPct = Number(sig.wPct) > 1 ? Number(sig.wPct) / 100 : Number(sig.wPct);
+					const hPct = Number(sig.hPct) > 1 ? Number(sig.hPct) / 100 : Number(sig.hPct);
+
+					targetLeft = xPct * pageWidth;
+					targetTop = yPct * pageHeight;
+					targetWidth = wPct * pageWidth;
+					targetHeight = hPct * pageHeight;
 					// Using percentage-based coordinates
 				} else if (
 					sig.viewportWidth &&
@@ -102,7 +107,54 @@ async function applySignaturesToPdf(template, signatures) {
 					continue;
 				}
 
-				// Extract base64 image data
+				// Check if this is a text field (address, email, phone, name, text, date)
+				const isTextField = ['address', 'email', 'phone', 'name', 'text', 'date'].includes(sig.type);
+
+				if (isTextField) {
+					// Handle text fields - draw text directly on PDF
+					const textValue = sig.signatureImageBuffer || '';
+					if (!textValue || textValue.trim() === '') {
+						console.warn(`[ApplySignatures] No text value for field ${sig.fieldId}`);
+						continue;
+					}
+
+					console.log(`[ApplySignatures] Processing text field ${sig.fieldId} as plain text: "${textValue}"`);
+					console.log(`[ApplySignatures] Page dimensions: ${pageWidth} x ${pageHeight}`);
+					console.log(`[ApplySignatures] Target coordinates: left=${targetLeft}, top=${targetTop}, width=${targetWidth}, height=${targetHeight}`);
+
+					// Convert from top-based coordinates to PDF bottom-left origin
+					// PDF coordinate system: (0,0) is bottom-left, Y increases upward
+					const x = targetLeft;
+					const y = pageHeight - targetTop - targetHeight; // Convert from top-based to bottom-based
+
+					console.log(`[ApplySignatures] Converted coordinates: x=${x}, y=${y}`);
+
+					// Calculate appropriate font size based on field dimensions
+					// Ensure minimum readable font size
+					const fontSize = Math.max(Math.min(targetHeight * 0.6, 16), 8); // Scale font to field height, min 8pt, max 16pt
+
+					// Calculate final text position (center vertically in the field)
+					const textX = x + 5; // Small padding from left edge
+					const textY = y + (targetHeight / 2); // Center vertically in field
+
+					console.log(`[ApplySignatures] Final text position: (${textX}, ${textY}) with fontSize=${fontSize}`);
+
+					try {
+						page.drawText(textValue, {
+							x: textX,
+							y: textY,
+							size: fontSize,
+							color: { type: 'RGB', red: 0, green: 0, blue: 0 },
+						});
+						console.log(`[ApplySignatures] Successfully drew text "${textValue}" at position (${textX}, ${textY})`);
+					} catch (textError) {
+						console.error(`[ApplySignatures] Error drawing text for field ${sig.fieldId}:`, textError);
+					}
+
+					continue; // Skip image processing for text fields
+				}
+
+				// Extract base64 image data for signature/initial fields
 				let buffer = null;
 				if (sig.signatureImageBuffer && typeof sig.signatureImageBuffer === "string") {
 					const base64Data = sig.signatureImageBuffer.replace(
@@ -181,24 +233,28 @@ async function applySignaturesToPdf(template, signatures) {
 }
 
 /**
- * Recipient signs the document by submitting signature images
- * Mirrors RSSC's approach: uses absolute pixel coordinates, not schema percentage fields
+ * Unified document signing endpoint for both recipients and senders
+ * Handles both recipient signing and sender (owner) signing with the same logic
+ * Uses direct signature processing with percentage-based coordinates
  * POST /api/docusign/:templateId/sign
  */
 export const recipientSignDocument = async (req, res) => {
 	try {
 		const { templateId } = req.params;
-		const { signatures } = req.body; // Array of signature data with pixel coordinates
+		const { signatures, placeholderFields, recipients, message } = req.body;
 		const userId = req.user?.id || req.user?._id;
 		const userEmail = req.user?.email;
 
-		// Recipient signing request
 
-		// Validate input
-		if (!signatures || !Array.isArray(signatures) || signatures.length === 0) {
+
+		// Validate input - allow empty signatures if there are placeholder fields
+		const hasSignatures = signatures && Array.isArray(signatures) && signatures.length > 0;
+		const hasPlaceholders = placeholderFields && Array.isArray(placeholderFields) && placeholderFields.length > 0;
+
+		if (!hasSignatures && !hasPlaceholders) {
 			return res.status(400).json({
 				success: false,
-				error: "signatures array is required",
+				error: "Either signatures or placeholder fields are required",
 			});
 		}
 
@@ -211,49 +267,208 @@ export const recipientSignDocument = async (req, res) => {
 			});
 		}
 
-		// Check if user is a recipient
+		// Check if user is a recipient or template owner (unified signing)
 		const myRecipient = template.recipients?.find(
 			(r) => r.email === userEmail || r.userId?.toString() === userId?.toString()
 		);
 
+		let isTemplateOwner = false;
 		if (!myRecipient) {
-			return res.status(403).json({
-				success: false,
-				error: "You are not authorized to sign this document",
-			});
+			// Check if user is the template owner (sender signing)
+			const templateOwnerId = template.userId?.toString() || template.createdBy?.toString();
+			isTemplateOwner = templateOwnerId === userId?.toString();
+
+			if (!isTemplateOwner) {
+				return res.status(403).json({
+					success: false,
+					error: "You are not authorized to sign this document",
+				});
+			}
+			// Template owner can sign without being in recipients list
+		} else {
+			// Check signing order for recipients (not template owners)
+			if (template.recipients && template.recipients.length > 1) {
+				const canSign = template.canRecipientSign(userEmail);
+				if (!canSign) {
+					const nextRecipient = template.getNextRecipientToSign();
+					return res.status(403).json({
+						success: false,
+						error: "It's not your turn to sign yet",
+						message: nextRecipient
+							? `Please wait for ${nextRecipient.name} to sign first`
+							: "Please wait for the previous signer to complete",
+						nextRecipient: nextRecipient ? {
+							name: nextRecipient.name,
+							email: nextRecipient.email,
+							signingOrder: nextRecipient.signingOrder,
+						} : null,
+					});
+				}
+			}
 		}
 
-		// Check if already signed
-		if (myRecipient.signatureStatus === "signed") {
+		// Check if already signed (for existing recipients)
+		if (myRecipient && myRecipient.signatureStatus === "signed") {
 			return res.status(400).json({
 				success: false,
 				error: "You have already signed this document",
 			});
 		}
 
-		// Apply signatures to PDF (RSSC approach: direct pixel coordinates)
-		// Applying signatures to PDF
-		const signedPdfPath = await applySignaturesToPdf(template, signatures);
+		// Enforce free-tier signing limit for template owners
+		if (isTemplateOwner) {
+			try {
+				const Subscription = (await import("../../models/Subscription.js")).default;
+				const { getFreeTierLimits } = await import("../../utils/freeTierLimits.js");
 
-		// Update template with signed PDF URL
-		const pdfUrl = signedPdfPath.replace(path.join(__dirname, "..", ".."), "").replace(/\\/g, "/");
-		template.finalPdfUrl = pdfUrl.startsWith("/") ? pdfUrl : `/${pdfUrl}`;
+				const now = new Date();
+				const activeSub = await Subscription.findOne({
+					userId,
+					status: "active",
+					$or: [{ endDate: { $exists: false } }, { endDate: { $gt: now } }],
+				});
 
-		// Update recipient status
-		const recipientIndex = template.recipients.findIndex(
-			(r) => r.email === userEmail || r.userId?.toString() === userId?.toString()
-		);
+				if (!activeSub) {
+					const signedCount = await DocuSignTemplate.countDocuments({
+						createdBy: userId,
+						status: "final",
+						isArchived: { $ne: true },
+					});
 
-		if (recipientIndex !== -1) {
-			template.recipients[recipientIndex].signatureStatus = "signed";
-			template.recipients[recipientIndex].signedAt = new Date();
+					const { signedLimit } = getFreeTierLimits();
+					if (signedCount >= signedLimit && template.status !== "final") {
+						return res.status(403).json({
+							success: false,
+							code: "FREE_SIGN_LIMIT_REACHED",
+							message: "Free plan signing limit reached. Upgrade your plan to sign more documents.",
+						});
+					}
+				}
+			} catch (limitErr) {
+				console.error("Free-tier limit check failed:", limitErr);
+				// Continue without blocking on limit check failure
+			}
+		}
+
+		// Add placeholder fields to template if provided (for sender signing with recipients)
+		if (placeholderFields && Array.isArray(placeholderFields) && placeholderFields.length > 0) {
+			// Valid field types according to schema
+			const validTypes = ["signature", "date", "initial", "text", "name", "email", "phone", "address"];
+
+			// Convert placeholder fields to template signature fields
+			const newSignatureFields = placeholderFields.map(field => ({
+				id: field.id,
+				recipientId: "placeholder", // Will be assigned to actual recipients later
+				type: validTypes.includes(field.type) ? field.type : "signature", // Fallback to signature if invalid
+				pageNumber: field.pageNumber,
+				// Convert percentage values from 0-100 to 0-1 for database
+				xPct: (field.xPct || 0) / 100,
+				yPct: (field.yPct || 0) / 100,
+				wPct: (field.wPct || 20) / 100,
+				hPct: (field.hPct || 5) / 100,
+				required: field.required || false,
+				placeholder: true,
+				placeholderText: field.placeholderText,
+			}));
+
+			// Add new placeholder fields to existing signature fields
+			template.signatureFields = [...(template.signatureFields || []), ...newSignatureFields];
+		}
+
+		// Ensure all signature fields have valid percentage values (0-1 range)
+		if (template.signatureFields && template.signatureFields.length > 0) {
+			template.signatureFields = template.signatureFields.map(field => {
+				const convertedField = { ...field };
+
+				// Convert any percentage values > 1 to proper 0-1 range
+				if (convertedField.xPct && convertedField.xPct > 1) {
+					convertedField.xPct = convertedField.xPct / 100;
+				}
+				if (convertedField.yPct && convertedField.yPct > 1) {
+					convertedField.yPct = convertedField.yPct / 100;
+				}
+				if (convertedField.wPct && convertedField.wPct > 1) {
+					convertedField.wPct = convertedField.wPct / 100;
+				}
+				if (convertedField.hPct && convertedField.hPct > 1) {
+					convertedField.hPct = convertedField.hPct / 100;
+				}
+
+				return convertedField;
+			});
+		}
+
+		// Update recipients if provided
+		if (recipients && Array.isArray(recipients) && recipients.length > 0) {
+			const User = (await import("../../models/User.js")).default;
+
+			// Enrich recipients with user IDs where possible
+			const enrichedRecipients = await Promise.all(
+				recipients.map(async (recipient, index) => {
+					const recipientData = {
+						id: recipient.id || `${Date.now()}-${Math.random()}`,
+						name: recipient.name,
+						email: recipient.email,
+						signatureStatus: index === 0 ? "pending" : "waiting", // First recipient is pending, others wait
+						signingOrder: recipient.signingOrder || (index + 1), // Use provided order or auto-assign
+						notifiedAt: new Date(),
+						eligibleAt: index === 0 ? new Date() : null, // Only first recipient is eligible initially
+					};
+
+					// Try to find matching user by email
+					if (recipient.email) {
+						const user = await User.findOne({ email: recipient.email });
+						if (user) {
+							recipientData.userId = user._id;
+						}
+					}
+
+					return recipientData;
+				})
+			);
+
+			template.recipients = enrichedRecipients;
+		}
+
+		// Save message if provided
+		if (message) {
+			template.message = {
+				subject: message.subject || "",
+				body: message.body || "",
+			};
+		}
+
+		// Apply signatures to PDF (direct percentage-based coordinates)
+		let signedPdfPath;
+		if (hasSignatures) {
+			signedPdfPath = await applySignaturesToPdf(template, signatures);
+		} else {
+			// No signatures to apply, just use original PDF
+			signedPdfPath = resolveTemplatePdfPath(template);
+		}
+
+		// Update template with signed PDF URL (only if signatures were applied)
+		if (hasSignatures) {
+			const pdfUrl = signedPdfPath.replace(path.join(__dirname, "..", ".."), "").replace(/\\/g, "/");
+			template.finalPdfUrl = pdfUrl.startsWith("/") ? pdfUrl : `/${pdfUrl}`;
+		}
+
+		// Update recipient status and signing order (only for actual recipients, not template owners)
+		if (!isTemplateOwner) {
+			const recipientIndex = template.recipients.findIndex(
+				(r) => r.email === userEmail || r.userId?.toString() === userId?.toString()
+			);
+
+			if (recipientIndex !== -1) {
+				// Mark this recipient as signed
+				await template.markRecipientSigned(userEmail);
+			}
 		}
 
 		// Check if all recipients have signed
 		const allRecipientsSigned = template.recipients.every((r) => r.signatureStatus === "signed");
 		if (allRecipientsSigned) {
 			template.status = "final";
-			console.log(`[RecipientSign] All recipients signed! Document marked as final.`);
 		}
 
 		// Update DocuSignDocument with final PDF info
@@ -275,7 +490,7 @@ export const recipientSignDocument = async (req, res) => {
 				}
 			}
 		} catch (docError) {
-			console.error("[RecipientSign] Failed to update DocuSignDocument:", docError);
+			console.error("Failed to update DocuSignDocument:", docError);
 			// Don't fail the entire request
 		}
 
@@ -283,18 +498,18 @@ export const recipientSignDocument = async (req, res) => {
 		await template.save();
 
 		// Sign process completed for user
-
 		res.json({
 			success: true,
 			message: "Document signed successfully",
 			data: {
 				template,
-				recipientStatus: template.recipients[recipientIndex],
+				recipientStatus: isTemplateOwner ? null : (template.recipients.find(r => r.email === userEmail || r.userId?.toString() === userId?.toString()) || null),
 				allSigned: allRecipientsSigned,
+				signerType: isTemplateOwner ? 'owner' : 'recipient'
 			},
 		});
 	} catch (error) {
-		console.error("[RecipientSign] Error:", error);
+		console.error("Unified sign error:", error);
 		res.status(500).json({
 			success: false,
 			error: "Failed to save signatures",

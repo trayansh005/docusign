@@ -30,7 +30,7 @@ interface AuthActions {
 	initializeAuth: () => Promise<void>;
 }
 
-interface AuthStore extends AuthState, AuthActions {}
+interface AuthStore extends AuthState, AuthActions { }
 
 // Ref for managing refresh timer outside of store
 let refreshTimerRef: NodeJS.Timeout | null = null;
@@ -55,9 +55,11 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 				try {
 					const rt = tokenUtils.getRefreshToken();
 					if (!rt) {
+						console.log("No refresh token available for silent refresh");
 						get().clearAuth();
 						return;
 					}
+
 					const refreshed = await tokenUtils.refreshAccessToken(rt);
 					if (refreshed.accessToken && refreshed.refreshToken) {
 						tokenUtils.setTokens(refreshed.accessToken, refreshed.refreshToken);
@@ -66,12 +68,22 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 							isAuthenticated: true,
 						});
 						scheduleSilentRefresh(refreshed.accessToken);
+						console.log("Silent refresh successful");
 					} else {
+						console.error("Silent refresh failed:", refreshed.error);
 						get().clearAuth();
+						// Only redirect if we're in a browser environment and not already on login page
+						if (typeof window !== "undefined" && !window.location.pathname.includes("/login")) {
+							window.location.href = "/login";
+						}
 					}
 				} catch (e) {
-					console.error("Silent refresh failed:", e);
+					console.error("Silent refresh failed with exception:", e);
 					get().clearAuth();
+					// Only redirect if we're in a browser environment and not already on login page
+					if (typeof window !== "undefined" && !window.location.pathname.includes("/login")) {
+						window.location.href = "/login";
+					}
 				}
 			}, delay);
 		} catch {
@@ -96,9 +108,9 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 		initializeAuth: async () => {
 			try {
 				const token = tokenUtils.getAccessToken();
-				const user = tokenUtils.getStoredUser();
+				const storedUser = tokenUtils.getStoredUser();
 
-				if (token && user) {
+				if (token && storedUser) {
 					// Check if token is expired
 					if (tokenUtils.isTokenExpired(token)) {
 						const refreshToken = tokenUtils.getRefreshToken();
@@ -107,14 +119,20 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 							const refreshResult = await tokenUtils.refreshAccessToken(refreshToken);
 							if (refreshResult.accessToken && refreshResult.refreshToken) {
 								tokenUtils.setTokens(refreshResult.accessToken, refreshResult.refreshToken);
-								set({
-									user: user as unknown as User,
-									token: refreshResult.accessToken,
-									isLoading: false,
-									isAuthenticated: true,
-								});
-								scheduleSilentRefresh(refreshResult.accessToken);
-								return;
+
+								// Validate the refreshed token with backend
+								const validation = await authAPI.validateToken();
+								if (validation.success && validation.user) {
+									tokenUtils.setStoredUser(validation.user);
+									set({
+										user: validation.user as User,
+										token: refreshResult.accessToken,
+										isLoading: false,
+										isAuthenticated: true,
+									});
+									scheduleSilentRefresh(refreshResult.accessToken);
+									return;
+								}
 							}
 						}
 						// Refresh failed, clear auth state
@@ -122,15 +140,24 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 						return;
 					}
 
-					set({
-						user: user as unknown as User,
-						token,
-						isLoading: false,
-						isAuthenticated: true,
-					});
+					// Token is not expired, but validate it with backend to ensure it's still valid
+					const validation = await authAPI.validateToken();
+					if (validation.success && validation.user) {
+						// Update stored user data if backend has newer info
+						tokenUtils.setStoredUser(validation.user);
+						set({
+							user: validation.user as User,
+							token,
+							isLoading: false,
+							isAuthenticated: true,
+						});
 
-					// Schedule refresh for current token
-					scheduleSilentRefresh(token);
+						// Schedule refresh for current token
+						scheduleSilentRefresh(token);
+					} else {
+						// Token validation failed, clear auth state
+						get().clearAuth();
+					}
 				} else {
 					set({ isLoading: false });
 				}
@@ -169,23 +196,38 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 		register: async (userData: RegisterData): Promise<AuthResponse> => {
 			set({ isLoading: true });
 
-			const result = await authAPI.register(userData);
+			try {
+				const result = await authAPI.register(userData);
 
-			if (result.success && result.token && result.user) {
-				tokenUtils.setTokens(result.token, result.refreshToken);
-				tokenUtils.setStoredUser(result.user as unknown as Record<string, unknown>);
-				set({
-					user: result.user as User,
-					token: result.token,
-					isLoading: false,
-					isAuthenticated: true,
-				});
-				scheduleSilentRefresh(result.token);
-			} else {
+				if (result.success) {
+					// Check if registration includes auto-login (tokens provided)
+					if (result.token && result.user) {
+						tokenUtils.setTokens(result.token, result.refreshToken);
+						tokenUtils.setStoredUser(result.user as unknown as Record<string, unknown>);
+						set({
+							user: result.user as User,
+							token: result.token,
+							isLoading: false,
+							isAuthenticated: true,
+						});
+						scheduleSilentRefresh(result.token);
+					} else {
+						// Registration successful but no auto-login
+						set({ isLoading: false });
+					}
+				} else {
+					set({ isLoading: false });
+				}
+
+				return result;
+			} catch (error) {
+				console.error("Registration error in store:", error);
 				set({ isLoading: false });
+				return {
+					success: false,
+					message: "Registration failed. Please try again.",
+				};
 			}
-
-			return result;
 		},
 
 		// Update profile
@@ -241,17 +283,24 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 
 		// Logout
 		logout: async (): Promise<void> => {
-			try {
-				await authAPI.logout();
-			} catch (error) {
-				console.error("Logout API error:", error);
-				// Continue with local logout even if API call fails
-			}
+			const refreshToken = tokenUtils.getRefreshToken();
 
+			// Always clear local state first to prevent any race conditions
 			get().clearAuth();
 			clearRefreshTimer();
 
-			// Redirect to login
+			// Then attempt backend cleanup
+			try {
+				if (refreshToken) {
+					await authAPI.logout();
+				}
+			} catch (error) {
+				console.error("Logout API error:", error);
+				// Backend cleanup failed, but local cleanup succeeded
+				// This is acceptable as the user is still logged out locally
+			}
+
+			// Redirect after cleanup
 			if (typeof window !== "undefined") {
 				window.location.href = "/login";
 			}

@@ -40,6 +40,8 @@ function processSignatureData(signatures) {
 			const rawData =
 				signature.signatureImageBuffer || signature.image || signature.dataUrl || signature.dataURL;
 
+
+
 			if (typeof rawData === "string") {
 				// Handle base64 data URLs
 				const base64Data = rawData.trim().replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, "");
@@ -55,10 +57,10 @@ function processSignatureData(signatures) {
 				const keys = [
 					signature.id,
 					signature.fieldId ||
-						signature.fieldID ||
-						signature.field_id ||
-						signature.field ||
-						signature.fieldName,
+					signature.fieldID ||
+					signature.field_id ||
+					signature.field ||
+					signature.fieldName,
 					`${signature.pageNumber}:${signature.recipientId}:${signature.type}`,
 					`${signature.pageNumber}:${signature.recipientId}`,
 					`${signature.recipientId}:${signature.type}`,
@@ -127,14 +129,14 @@ function calculateFieldDimensions(field, pageWidth, pageHeight, viewport, pageNu
 		field.wPct != null
 			? field.wPct
 			: baseW && field.width != null
-			? (field.width / baseW) * 100
-			: undefined;
+				? (field.width / baseW) * 100
+				: undefined;
 	const hPct =
 		field.hPct != null
 			? field.hPct
 			: baseH && field.height != null
-			? (field.height / baseH) * 100
-			: undefined;
+				? (field.height / baseH) * 100
+				: undefined;
 
 	// Calculate final pixel dimensions
 	const targetWidth = Math.max(
@@ -205,6 +207,8 @@ async function applySignaturesPdfLib(template, fields, signatureMap, viewport) {
 					.filter(Boolean)
 					.map(String);
 
+
+
 				let signatureBuffer = null;
 				for (const key of candidateKeys) {
 					const buffer = signatureMap.get(key);
@@ -225,8 +229,7 @@ async function applySignaturesPdfLib(template, fields, signatureMap, viewport) {
 
 				if (!signatureBuffer) {
 					console.warn(
-						`No signature found for field ${field.id || field.fieldId} (tried ${
-							candidateKeys.length
+						`No signature found for field ${field.id || field.fieldId} (tried ${candidateKeys.length
 						} keys)`
 					);
 
@@ -366,6 +369,20 @@ export const applySignatures = async (req, res) => {
 	try {
 		const { templateId } = req.params;
 		const { signatures, fields: incomingFields, viewport, recipients, message } = req.body;
+
+		console.log(`[ApplySignatures] SENDER SIGNING - Request received:`, {
+			templateId,
+			userId: req.user?.id,
+			userEmail: req.user?.email,
+			signaturesCount: signatures?.length || 0,
+			fieldsCount: incomingFields?.length || 0,
+			signatures: signatures?.map(sig => ({
+				fieldId: sig.fieldId,
+				type: sig.type,
+				hasImageData: !!sig.signatureImageBuffer,
+				imageDataLength: sig.signatureImageBuffer?.length || 0
+			}))
+		});
 
 		if (!TemplateValidator.isValidObjectId(templateId)) {
 			return res.status(400).json({ success: false, message: "Invalid template ID" });

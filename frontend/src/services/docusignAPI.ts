@@ -215,5 +215,103 @@ export const getSignatureTracking = async (templateId: string): Promise<Signatur
 	return result.data;
 };
 
+// Recipients and Signing Order Management
+export const addRecipients = async (
+	templateId: string,
+	recipients: Array<{ name: string; email: string; signingOrder?: number }>
+): Promise<{ template: DocuSignTemplateData; addedRecipients: RecipientData[] }> => {
+	const result = await serverApi.post(`/docusign/${templateId}/recipients`, {
+		recipients,
+	});
+
+	if (!result.success) {
+		throw new Error(result.message || "Failed to add recipients");
+	}
+
+	return result.data;
+};
+
+export const updateSigningOrder = async (
+	templateId: string,
+	recipients: Array<{ id: string; signingOrder: number }>
+): Promise<DocuSignTemplateData> => {
+	const result = await serverApi.put(`/docusign/${templateId}/recipients/order`, {
+		recipients,
+	});
+
+	if (!result.success) {
+		throw new Error(result.message || "Failed to update signing order");
+	}
+
+	return result.data;
+};
+
+export const removeRecipient = async (
+	templateId: string,
+	recipientId: string
+): Promise<{ template: DocuSignTemplateData; removedRecipient: RecipientData }> => {
+	const result = await serverApi.delete(`/docusign/${templateId}/recipients/${recipientId}`);
+
+	if (!result.success) {
+		throw new Error(result.message || "Failed to remove recipient");
+	}
+
+	return result.data;
+};
+
+export const getSigningProgress = async (templateId: string): Promise<{
+	totalRecipients: number;
+	signedRecipients: number;
+	completionPercentage: number;
+	nextRecipient: {
+		id: string;
+		name: string;
+		email: string;
+		signingOrder: number;
+	} | null;
+	recipients: RecipientData[];
+	isComplete: boolean;
+}> => {
+	const result = await serverApi.get(`/docusign/${templateId}/signing-progress`);
+
+	if (!result.success) {
+		throw new Error(result.message || "Failed to get signing progress");
+	}
+
+	return result.data;
+};
+
+export const checkSigningEligibility = async (
+	templateId: string,
+	recipientEmail: string
+): Promise<{
+	canSign: boolean;
+	recipient: {
+		id: string;
+		name: string;
+		email: string;
+		signatureStatus: string;
+		signingOrder: number;
+		signedAt?: string;
+	} | null;
+	nextRecipient: {
+		id: string;
+		name: string;
+		email: string;
+		signingOrder: number;
+	} | null;
+	message: string;
+}> => {
+	const result = await serverApi.get(`/docusign/${templateId}/signing-eligibility`, {
+		params: { recipientEmail },
+	});
+
+	if (!result.success) {
+		throw new Error(result.message || "Failed to check signing eligibility");
+	}
+
+	return result.data;
+};
+
 // Activity logging is handled by the activity API service
 // Import getDocuSignActivities from activityAPI.ts instead

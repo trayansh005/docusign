@@ -216,3 +216,68 @@ export const cancelSubscription = async (req, res) => {
 		await session.endSession();
 	}
 };
+
+// Delete subscription by ID
+export const deleteSubscription = async (req, res) => {
+	const session = await mongoose.startSession();
+
+	try {
+		await session.withTransaction(async () => {
+			const userId = req.user.id;
+			const { id: subscriptionId } = req.params;
+
+			// Find the subscription
+			const subscription = await Subscription.findById(subscriptionId).session(session);
+
+			if (!subscription) {
+				throw new Error("Subscription not found");
+			}
+
+			// Check if user owns this subscription
+			if (subscription.userId.toString() !== userId.toString()) {
+				throw new Error("Unauthorized: You can only delete your own subscriptions");
+			}
+
+			// If subscription is managed by Stripe, cancel it there first
+			if (subscription.paymentMethod === "stripe" && subscription.externalSubscriptionId) {
+				if (stripe) {
+					try {
+						await stripe.subscriptions.del(subscription.externalSubscriptionId);
+					} catch (stripeError) {
+						console.error("Failed to cancel Stripe subscription:", stripeError);
+						// Continue with local deletion even if Stripe fails
+					}
+				}
+			}
+
+			// Update subscription status to cancelled
+			subscription.status = "cancelled";
+			subscription.autoRenew = false;
+			subscription.cancelledAt = new Date();
+			await subscription.save({ session });
+
+			// Remove from user's current subscription if it's the active one
+			const user = await User.findById(userId).session(session);
+			if (user.currentSubscription && user.currentSubscription.toString() === subscriptionId) {
+				user.currentSubscription = null;
+				await user.save({ session });
+			}
+
+			res.json({
+				success: true,
+				message: "Subscription deleted successfully",
+				subscription
+			});
+		});
+	} catch (error) {
+		console.error("Error deleting subscription:", error);
+		const statusCode = error.message.includes("not found") ? 404 :
+			error.message.includes("Unauthorized") ? 403 : 500;
+		res.status(statusCode).json({
+			success: false,
+			message: error.message || "Failed to delete subscription",
+		});
+	} finally {
+		await session.endSession();
+	}
+};

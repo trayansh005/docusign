@@ -6,12 +6,13 @@ import dynamic from "next/dynamic";
 import { DocuSignTemplateData, SignatureField } from "@/types/docusign";
 import apiClient from "@/lib/apiClient";
 import { useAuthStore } from "@/stores/authStore";
+import { checkSigningEligibility } from "@/services/docusignAPI";
 
-// Dynamically import MultiPageTemplateViewer to avoid SSR issues
-const MultiPageTemplateViewer = dynamic(
+// Dynamically import RecipientDocumentViewer - simpler component for recipients
+const RecipientDocumentViewer = dynamic(
 	() =>
-		import("@/components/docusign/MultiPageTemplateViewer").then((mod) => ({
-			default: mod.MultiPageTemplateViewer,
+		import("@/components/docusign/RecipientDocumentViewer").then((mod) => ({
+			default: mod.RecipientDocumentViewer,
 		})),
 
 	{
@@ -35,7 +36,8 @@ export default function SignDocumentClient() {
 	const [error, setError] = useState<string | null>(null);
 	const [isSaving, setIsSaving] = useState(false);
 	const [showSuccess, setShowSuccess] = useState(false);
-	const [activeSignatureField, setActiveSignatureField] = useState<SignatureField | null>(null);
+	const [canSign, setCanSign] = useState(true);
+	const [signingMessage, setSigningMessage] = useState<string>("");
 	const [limitError, setLimitError] = useState<string | null>(null);
 
 	useEffect(() => {
@@ -55,6 +57,18 @@ export default function SignDocumentClient() {
 				if (response && response.success && response.data) {
 					// Template loaded
 					setTemplate(response.data);
+
+					// Check signing eligibility if user is a recipient
+					if (user?.email && response.data.recipients && response.data.recipients.length > 0) {
+						try {
+							const eligibility = await checkSigningEligibility(templateId, user.email);
+							setCanSign(eligibility.canSign);
+							setSigningMessage(eligibility.message);
+						} catch (eligibilityError) {
+							console.error("Error checking signing eligibility:", eligibilityError);
+							// Don't block signing if eligibility check fails
+						}
+					}
 				} else {
 					setError("Failed to load document");
 				}
@@ -75,6 +89,12 @@ export default function SignDocumentClient() {
 
 	const handleSaveSignatures = async () => {
 		if (!template || !user) return;
+
+		// Check if user can sign based on signing order
+		if (!canSign) {
+			alert(signingMessage || "It's not your turn to sign yet. Please wait for the previous signer to complete.");
+			return;
+		}
 
 		const userId = (user as { id?: string })?.id || "";
 		// Check if user has filled all their signature fields
@@ -101,8 +121,8 @@ export default function SignDocumentClient() {
 			// Build signature payload using percentage-based coordinates from the viewer
 			// Backend will map percentages directly to PDF page size
 
+			// Include all field types (signature, initial, text, address, email, phone, name, date)
 			const signatures = myFields
-				.filter((field) => field.type === "signature" || field.type === "initial")
 				.map((field: SignatureField) => ({
 					pageNumber: field.pageNumber || 1,
 					xPct: field.xPct as number,
@@ -115,6 +135,16 @@ export default function SignDocumentClient() {
 					fieldId: field.id,
 				}));
 
+			// Debug logging to see what's being sent
+			console.log("Signatures being sent to backend:", signatures.map(sig => ({
+				fieldId: sig.fieldId,
+				type: sig.type,
+				hasImageData: sig.signatureImageBuffer.startsWith("data:image"),
+				valuePreview: sig.signatureImageBuffer.substring(0, 50) + "..."
+			})));
+
+
+
 			// Sending signatures to API
 
 			// Save the signatures to the backend (RSSC format)
@@ -126,13 +156,26 @@ export default function SignDocumentClient() {
 				signatures, // Send as "signatures" (RSSC format), not "signatureFields"
 			});
 
+			console.log("[SignDocumentClient] Full API response:", response);
+			console.log("[SignDocumentClient] Response success:", response?.success);
+			console.log("[SignDocumentClient] Response data:", response?.data);
+
 			if (response && response.success) {
+				console.log("[SignDocumentClient] Signature response:", response);
+
+				// Update template with the signed PDF data if available
+				if (response.data && typeof response.data === 'object' && 'template' in response.data) {
+					const updatedTemplate = (response.data as any).template;
+					console.log("[SignDocumentClient] Updating template with signed PDF:", updatedTemplate.finalPdfUrl);
+					setTemplate(updatedTemplate);
+				}
+
 				setShowSuccess(true);
-				// Auto-close modal and navigate back after a short delay
+				// Auto-close modal and navigate back after a longer delay to show the signed document
 				setTimeout(() => {
 					setShowSuccess(false);
 					router.push("/dashboard");
-				}, 1600);
+				}, 3000); // Increased delay to 3 seconds
 			} else {
 				alert("Failed to save signatures. Please try again.");
 			}
@@ -178,11 +221,18 @@ export default function SignDocumentClient() {
 		);
 	}
 
-	// Get my signature fields (fields assigned to me)
+	// Get my signature fields (fields assigned to me or placeholders for recipients)
 	const userId = (user as { id?: string })?.id || "";
 	const myFields =
 		template.signatureFields?.filter(
-			(f) => user && (f.recipientId === user.email || f.recipientId === userId)
+			(f) => {
+				if (!user) return false;
+				// Include fields assigned to this user
+				if (f.recipientId === user.email || f.recipientId === userId) return true;
+				// Include placeholder fields (for recipients to fill)
+				if (f.placeholder && f.recipientId === "placeholder") return true;
+				return false;
+			}
 		) || [];
 
 	const filledFields = myFields.filter((f) => f.value && f.value.trim() !== "");
@@ -201,42 +251,7 @@ export default function SignDocumentClient() {
 		})),
 	});
 
-	// Handle adding new signature fields when user clicks on PDF
-	const handleFieldAdd = (pageNumber: number, field: Omit<SignatureField, "id">) => {
-		// Generate a unique ID for the new field
-		const newFieldId = `field-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-		const newField: SignatureField = {
-			...field,
-			id: newFieldId,
-			recipientId: user?.email || userId, // Assign to current user
-		};
 
-		setTemplate((prev) => {
-			if (!prev) return prev;
-
-			return {
-				...prev,
-				signatureFields: [...(prev.signatureFields || []), newField],
-			};
-		});
-
-		// 🎯 AUTO-OPEN SIGNATURE MODAL (like RSSC does)
-		// Immediately set the newly created field as active to open the signature modal
-		console.log("[SignDocumentClient] Auto-opening signature modal for new field:", newFieldId);
-		setActiveSignatureField(newField);
-	};
-
-	// Handle removing signature fields
-	const handleFieldRemove = (pageNumber: number, fieldId: string) => {
-		setTemplate((prev) => {
-			if (!prev) return prev;
-
-			return {
-				...prev,
-				signatureFields: (prev.signatureFields || []).filter((f) => f.id !== fieldId),
-			};
-		});
-	};
 
 	return (
 		<div className="min-h-screen bg-gray-50">
@@ -332,65 +347,44 @@ export default function SignDocumentClient() {
 								</svg>
 							</button>
 							<div>
-								<h1 className="text-xl font-semibold text-gray-900">
+								<h4 className="text-xl font-semibold text-gray-900">
 									{template.metadata?.filename || template.name || "Document"}
-								</h1>
+								</h4>
 								<p className="text-sm text-gray-600">
 									Click anywhere on the document to add your signature
 								</p>
 							</div>
 						</div>
-						<div className="flex items-center gap-4">
-							{/* Progress Indicator */}
-							{myFields.length > 0 ? (
-								<div className="flex items-center gap-3">
-									<div className="text-right">
-										<p className="text-sm font-medium text-gray-700">
-											{filledFields.length} of {myFields.length} completed
-										</p>
-										<div className="w-32 h-2 bg-gray-200 rounded-full mt-1">
-											<div
-												className="h-2 bg-green-500 rounded-full transition-all duration-300"
-												style={{ width: `${progress}%` }}
-											/>
-										</div>
-									</div>
-								</div>
-							) : (
-								<div className="text-sm text-gray-600 bg-blue-50 px-4 py-2 rounded-lg border border-blue-200">
-									<span className="font-medium">👆 Click on the PDF to add your signature</span>
-								</div>
-							)}
-							{/* Submit Button */}
-							<button
-								onClick={handleSaveSignatures}
-								disabled={
-									isSaving || myFields.length === 0 || filledFields.length !== myFields.length
-								}
-								className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-									isSaving || myFields.length === 0 || filledFields.length !== myFields.length
-										? "bg-gray-300 text-gray-500 cursor-not-allowed"
-										: "bg-green-600 hover:bg-green-700 text-white"
-								}`}
-							>
-								{isSaving ? "Submitting..." : "Complete Signing"}
-							</button>
-						</div>
+
 					</div>
 				</div>
 			</div>
+
+			{/* Signing Order Message */}
+			{!canSign && signingMessage && (
+				<div className="max-w-7xl mx-auto px-4 py-4">
+					<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+						<div className="flex items-center gap-3">
+							<div className="flex-shrink-0">
+								<svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+								</svg>
+							</div>
+							<div>
+								<h3 className="text-sm font-medium text-yellow-800">Waiting for your turn</h3>
+								<p className="text-sm text-yellow-700 mt-1">{signingMessage}</p>
+							</div>
+						</div>
+					</div>
+				</div>
+			)}
 
 			{/* Document Viewer */}
 			<div className="max-w-7xl mx-auto px-4 py-6 pb-24">
 				<div className="bg-white rounded-lg shadow-lg overflow-hidden">
 					{template && (
-						<MultiPageTemplateViewer
+						<RecipientDocumentViewer
 							template={template}
-							editable={true}
-							activeSignatureField={activeSignatureField}
-							setActiveSignatureField={setActiveSignatureField}
-							onFieldAdd={handleFieldAdd}
-							onFieldRemove={handleFieldRemove}
 							onFieldUpdate={(
 								pageNumber: number,
 								fieldId: string,
@@ -438,11 +432,10 @@ export default function SignDocumentClient() {
 					<button
 						onClick={handleSaveSignatures}
 						disabled={isSaving || filledFields.length !== myFields.length}
-						className={`px-8 py-4 rounded-lg font-bold text-lg shadow-2xl transition-all transform hover:scale-105 ${
-							isSaving || filledFields.length !== myFields.length
-								? "bg-gray-400 text-gray-600 cursor-not-allowed"
-								: "bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
-						}`}
+						className={`px-8 py-4 rounded-lg font-bold text-lg shadow-2xl transition-all transform hover:scale-105 ${isSaving || filledFields.length !== myFields.length
+							? "bg-gray-400 text-gray-600 cursor-not-allowed"
+							: "bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
+							}`}
 					>
 						{isSaving ? (
 							<span className="flex items-center gap-2">

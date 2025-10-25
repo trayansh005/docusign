@@ -7,6 +7,18 @@ export interface PaginationData {
 	hasPrev?: boolean;
 }
 
+export interface RecipientData {
+	id: string;
+	name: string;
+	email: string;
+	userId?: string;
+	signatureStatus: "pending" | "signed" | "declined" | "waiting";
+	signingOrder: number;
+	signedAt?: string;
+	notifiedAt?: string;
+	eligibleAt?: string;
+}
+
 export interface DocuSignTemplateData {
 	_id: string;
 	name: string;
@@ -16,6 +28,7 @@ export interface DocuSignTemplateData {
 	finalPdfUrl?: string;
 	numPages: number;
 	signatureFields: SignatureField[];
+	recipients: RecipientData[];
 	metadata: TemplateMetadata;
 	createdAt: string;
 	updatedAt: string;
@@ -30,7 +43,7 @@ export interface DocuSignTemplateData {
 export interface SignatureField {
 	id: string;
 	recipientId: string;
-	type: "signature" | "date" | "initial" | "text";
+	type: "signature" | "date" | "initial" | "text" | "name" | "email" | "phone" | "address";
 	pageNumber: number;
 	xPct: number;
 	yPct: number;
@@ -43,6 +56,8 @@ export interface SignatureField {
 	y?: number;
 	width?: number;
 	height?: number;
+	placeholder?: boolean; // Mark as placeholder for recipients
+	placeholderText?: string; // Display text for placeholder
 }
 
 export interface TemplateMetadata {
@@ -120,7 +135,7 @@ export interface ViewportData {
 	};
 }
 
-export interface RecipientData {
+export interface RecipientRole {
 	id: string;
 	name: string;
 	email: string;
@@ -143,7 +158,7 @@ export interface StatusHistoryData {
 	templateId: string;
 	currentStatus: string;
 	docusignStatus?: string;
-	recipients: RecipientData[];
+	recipients: RecipientRole[];
 	auditTrail: AuditEntry[];
 }
 

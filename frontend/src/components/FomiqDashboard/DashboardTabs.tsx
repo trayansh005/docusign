@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import ActivityClient from "@/app/fomiqsign/activity/ActivityClient";
+import apiClient from "@/lib/apiClient";
 import StatusTrackerClient from "@/app/fomiqsign/status-tracker/StatusTrackerClient";
 import { MultiPageTemplateViewer } from "@/components/docusign/MultiPageTemplateViewer";
 import { PDFUpload } from "@/components/docusign/PDFUpload";
@@ -63,6 +65,9 @@ export function DashboardTabs({
 	setMessageBody,
 	setResultUrls,
 }: DashboardTabsProps) {
+	// Add signature field state management for sender signing
+	const [activeSignatureField, setActiveSignatureField] = useState<SignatureField | null>(null);
+
 	const renderTabContent = () => {
 		switch (activeTab) {
 			case "upload":
@@ -110,15 +115,34 @@ export function DashboardTabs({
 									<MultiPageTemplateViewer
 										template={selectedTemplate}
 										editable={true}
-										onFieldAdd={(pageNumber: number, newField: Omit<SignatureField, "id">) => {
+										activeSignatureField={activeSignatureField}
+										setActiveSignatureField={setActiveSignatureField}
+										onFieldAdd={async (pageNumber: number, newField: Omit<SignatureField, "id">) => {
+											const id = `${Date.now()}-${Math.random()}`;
+											const fieldWithId = { ...newField, id };
+
+											// Update local state immediately
 											setSelectedTemplate((prev) => {
 												if (!prev) return prev;
-												const id = `${Date.now()}-${Math.random()}`;
 												return {
 													...prev,
-													signatureFields: [...(prev.signatureFields || []), { ...newField, id }],
+													signatureFields: [...(prev.signatureFields || []), fieldWithId],
 												};
 											});
+
+											// Save to database if it's a placeholder field
+											if (newField.placeholder && selectedTemplate) {
+												try {
+													const updatedFields = [...(selectedTemplate.signatureFields || []), fieldWithId];
+													await apiClient.put(`/docusign/${selectedTemplate._id}/fields`, {
+														fields: updatedFields
+													});
+													console.log("Placeholder field saved to database");
+												} catch (error) {
+													console.error("Failed to save placeholder field:", error);
+													// Could show a toast notification here
+												}
+											}
 										}}
 										onFieldRemove={(pageNumber: number, fieldId: string) => {
 											setSelectedTemplate((prev) => {
@@ -151,6 +175,9 @@ export function DashboardTabs({
 
 								<div className="mt-4 md:mt-0 md:w-96 lg:w-96 bg-gray-900/20 p-5 rounded-lg shadow-inner sticky top-20">
 									<h3 className="text-lg font-medium text-gray-100 mb-3">Recipients</h3>
+									<p className="text-sm text-gray-300 mb-3">
+										Add recipients to send the document for signing, or leave empty to sign it yourself.
+									</p>
 									<RecipientsManager recipients={recipients} setRecipients={setRecipients} />
 									<hr className="my-4 border-gray-700" />
 									<h3 className="text-lg font-medium text-gray-100 mb-3">Message</h3>

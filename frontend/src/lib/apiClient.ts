@@ -4,6 +4,9 @@ import { tokenUtils } from "./tokenUtils";
 const rawBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 const API_BASE_URL = rawBase.endsWith("/api") ? rawBase : rawBase.replace(/\/$/, "") + "/api";
 
+// Global refresh promise to prevent multiple simultaneous refresh attempts
+let refreshPromise: Promise<{ accessToken?: string; refreshToken?: string; error?: string }> | null = null;
+
 class ApiClient {
 	private baseURL: string;
 
@@ -32,7 +35,14 @@ class ApiClient {
 			if (response.status === 401 && accessToken) {
 				const refreshToken = tokenUtils.getRefreshToken();
 				if (refreshToken) {
-					const refreshResult = await tokenUtils.refreshAccessToken(refreshToken);
+					// Use global refresh promise to prevent multiple simultaneous refresh attempts
+					if (!refreshPromise) {
+						refreshPromise = tokenUtils.refreshAccessToken(refreshToken);
+					}
+
+					const refreshResult = await refreshPromise;
+					refreshPromise = null; // Reset after completion
+
 					if (refreshResult.accessToken && refreshResult.refreshToken) {
 						tokenUtils.setTokens(refreshResult.accessToken, refreshResult.refreshToken);
 

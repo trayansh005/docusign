@@ -27,13 +27,11 @@ export const tokenUtils = {
 		}
 
 		// Also set non-httpOnly cookies for Next middleware checks (backend also sets httpOnly cookies)
-		document.cookie = `${TOKEN_STORAGE_KEY}=${accessToken}; path=/; max-age=${
-			15 * 60
-		}; SameSite=lax`;
-		if (refreshToken) {
-			document.cookie = `${REFRESH_TOKEN_STORAGE_KEY}=${refreshToken}; path=/; max-age=${
-				7 * 24 * 60 * 60
+		document.cookie = `${TOKEN_STORAGE_KEY}=${accessToken}; path=/; max-age=${15 * 60
 			}; SameSite=lax`;
+		if (refreshToken) {
+			document.cookie = `${REFRESH_TOKEN_STORAGE_KEY}=${refreshToken}; path=/; max-age=${7 * 24 * 60 * 60
+				}; SameSite=lax`;
 		}
 	},
 
@@ -86,6 +84,11 @@ export const tokenUtils = {
 		refreshToken: string
 	): Promise<{ accessToken?: string; refreshToken?: string; error?: string }> => {
 		try {
+			// Validate refresh token before making request
+			if (!refreshToken || tokenUtils.isTokenExpired(refreshToken)) {
+				return { error: "Invalid or expired refresh token" };
+			}
+
 			const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 			// Backend exposes refresh under /api/auth/refresh-token
 			const response = await fetch(`${apiBase}/auth/refresh-token`, {
@@ -96,6 +99,15 @@ export const tokenUtils = {
 				body: JSON.stringify({ refreshToken }),
 				credentials: "include", // Important for cookies
 			});
+
+			if (!response.ok) {
+				// Handle specific HTTP status codes
+				if (response.status === 401) {
+					return { error: "Refresh token expired or invalid" };
+				} else if (response.status >= 500) {
+					return { error: "Server error during token refresh" };
+				}
+			}
 
 			const data = await response.json();
 
@@ -109,7 +121,10 @@ export const tokenUtils = {
 			}
 		} catch (error) {
 			console.error("Token refresh error:", error);
-			return { error: "Network error during token refresh" };
+			if (error instanceof TypeError && error.message.includes("fetch")) {
+				return { error: "Network error during token refresh" };
+			}
+			return { error: "Unexpected error during token refresh" };
 		}
 	},
 };

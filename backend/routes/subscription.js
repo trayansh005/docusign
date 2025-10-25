@@ -5,6 +5,7 @@ import {
 	getUserSubscription,
 	createSubscription,
 	cancelSubscription,
+	deleteSubscription,
 } from "../controllers/subscriptionController.js";
 import {
 	createCheckoutSession,
@@ -25,6 +26,9 @@ router.post("/", authenticate, createSubscription);
 
 // Cancel
 router.post("/cancel", authenticate, cancelSubscription);
+
+// Delete subscription by ID (admin/user action)
+router.delete("/:id", authenticate, deleteSubscription);
 
 // Stripe checkout creation
 router.post("/checkout", authenticate, createCheckoutSession);

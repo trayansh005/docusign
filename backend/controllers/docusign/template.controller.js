@@ -27,7 +27,7 @@ export const listTemplates = async (req, res) => {
 		const [templates, total] = await Promise.all([
 			DocuSignTemplate.find(query)
 				.select(
-					"name type status numPages metadata.filename metadata.fileSize metadata.originalPdfPath metadata.fileHash metadata.document createdAt updatedAt signatureFields finalPdfUrl"
+					"name type status numPages metadata.filename metadata.fileSize metadata.originalPdfPath metadata.fileHash metadata.document createdAt updatedAt signatureFields finalPdfUrl recipients"
 				)
 				.populate("createdBy", "firstName lastName email")
 				.sort({ createdAt: -1 })

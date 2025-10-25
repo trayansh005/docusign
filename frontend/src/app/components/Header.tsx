@@ -22,13 +22,12 @@ export default function Header() {
 						className="flex items-center space-x-3 text-xl font-bold text-white hover:text-blue-400 transition-colors duration-200"
 					>
 						<Image
-							src="/fomiqsign-logo.png"
+							src="/logo.png"
 							alt="FomiqSign Platform"
 							width={150}
 							height={40}
-							className="h-10 w-auto object-contain"
+							className="h-32 w-auto object-contain"
 						/>
-						<span className="text-gradient">FomiqSign</span>
 					</Link>
 
 					{/* Desktop Navigation */}
@@ -62,6 +61,9 @@ export default function Header() {
 										</Link>
 										<Link href="/dashboard" className="nav-link">
 											Dashboard
+										</Link>
+										<Link href="/dashboard/signing-progress" className="nav-link">
+											Signing Progress
 										</Link>
 										<Link href="/fomiqsign/dashboard" className="nav-link">
 											Sign Document
@@ -115,24 +117,20 @@ export default function Header() {
 						aria-label="Toggle menu"
 					>
 						<div
-							className={`absolute inset-0 flex flex-col justify-center space-y-1 transition-all duration-200 ${
-								isMenuOpen ? "rotate-45" : ""
-							}`}
+							className={`absolute inset-0 flex flex-col justify-center space-y-1 transition-all duration-200 ${isMenuOpen ? "rotate-45" : ""
+								}`}
 						>
 							<span
-								className={`block h-0.5 bg-current rounded transition-all duration-200 ${
-									isMenuOpen ? "rotate-90 translate-y-1.5" : "w-6"
-								}`}
+								className={`block h-0.5 bg-current rounded transition-all duration-200 ${isMenuOpen ? "rotate-90 translate-y-1.5" : "w-6"
+									}`}
 							/>
 							<span
-								className={`block h-0.5 bg-current rounded transition-all duration-200 ${
-									isMenuOpen ? "opacity-0" : "w-6"
-								}`}
+								className={`block h-0.5 bg-current rounded transition-all duration-200 ${isMenuOpen ? "opacity-0" : "w-6"
+									}`}
 							/>
 							<span
-								className={`block h-0.5 bg-current rounded transition-all duration-200 ${
-									isMenuOpen ? "-rotate-90 -translate-y-1.5" : "w-6"
-								}`}
+								className={`block h-0.5 bg-current rounded transition-all duration-200 ${isMenuOpen ? "-rotate-90 -translate-y-1.5" : "w-6"
+									}`}
 							/>
 						</div>
 					</button>
@@ -140,9 +138,8 @@ export default function Header() {
 
 				{/* Mobile Navigation */}
 				<div
-					className={`md:hidden overflow-hidden transition-all duration-300 ${
-						isMenuOpen ? "max-h-96 pb-4" : "max-h-0"
-					}`}
+					className={`md:hidden overflow-hidden transition-all duration-300 ${isMenuOpen ? "max-h-96 pb-4" : "max-h-0"
+						}`}
 				>
 					<nav className="flex flex-col space-y-2 pt-4 border-t border-white/10">
 						{isLoading ? (
@@ -216,6 +213,13 @@ export default function Header() {
 											onClick={() => setIsMenuOpen(false)}
 										>
 											Dashboard
+										</Link>
+										<Link
+											href="/dashboard/signing-progress"
+											className="nav-link text-center"
+											onClick={() => setIsMenuOpen(false)}
+										>
+											Signing Progress
 										</Link>
 										<Link
 											href="/fomiqsign/dashboard"

@@ -28,6 +28,17 @@ import {
 	getStatusStatistics,
 } from "../controllers/docusign/status.controller.js";
 import { migrateTemplates } from "../controllers/docusign/migration.controller.js";
+import {
+	migrateSigningOrder,
+	fixTemplateSigningOrder
+} from "../controllers/docusign/migration-signing-order.controller.js";
+import {
+	addRecipients,
+	updateSigningOrder,
+	removeRecipient,
+	getSigningProgress,
+	checkSigningEligibility,
+} from "../controllers/docusign/recipients.controller.js";
 
 const router = express.Router();
 
@@ -77,12 +88,24 @@ router.delete("/:templateId/fields/:fieldId", deleteSignatureField);
 
 // ===== SIGNATURE ROUTES =====
 
-// Recipient signing (user signs document sent to them)
+// Unified signing endpoint (handles both recipient and sender signing)
 router.post("/:templateId/sign", recipientSignDocument);
 
-// Signature application (optimized with pdf-lib)
+// Legacy signature application endpoint (deprecated - use /sign instead)
+// TODO: Remove this endpoint after frontend migration is complete
 router.post("/:templateId/apply-signatures", applySignatures);
 router.get("/:templateId/signed", getSignedDocument);
+
+// ===== RECIPIENTS & SIGNING ORDER ROUTES =====
+
+// Recipient management
+router.post("/:templateId/recipients", addRecipients);
+router.put("/:templateId/recipients/order", updateSigningOrder);
+router.delete("/:templateId/recipients/:recipientId", removeRecipient);
+
+// Signing progress and eligibility
+router.get("/:templateId/signing-progress", getSigningProgress);
+router.get("/:templateId/signing-eligibility", checkSigningEligibility);
 
 // ===== STATUS & TRACKING ROUTES =====
 
@@ -99,5 +122,9 @@ router.get("/:templateId/signature-tracking", getSignatureTracking);
 
 // Migrate old templates to new format
 router.post("/migrate", migrateTemplates);
+
+// Migrate signing order for existing templates
+router.post("/migrate-signing-order", migrateSigningOrder);
+router.post("/:templateId/fix-signing-order", fixTemplateSigningOrder);
 
 export default router;

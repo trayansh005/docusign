@@ -12,7 +12,7 @@ const signatureFieldSchema = new mongoose.Schema(
 		},
 		type: {
 			type: String,
-			enum: ["signature", "date", "initial", "text"],
+			enum: ["signature", "date", "initial", "text", "name", "email", "phone", "address"],
 			required: true,
 		},
 		pageNumber: {
@@ -50,6 +50,18 @@ const signatureFieldSchema = new mongoose.Schema(
 		value: {
 			type: String,
 		},
+		// Placeholder fields for recipients
+		placeholder: {
+			type: Boolean,
+			default: false,
+		},
+		placeholderText: {
+			type: String,
+		},
+		required: {
+			type: Boolean,
+			default: false,
+		},
 	},
 	{ _id: false }
 );
@@ -76,8 +88,14 @@ const recipientSchema = new mongoose.Schema(
 		// Status of this recipient's signature
 		signatureStatus: {
 			type: String,
-			enum: ["pending", "signed", "declined"],
+			enum: ["pending", "signed", "declined", "waiting"],
 			default: "pending",
+		},
+		// Signing order - determines the sequence in which recipients must sign
+		signingOrder: {
+			type: Number,
+			required: true,
+			min: 1,
 		},
 		// When the recipient signed
 		signedAt: {
@@ -85,6 +103,10 @@ const recipientSchema = new mongoose.Schema(
 		},
 		// Notification tracking
 		notifiedAt: {
+			type: Date,
+		},
+		// When this recipient becomes eligible to sign (based on signing order)
+		eligibleAt: {
 			type: Date,
 		},
 	},
@@ -217,6 +239,74 @@ templateSchema.methods.updateSignatureField = function (fieldId, updates) {
 		return this.save();
 	}
 	throw new Error("Signature field not found");
+};
+
+// Signing order management methods
+templateSchema.methods.getNextRecipientToSign = function () {
+	// Find the next recipient in signing order who hasn't signed yet
+	const pendingRecipients = this.recipients
+		.filter(r => r.signatureStatus === "pending" || r.signatureStatus === "waiting")
+		.sort((a, b) => a.signingOrder - b.signingOrder);
+
+	return pendingRecipients.length > 0 ? pendingRecipients[0] : null;
+};
+
+templateSchema.methods.updateSigningStatus = function () {
+	// Update recipient statuses based on signing order
+	const sortedRecipients = this.recipients.sort((a, b) => a.signingOrder - b.signingOrder);
+	let nextToSign = true;
+
+	for (const recipient of sortedRecipients) {
+		if (recipient.signatureStatus === "signed") {
+			continue; // Already signed, skip
+		}
+
+		if (nextToSign) {
+			// This is the next person who should sign
+			if (recipient.signatureStatus !== "pending") {
+				recipient.signatureStatus = "pending";
+				recipient.eligibleAt = new Date();
+			}
+			nextToSign = false; // Only one person can be "pending" at a time
+		} else {
+			// Everyone else should be waiting
+			if (recipient.signatureStatus !== "waiting") {
+				recipient.signatureStatus = "waiting";
+				recipient.eligibleAt = null;
+			}
+		}
+	}
+
+	return this.save();
+};
+
+templateSchema.methods.canRecipientSign = function (recipientId) {
+	const recipient = this.recipients.find(r => r.id === recipientId || r.email === recipientId);
+	if (!recipient) return false;
+
+	// Check if this recipient is next in line to sign
+	const nextRecipient = this.getNextRecipientToSign();
+	return nextRecipient && (nextRecipient.id === recipientId || nextRecipient.email === recipientId);
+};
+
+templateSchema.methods.markRecipientSigned = function (recipientId) {
+	const recipient = this.recipients.find(r => r.id === recipientId || r.email === recipientId);
+	if (recipient) {
+		recipient.signatureStatus = "signed";
+		recipient.signedAt = new Date();
+
+		// Update signing status for remaining recipients
+		this.updateSigningStatus();
+
+		// Check if all recipients have signed
+		const allSigned = this.recipients.every(r => r.signatureStatus === "signed");
+		if (allSigned) {
+			this.status = "final";
+		}
+
+		return this.save();
+	}
+	throw new Error("Recipient not found");
 };
 
 const DocuSignTemplate = mongoose.model("DocuSignTemplate", templateSchema);

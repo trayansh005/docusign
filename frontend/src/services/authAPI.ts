@@ -61,6 +61,8 @@ export const authAPI = {
 				headers: {
 					"Content-Type": "application/json",
 				},
+				// Include credentials for cookie support
+				credentials: "include",
 				body: JSON.stringify({
 					firstName: userData.firstName,
 					lastName: userData.lastName,
@@ -73,11 +75,26 @@ export const authAPI = {
 
 			const data = await response.json();
 
-			if (response.ok) {
-				return {
-					success: true,
-					message: data.message || "Registration successful",
-				};
+			if (response.ok && data.success) {
+				// Registration now returns tokens like login (backend auto-login after registration)
+				const accessToken: string | undefined = data?.data?.accessToken || data?.data?.token;
+				const refreshToken: string | undefined = data?.data?.refreshToken;
+				const user = data.data.user;
+
+				if (accessToken && user) {
+					return {
+						success: true,
+						message: data.message || "Registration successful",
+						token: accessToken,
+						refreshToken,
+						user,
+					};
+				} else {
+					return {
+						success: true,
+						message: data.message || "Registration successful",
+					};
+				}
 			} else {
 				console.error("Registration failed:", data);
 
@@ -192,6 +209,38 @@ export const authAPI = {
 				success: false,
 				message: "Network error. Please try again.",
 			};
+		}
+	},
+
+	async validateToken(): Promise<{ success: boolean; user?: any }> {
+		try {
+			const token = tokenUtils.getAccessToken();
+			if (!token) {
+				return { success: false };
+			}
+
+			const response = await fetch(`${API_BASE_URL}/auth/validate-token`, {
+				method: "GET",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`,
+				},
+				credentials: "include",
+			});
+
+			const data = await response.json();
+
+			if (response.ok && data.success) {
+				return {
+					success: true,
+					user: data.data.user,
+				};
+			} else {
+				return { success: false };
+			}
+		} catch (error) {
+			console.error("Token validation error:", error);
+			return { success: false };
 		}
 	},
 
