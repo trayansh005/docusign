@@ -27,6 +27,10 @@ export const useSignatureFields = ({
 		initial: { defaultWidth: 8, defaultHeight: 6, minWidth: 4, minHeight: 3 },
 		date: { defaultWidth: 12, defaultHeight: 4, minWidth: 6, minHeight: 2 },
 		text: { defaultWidth: 15, defaultHeight: 4, minWidth: 6, minHeight: 2 },
+		name: { defaultWidth: 15, defaultHeight: 4, minWidth: 6, minHeight: 2 },
+		email: { defaultWidth: 15, defaultHeight: 4, minWidth: 6, minHeight: 2 },
+		phone: { defaultWidth: 12, defaultHeight: 4, minWidth: 6, minHeight: 2 },
+		address: { defaultWidth: 20, defaultHeight: 6, minWidth: 10, minHeight: 4 },
 	}), []);
 
 	const selectedField = selectedFieldId ? fields.find(f => f.id === selectedFieldId) || null : null;

@@ -295,6 +295,8 @@ export const RecipientDocumentViewer: React.FC<RecipientDocumentViewerProps> = (
                             <PDFPageCanvas
                                 pdfUrl={ensureAbsoluteUrl(template.finalPdfUrl || template.pdfUrl || template.metadata?.originalPdfPath || "")}
                                 pageNumber={currentPage}
+                                zoom={zoom}
+                                rotation={rotation}
                                 onPageLoad={() => { }}
                             />
 

@@ -43,29 +43,31 @@ export const SignatureCollector: React.FC<SignatureCollectorProps> = ({
 	const currentFields = currentRecipient ? fieldsByRecipient[currentRecipient.id] || [] : [];
 
 	const handleSignatureComplete = (fieldId: string, data: string) => {
-		const field = fields.find(f => f.id === fieldId);
+		const field = fields.find((f) => f.id === fieldId);
 		if (!field) return;
 
 		const signature: CollectedSignature = {
 			fieldId,
 			recipientId: field.recipientId,
 			data,
-			type: field.type,
+			type: field.type as "signature" | "date" | "initial" | "text",
 			pageNumber: field.pageNumber,
 		};
 
-		setCollectedSignatures(prev => [...prev.filter(s => s.fieldId !== fieldId), signature]);
+		setCollectedSignatures((prev) => [...prev.filter((s) => s.fieldId !== fieldId), signature]);
 		setActiveField(null);
 
 		// Check if all signatures for current recipient are complete
-		const recipientSignatures = collectedSignatures.filter(s => s.recipientId === currentRecipient.id);
+		const recipientSignatures = collectedSignatures.filter(
+			(s) => s.recipientId === currentRecipient.id
+		);
 		if (recipientSignatures.length + 1 >= currentFields.length) {
 			// Move to next recipient or complete
 			if (currentRecipientIndex < recipients.length - 1) {
-				setCurrentRecipientIndex(prev => prev + 1);
+				setCurrentRecipientIndex((prev) => prev + 1);
 			} else {
 				// All signatures collected
-				const signatureData: SignatureData[] = [...collectedSignatures, signature].map(sig => ({
+				const signatureData: SignatureData[] = [...collectedSignatures, signature].map((sig) => ({
 					id: sig.fieldId,
 					pageNumber: sig.pageNumber,
 					recipientId: sig.recipientId,
@@ -93,7 +95,7 @@ export const SignatureCollector: React.FC<SignatureCollectorProps> = ({
 	};
 
 	const isFieldCompleted = (fieldId: string) => {
-		return collectedSignatures.some(s => s.fieldId === fieldId);
+		return collectedSignatures.some((s) => s.fieldId === fieldId);
 	};
 
 	if (!currentRecipient) {
@@ -124,13 +126,20 @@ export const SignatureCollector: React.FC<SignatureCollectorProps> = ({
 				<div className="mt-4">
 					<div className="flex justify-between text-sm text-gray-600 mb-2">
 						<span>Progress</span>
-						<span>{collectedSignatures.filter(s => s.recipientId === currentRecipient.id).length} of {currentFields.length}</span>
+						<span>
+							{collectedSignatures.filter((s) => s.recipientId === currentRecipient.id).length} of{" "}
+							{currentFields.length}
+						</span>
 					</div>
 					<div className="w-full bg-gray-200 rounded-full h-2">
 						<div
 							className="bg-blue-600 h-2 rounded-full transition-all duration-300"
 							style={{
-								width: `${(collectedSignatures.filter(s => s.recipientId === currentRecipient.id).length / currentFields.length) * 100}%`
+								width: `${
+									(collectedSignatures.filter((s) => s.recipientId === currentRecipient.id).length /
+										currentFields.length) *
+									100
+								}%`,
 							}}
 						/>
 					</div>
@@ -144,10 +153,11 @@ export const SignatureCollector: React.FC<SignatureCollectorProps> = ({
 					{currentFields.map((field) => (
 						<div
 							key={field.id}
-							className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${isFieldCompleted(field.id)
-								? "bg-green-50 border-green-200"
-								: "bg-gray-50 border-gray-200 hover:bg-gray-100"
-								}`}
+							className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+								isFieldCompleted(field.id)
+									? "bg-green-50 border-green-200"
+									: "bg-gray-50 border-gray-200 hover:bg-gray-100"
+							}`}
 						>
 							<div className="flex items-center gap-3">
 								{getFieldIcon(field.type)}

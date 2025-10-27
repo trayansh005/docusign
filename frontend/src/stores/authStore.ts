@@ -215,7 +215,7 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 						console.log("   ✅ Setting authenticated state with stored user");
 						// Use stored user data immediately
 						set({
-							user: storedUser as User,
+							user: storedUser as unknown as User,
 							token,
 							isLoading: false,
 							isAuthenticated: true,
