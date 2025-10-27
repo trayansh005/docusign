@@ -130,7 +130,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 
 		// Find signature fields that belong to the current user (not placeholders)
 		const userEmail = user?.email;
-		const userId = (user as any)?.id;
+		const userId = user?.id;
 
 		const senderFields = template.signatureFields.filter((field) => {
 			// Must not be a placeholder
@@ -152,7 +152,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 		// For now, if sender fields exist, assume they can mark places
 		// TODO: Fix the signature value saving issue
 		return senderFields.length > 0;
-	}, [template?.signatureFields, user?.email, user]);
+	}, [template?.signatureFields, user]);
 
 	// Get user's full name for signature fields
 	const userFullName =
@@ -275,7 +275,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 
 		// Only document owners can drag fields (including their placeholder fields)
 		// Recipients cannot drag any fields
-		const isDocumentOwner = template && user && template.createdBy === (user as any)?.id;
+		const isDocumentOwner = template && user && template.createdBy?._id === user?.id;
 		const isDraggingDisabled = isResizing || !isDocumentOwner;
 
 		const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -505,7 +505,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 				{/* Action buttons positioned outside the draggable element */}
 				{editable && !field.placeholder && (
 					// Check if user is document owner (can delete any field)
-					template && user && template.createdBy === (user as any)?.id
+					template && user && template.createdBy?._id === user?.id
 				) && (
 						<>
 							{/* Delete button - only for document owners */}
@@ -582,7 +582,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 
 			// Only document owners can add new fields by clicking on canvas
 			// Recipients should only fill existing placeholder fields
-			const isDocumentOwner = template && user && template.createdBy === (user as any)?.id;
+			const isDocumentOwner = template && user && template.createdBy?._id === user?.id;
 
 			if (!isDocumentOwner) return;
 
@@ -648,7 +648,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 
 			onFieldAdd?.(currentPage, newField);
 		},
-		[editable, currentPage, onFieldAdd, isMarkingMode, selectedFieldType, user]
+		[editable, currentPage, onFieldAdd, isMarkingMode, selectedFieldType, user, template]
 	);
 
 	const handlePageLoad = useCallback(() => {
@@ -731,7 +731,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 			</div>
 
 			{/* Mark Place Section - Only show for document owners/senders */}
-			{editable && template && user && template.createdBy === (user as any)?.id && (
+			{editable && template && user && template.createdBy?._id === user?.id && (
 				<div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-3">

@@ -212,7 +212,7 @@ export const authAPI = {
 		}
 	},
 
-	async validateToken(): Promise<{ success: boolean; user?: any }> {
+	async validateToken(): Promise<{ success: boolean; user?: User }> {
 		try {
 			const token = tokenUtils.getAccessToken();
 			if (!token) {

@@ -445,7 +445,7 @@ export function FinalizePanel({
 					<div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
 						No signed document was generated. This usually means:
 						<ul className="mt-1 ml-4 list-disc text-xs">
-							<li>You haven't signed the document yet</li>
+							<li>You haven&apos;t signed the document yet</li>
 							<li>There was an error processing your signature</li>
 							<li>The document format is not supported</li>
 						</ul>

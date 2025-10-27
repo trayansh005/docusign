@@ -213,7 +213,7 @@ export const SenderDashboard: React.FC = () => {
                             ].map((tab) => (
                                 <button
                                     key={tab.key}
-                                    onClick={() => setFilter(tab.key as any)}
+                                    onClick={() => setFilter(tab.key as "all" | "pending" | "completed")}
                                     className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${filter === tab.key
                                         ? "border-blue-500 text-blue-400"
                                         : "border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600"
@@ -398,7 +398,7 @@ export const SenderDashboard: React.FC = () => {
                                     <div className="text-center py-8">
                                         <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                                         <h3 className="text-lg font-medium text-white mb-2">No Recipients</h3>
-                                        <p className="text-gray-400">This document hasn't been sent to anyone yet.</p>
+                                        <p className="text-gray-400">This document hasn&apos;t been sent to anyone yet.</p>
                                     </div>
                                 )}
 

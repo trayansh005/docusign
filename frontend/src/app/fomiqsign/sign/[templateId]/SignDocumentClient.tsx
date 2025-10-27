@@ -88,7 +88,7 @@ export default function SignDocumentClient() {
 		};
 
 		loadTemplate();
-	}, [templateId]);
+	}, [templateId, user?.email]);
 
 	const handleBackToDashboard = () => {
 		router.push("/dashboard");
@@ -157,7 +157,7 @@ export default function SignDocumentClient() {
 			// Save the signatures to the backend (RSSC format)
 			interface SignResponse {
 				success: boolean;
-				data: unknown;
+				data: { template?: DocuSignTemplateData };
 			}
 			const response = await apiClient.post<SignResponse>(`/docusign/${templateId}/sign`, {
 				signatures, // Send as "signatures" (RSSC format), not "signatureFields"
@@ -172,9 +172,9 @@ export default function SignDocumentClient() {
 
 				// Update template with the signed PDF data if available
 				if (response.data && typeof response.data === 'object' && 'template' in response.data) {
-					const updatedTemplate = (response.data as any).template;
-					console.log("[SignDocumentClient] Updating template with signed PDF:", updatedTemplate.finalPdfUrl);
-					setTemplate(updatedTemplate);
+					const updatedTemplate = response.data.template;
+					console.log("[SignDocumentClient] Updating template with signed PDF:", updatedTemplate?.finalPdfUrl);
+					if (updatedTemplate) setTemplate(updatedTemplate);
 				}
 
 				setShowSuccess(true);

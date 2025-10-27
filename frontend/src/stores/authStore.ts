@@ -30,7 +30,7 @@ interface AuthActions {
 	initializeAuth: () => Promise<void>;
 }
 
-interface AuthStore extends AuthState, AuthActions { }
+interface AuthStore extends AuthState, AuthActions {}
 
 // Ref for managing refresh timer outside of store
 let refreshTimerRef: NodeJS.Timeout | null = null;
@@ -147,14 +147,17 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 					console.log("   Have token but no user, fetching user data from backend...");
 					try {
 						// Use profile endpoint which works with httpOnly cookies
-						const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/profile`, {
-							method: "GET",
-							headers: {
-								"Content-Type": "application/json",
-								...(token && { Authorization: `Bearer ${token}` }),
-							},
-							credentials: "include", // Important for httpOnly cookies
-						});
+						const response = await fetch(
+							`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/profile`,
+							{
+								method: "GET",
+								headers: {
+									"Content-Type": "application/json",
+									...(token && { Authorization: `Bearer ${token}` }),
+								},
+								credentials: "include", // Important for httpOnly cookies
+							}
+						);
 
 						if (response.ok) {
 							const data = await response.json();
@@ -192,7 +195,7 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 								// Validate the refreshed token with backend
 								const validation = await authAPI.validateToken();
 								if (validation.success && validation.user) {
-									tokenUtils.setStoredUser(validation.user);
+									tokenUtils.setStoredUser(validation.user as unknown as Record<string, unknown>);
 									set({
 										user: validation.user as User,
 										token: refreshResult.accessToken,
@@ -225,16 +228,19 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 						scheduleSilentRefresh(token);
 
 						// Optionally validate in background (don't block UI)
-						authAPI.validateToken().then((validation) => {
-							if (validation.success && validation.user) {
-								// Update with fresh user data from backend
-								tokenUtils.setStoredUser(validation.user);
-								set({ user: validation.user as User });
-							}
-						}).catch((err) => {
-							console.error("Background token validation failed:", err);
-							// Don't clear auth on background validation failure
-						});
+						authAPI
+							.validateToken()
+							.then((validation) => {
+								if (validation.success && validation.user) {
+									// Update with fresh user data from backend
+									tokenUtils.setStoredUser(validation.user as unknown as Record<string, unknown>);
+									set({ user: validation.user as User });
+								}
+							})
+							.catch((err) => {
+								console.error("Background token validation failed:", err);
+								// Don't clear auth on background validation failure
+							});
 					} else {
 						// No stored user, try to validate with backend to get user data
 						console.log("   No stored user, fetching from backend...");
@@ -242,7 +248,7 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 							const validation = await authAPI.validateToken();
 							if (validation.success && validation.user) {
 								console.log("   ✅ Got user from backend, setting authenticated state");
-								tokenUtils.setStoredUser(validation.user);
+								tokenUtils.setStoredUser(validation.user as unknown as Record<string, unknown>);
 								set({
 									user: validation.user as User,
 									token,

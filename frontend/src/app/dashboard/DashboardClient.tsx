@@ -9,6 +9,7 @@ import { Portal } from "@/components/Portal";
 import { Activity } from "@/types/activity";
 import { SigningProgressWidget } from "@/components/docusign/SigningProgressWidget";
 import { getTemplates } from "@/services/docusignAPI";
+import { DocuSignTemplateData } from "@/types/docusign";
 
 interface UserStats {
 	totalDocuments: number;
@@ -86,7 +87,7 @@ export default function DashboardClient() {
 	const INBOX_LIMIT = 10;
 
 	// Signing progress state
-	const [documentsWithRecipients, setDocumentsWithRecipients] = useState<any[]>([]);
+	const [documentsWithRecipients, setDocumentsWithRecipients] = useState<DocuSignTemplateData[]>([]);
 	const [loadingDocuments, setLoadingDocuments] = useState(false);
 
 	// Auth guard - redirect to login if not authenticated
