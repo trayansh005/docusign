@@ -169,21 +169,19 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 			const userId = (user as { id?: string })?.id || "";
 			const userEmail = user?.email || "";
 
-
-
-			const isMyField = user && (
-				field.recipientId === userEmail ||
-				field.recipientId === userId ||
-				!field.recipientId || // Handle fields without recipientId (newly created fields)
-				field.recipientId === "current-user" || // Handle fields created with fallback recipientId
-				field.recipientId?.includes("current-user") // Handle variations
-			);
+			const isMyField =
+				user &&
+				(field.recipientId === userEmail ||
+					field.recipientId === userId ||
+					!field.recipientId || // Handle fields without recipientId (newly created fields)
+					field.recipientId === "current-user" || // Handle fields created with fallback recipientId
+					field.recipientId?.includes("current-user")); // Handle variations
 
 			const isPlaceholder = field.placeholder && field.recipientId === "placeholder";
 
 			// Allow interaction if:
 			// 1. It's my field, OR
-			// 2. In editable mode (sender), OR  
+			// 2. In editable mode (sender), OR
 			// 3. It's a placeholder (recipient can fill any placeholder)
 			if (isMyField || editable || isPlaceholder) {
 				// Open signature pad for this field
@@ -200,7 +198,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 	const handleSignatureComplete = useCallback(
 		(fieldId: string, signatureData: string) => {
 			if (onFieldUpdate) {
-				const field = template.signatureFields.find(f => f.id === fieldId);
+				const field = template.signatureFields.find((f) => f.id === fieldId);
 				const userId = (user as { id?: string })?.id || "";
 				const userEmail = user?.email || "";
 
@@ -295,8 +293,6 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 			}
 		}, [isDragging]);
 
-
-
 		const style: React.CSSProperties = {
 			transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
 			position: "absolute",
@@ -311,8 +307,6 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 		// Change color based on field type and status
 		const hasSigned = field.value && field.value.trim() !== "";
 		const isPlaceholder = field.placeholder;
-
-
 
 		let fieldColor;
 		if (isPlaceholder) {
@@ -441,16 +435,25 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 					}}
 					className={`signature-field border-2 border-dashed ${fieldColor} backdrop-blur-sm rounded-lg 
 						flex items-center justify-center hover:shadow-xl transition-all duration-300 ease-out
-						${isDragging || isResizing
-							? "shadow-2xl scale-110 ring-2 ring-blue-400 ring-opacity-50"
-							: "shadow-lg hover:scale-105"
+						${
+							isDragging || isResizing
+								? "shadow-2xl scale-110 ring-2 ring-blue-400 ring-opacity-50"
+								: "shadow-lg hover:scale-105"
 						}
-						group select-none ${isResizing ? "cursor-se-resize" : field.placeholder ? "cursor-pointer" : editable ? "cursor-move" : "cursor-pointer"}`}
+						group select-none ${
+							isResizing
+								? "cursor-se-resize"
+								: field.placeholder
+								? "cursor-pointer"
+								: editable
+								? "cursor-move"
+								: "cursor-pointer"
+						}`}
 				>
 					<div className="flex flex-col items-center justify-center p-3 text-center min-w-0">
 						{(field.type === "signature" || field.type === "initial") &&
-							field.value &&
-							field.value.startsWith("data:image") ? (
+						field.value &&
+						field.value.startsWith("data:image") ? (
 							// eslint-disable-next-line @next/next/no-img-element
 							<img
 								src={field.value}
@@ -465,10 +468,19 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 							/>
 						) : (
 							<span
-								className={`font-semibold truncate max-w-full ${field.placeholder ? 'text-gray-600' : 'text-gray-800'}`}
+								className={`font-semibold truncate max-w-full ${
+									field.placeholder ? "text-gray-600" : "text-gray-800"
+								}`}
 								style={{
 									fontFamily: getFontFamily(),
-									fontSize: (field.type === "text" || field.type === "name" || field.type === "email" || field.type === "phone" || field.type === "address") ? '16px' : getDynamicFontSize(),
+									fontSize:
+										field.type === "text" ||
+										field.type === "name" ||
+										field.type === "email" ||
+										field.type === "phone" ||
+										field.type === "address"
+											? "16px"
+											: getDynamicFontSize(),
 									lineHeight: "1.2",
 									fontWeight:
 										field.type === "signature" || field.type === "initial" ? "400" : "600",
@@ -503,16 +515,19 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 				</div>
 
 				{/* Action buttons positioned outside the draggable element */}
-				{editable && !field.placeholder && (
+				{editable &&
+					!field.placeholder &&
 					// Check if user is document owner (can delete any field)
-					template && user && template.createdBy?._id === user?.id
-				) && (
+					template &&
+					user &&
+					template.createdBy?._id === user?.id && (
 						<>
 							{/* Delete button - only for document owners */}
 							<button
 								type="button"
-								className={`absolute w-7 h-7 rounded-full bg-red-500 text-white shadow-lg transition-all duration-200 flex items-center justify-center z-10 hover:bg-red-600 pointer-events-auto ${isDragging ? "opacity-0" : "opacity-100"
-									}`}
+								className={`absolute w-7 h-7 rounded-full bg-red-500 text-white shadow-lg transition-all duration-200 flex items-center justify-center z-10 hover:bg-red-600 pointer-events-auto ${
+									isDragging ? "opacity-0" : "opacity-100"
+								}`}
 								style={{
 									left: `calc(${field.xPct || 0}% + ${field.wPct || 25}% - 14px)`,
 									top: `calc(${field.yPct || 0}% - 12px)`,
@@ -531,8 +546,9 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 							{(field.type === "signature" || field.type === "initial") && (
 								<button
 									type="button"
-									className={`absolute w-7 h-7 rounded-full bg-purple-600 text-white shadow-lg transition-all duration-200 flex items-center justify-center z-10 hover:bg-purple-700 pointer-events-auto ${isDragging ? "opacity-0" : "opacity-100"
-										}`}
+									className={`absolute w-7 h-7 rounded-full bg-purple-600 text-white shadow-lg transition-all duration-200 flex items-center justify-center z-10 hover:bg-purple-700 pointer-events-auto ${
+										isDragging ? "opacity-0" : "opacity-100"
+									}`}
 									style={{
 										left: `calc(${field.xPct || 0}% + ${(field.wPct || 25) / 2}% - 24px)`,
 										top: `calc(${field.yPct || 0}% - 12px)`,
@@ -542,9 +558,10 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 										e.stopPropagation();
 										handleFontChange(field.id);
 									}}
-									title={`Change font style (${SIGNATURE_FONTS.find((font) => font.id === field.fontId)?.name ||
+									title={`Change font style (${
+										SIGNATURE_FONTS.find((font) => font.id === field.fontId)?.name ||
 										SIGNATURE_FONTS[0].name
-										})`}
+									})`}
 								>
 									<Palette className="w-3.5 h-3.5" />
 								</button>
@@ -554,8 +571,9 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 							{(field.type === "signature" || field.type === "initial") && (
 								<button
 									type="button"
-									className={`absolute w-8 h-8 rounded-full bg-green-600 text-white shadow-xl transition-all duration-200 flex items-center justify-center hover:bg-green-700 hover:scale-110 pointer-events-auto cursor-pointer border-2 border-white ${isDragging ? "opacity-0 pointer-events-none" : "opacity-100"
-										}`}
+									className={`absolute w-8 h-8 rounded-full bg-green-600 text-white shadow-xl transition-all duration-200 flex items-center justify-center hover:bg-green-700 hover:scale-110 pointer-events-auto cursor-pointer border-2 border-white ${
+										isDragging ? "opacity-0 pointer-events-none" : "opacity-100"
+									}`}
 									style={{
 										left: `calc(${field.xPct || 0}% + ${(field.wPct || 25) / 2}% + 16px)`,
 										top: `calc(${field.yPct || 0}% - 16px)`,
@@ -605,9 +623,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 
 			// Fixed field size for consistency
 			const wPct = 25; // 25% of page width
-			const hPct = 8;  // 8% of page height
-
-
+			const hPct = 8; // 8% of page height
 
 			const userId = (user as { id?: string })?.id || "";
 			const userEmail = user?.email || "";
@@ -626,7 +642,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 					hPct: hPct,
 					fontId: SIGNATURE_FONTS[0].id,
 					placeholder: true, // Mark as placeholder
-					placeholderText: FIELD_TYPES.find(f => f.id === selectedFieldType)?.label || "Field",
+					placeholderText: FIELD_TYPES.find((f) => f.id === selectedFieldType)?.label || "Field",
 				};
 				// Exit marking mode after placing field
 				setIsMarkingMode(false);
@@ -644,8 +660,6 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 				};
 			}
 
-
-
 			onFieldAdd?.(currentPage, newField);
 		},
 		[editable, currentPage, onFieldAdd, isMarkingMode, selectedFieldType, user, template]
@@ -659,16 +673,11 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 	// Use finalPdfUrl if available (signed document), otherwise use original pdfUrl
 	const pdfUrlToUse = template.finalPdfUrl || template.pdfUrl || template.metadata?.originalPdfPath;
 
-
-
 	return (
 		<div className={`space-y-4 ${className}`}>
 			{/* Signing Progress */}
 			{showSigningProgress && template.recipients && template.recipients.length > 0 && (
-				<SigningProgress
-					recipients={template.recipients}
-					currentUserEmail={user?.email}
-				/>
+				<SigningProgress recipients={template.recipients} currentUserEmail={user?.email} />
 			)}
 
 			{/* Controls */}
@@ -740,11 +749,12 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 								<h3 className="text-sm font-medium text-blue-900">Mark Places for Recipients</h3>
 								<p className="text-xs text-blue-700">
 									{isMarkingMode
-										? `Click on the document to place a ${FIELD_TYPES.find(f => f.id === selectedFieldType)?.label} field`
+										? `Click on the document to place a ${
+												FIELD_TYPES.find((f) => f.id === selectedFieldType)?.label
+										  } field`
 										: hasSenderSigned()
-											? "Create placeholders for recipients to fill in specific information"
-											: "Sign the document first, then you can mark places for recipients"
-									}
+										? "Create placeholders for recipients to fill in specific information"
+										: "Sign the document first, then you can mark places for recipients"}
 								</p>
 							</div>
 						</div>
@@ -760,17 +770,24 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 							<button
 								onClick={() => {
 									if (!hasSenderSigned()) {
-										alert("You must sign the document first before marking places for recipients. Please click the green pen icon to add your signature.");
+										alert(
+											"You must sign the document first before marking places for recipients. Please click the green pen icon to add your signature."
+										);
 										return;
 									}
 									setShowMarkPlaceDialog(true);
 								}}
 								disabled={!hasSenderSigned()}
-								className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${hasSenderSigned()
-									? "bg-blue-600 hover:bg-blue-700 text-white"
-									: "bg-gray-300 text-gray-500 cursor-not-allowed"
-									}`}
-								title={!hasSenderSigned() ? "Sign the document first before marking places" : "Mark places for recipients to sign"}
+								className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+									hasSenderSigned()
+										? "bg-blue-600 hover:bg-blue-700 text-white"
+										: "bg-gray-300 text-gray-500 cursor-not-allowed"
+								}`}
+								title={
+									!hasSenderSigned()
+										? "Sign the document first before marking places"
+										: "Mark places for recipients to sign"
+								}
 							>
 								Mark Place
 							</button>
@@ -784,11 +801,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 				<div
 					className="relative overflow-auto bg-gray-100 flex items-start justify-center"
 					style={{
-						cursor: editable
-							? isMarkingMode
-								? "copy"
-								: "crosshair"
-							: "default",
+						cursor: editable ? (isMarkingMode ? "copy" : "crosshair") : "default",
 						minHeight: "600px",
 						padding: "20px",
 					}}
@@ -877,19 +890,18 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 								</button>
 							</div>
 
-							<p className="text-sm text-gray-600 mb-3">
-								Select field type for recipient to fill:
-							</p>
+							<p className="text-sm text-gray-600 mb-3">Select field type for recipient to fill:</p>
 
 							<div className="space-y-1.5 mb-4">
 								{FIELD_TYPES.map((fieldType) => (
 									<button
 										key={fieldType.id}
 										onClick={() => setSelectedFieldType(fieldType.id)}
-										className={`w-full p-2 text-left border rounded-md transition-all ${selectedFieldType === fieldType.id
-											? "border-blue-600 bg-blue-50"
-											: "border-gray-200 hover:border-gray-300"
-											}`}
+										className={`w-full p-2 text-left border rounded-md transition-all ${
+											selectedFieldType === fieldType.id
+												? "border-blue-600 bg-blue-50"
+												: "border-gray-200 hover:border-gray-300"
+										}`}
 									>
 										<div className="flex items-center gap-2">
 											<span className="text-sm">{fieldType.icon}</span>
@@ -936,6 +948,6 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 					</div>
 				</div>
 			)}
-		</div >
+		</div>
 	);
 };

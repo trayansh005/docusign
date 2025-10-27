@@ -99,7 +99,10 @@ export default function SignDocumentClient() {
 
 		// Check if user can sign based on signing order
 		if (!canSign) {
-			alert(signingMessage || "It's not your turn to sign yet. Please wait for the previous signer to complete.");
+			alert(
+				signingMessage ||
+					"It's not your turn to sign yet. Please wait for the previous signer to complete."
+			);
 			return;
 		}
 
@@ -129,28 +132,28 @@ export default function SignDocumentClient() {
 			// Backend will map percentages directly to PDF page size
 
 			// Include all field types (signature, initial, text, address, email, phone, name, date)
-			const signatures = myFields
-				.map((field: SignatureField) => ({
-					pageNumber: field.pageNumber || 1,
-					xPct: field.xPct as number,
-					yPct: field.yPct as number,
-					wPct: field.wPct as number,
-					hPct: field.hPct as number,
-					signatureImageBuffer: field.value || "",
-					recipientId: field.recipientId || user.email || userId,
-					type: field.type || "signature",
-					fieldId: field.id,
-				}));
+			const signatures = myFields.map((field: SignatureField) => ({
+				pageNumber: field.pageNumber || 1,
+				xPct: field.xPct as number,
+				yPct: field.yPct as number,
+				wPct: field.wPct as number,
+				hPct: field.hPct as number,
+				signatureImageBuffer: field.value || "",
+				recipientId: field.recipientId || user.email || userId,
+				type: field.type || "signature",
+				fieldId: field.id,
+			}));
 
 			// Debug logging to see what's being sent
-			console.log("Signatures being sent to backend:", signatures.map(sig => ({
-				fieldId: sig.fieldId,
-				type: sig.type,
-				hasImageData: sig.signatureImageBuffer.startsWith("data:image"),
-				valuePreview: sig.signatureImageBuffer.substring(0, 50) + "..."
-			})));
-
-
+			console.log(
+				"Signatures being sent to backend:",
+				signatures.map((sig) => ({
+					fieldId: sig.fieldId,
+					type: sig.type,
+					hasImageData: sig.signatureImageBuffer.startsWith("data:image"),
+					valuePreview: sig.signatureImageBuffer.substring(0, 50) + "...",
+				}))
+			);
 
 			// Sending signatures to API
 
@@ -171,9 +174,12 @@ export default function SignDocumentClient() {
 				console.log("[SignDocumentClient] Signature response:", response);
 
 				// Update template with the signed PDF data if available
-				if (response.data && typeof response.data === 'object' && 'template' in response.data) {
+				if (response.data && typeof response.data === "object" && "template" in response.data) {
 					const updatedTemplate = response.data.template;
-					console.log("[SignDocumentClient] Updating template with signed PDF:", updatedTemplate?.finalPdfUrl);
+					console.log(
+						"[SignDocumentClient] Updating template with signed PDF:",
+						updatedTemplate?.finalPdfUrl
+					);
 					if (updatedTemplate) setTemplate(updatedTemplate);
 				}
 
@@ -231,16 +237,14 @@ export default function SignDocumentClient() {
 	// Get my signature fields (fields assigned to me or placeholders for recipients)
 	const userId = (user as { id?: string })?.id || "";
 	const myFields =
-		template.signatureFields?.filter(
-			(f) => {
-				if (!user) return false;
-				// Include fields assigned to this user
-				if (f.recipientId === user.email || f.recipientId === userId) return true;
-				// Include placeholder fields (for recipients to fill)
-				if (f.placeholder && f.recipientId === "placeholder") return true;
-				return false;
-			}
-		) || [];
+		template.signatureFields?.filter((f) => {
+			if (!user) return false;
+			// Include fields assigned to this user
+			if (f.recipientId === user.email || f.recipientId === userId) return true;
+			// Include placeholder fields (for recipients to fill)
+			if (f.placeholder && f.recipientId === "placeholder") return true;
+			return false;
+		}) || [];
 
 	const filledFields = myFields.filter((f) => f.value && f.value.trim() !== "");
 	const progress = myFields.length > 0 ? (filledFields.length / myFields.length) * 100 : 0;
@@ -257,8 +261,6 @@ export default function SignDocumentClient() {
 			valueLength: f.value?.length || 0,
 		})),
 	});
-
-
 
 	return (
 		<div className="min-h-screen bg-gray-50">
@@ -362,7 +364,6 @@ export default function SignDocumentClient() {
 								</p>
 							</div>
 						</div>
-
 					</div>
 				</div>
 			</div>
@@ -373,8 +374,18 @@ export default function SignDocumentClient() {
 					<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
 						<div className="flex items-center gap-3">
 							<div className="flex-shrink-0">
-								<svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+								<svg
+									className="w-5 h-5 text-yellow-600"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										strokeWidth={2}
+										d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+									/>
 								</svg>
 							</div>
 							<div>
@@ -439,10 +450,11 @@ export default function SignDocumentClient() {
 					<button
 						onClick={handleSaveSignatures}
 						disabled={isSaving || filledFields.length !== myFields.length}
-						className={`px-8 py-4 rounded-lg font-bold text-lg shadow-2xl transition-all transform hover:scale-105 ${isSaving || filledFields.length !== myFields.length
-							? "bg-gray-400 text-gray-600 cursor-not-allowed"
-							: "bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
-							}`}
+						className={`px-8 py-4 rounded-lg font-bold text-lg shadow-2xl transition-all transform hover:scale-105 ${
+							isSaving || filledFields.length !== myFields.length
+								? "bg-gray-400 text-gray-600 cursor-not-allowed"
+								: "bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
+						}`}
 					>
 						{isSaving ? (
 							<span className="flex items-center gap-2">

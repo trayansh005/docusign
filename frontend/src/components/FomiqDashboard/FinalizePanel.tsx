@@ -116,19 +116,24 @@ export function FinalizePanel({
 		setLimitError(null);
 		try {
 			// Get sender's signature fields and placeholder fields
-			const senderSignatureFields = template.signatureFields.filter((field) =>
-				!field.placeholder && // Exclude placeholder fields
-				(field.type === "signature" || field.type === "initial") && // Only signature/initial fields
-				(field.recipientId === user?.email || field.recipientId?.includes("current-user") || !field.recipientId)
+			const senderSignatureFields = template.signatureFields.filter(
+				(field) =>
+					!field.placeholder && // Exclude placeholder fields
+					(field.type === "signature" || field.type === "initial") && // Only signature/initial fields
+					(field.recipientId === user?.email ||
+						field.recipientId?.includes("current-user") ||
+						!field.recipientId)
 			);
 
-			const placeholderFields = template.signatureFields.filter(field => field.placeholder);
+			const placeholderFields = template.signatureFields.filter((field) => field.placeholder);
 			const hasPlaceholders = placeholderFields.length > 0;
 			const hasRecipients = recipients && recipients.length > 0;
 
 			// Validation 1: If there are placeholder fields, recipients must be selected
 			if (hasPlaceholders && !hasRecipients) {
-				setLimitError("You have marked places for recipients to sign, but no recipients are selected. Please add recipients or remove the marked places.");
+				setLimitError(
+					"You have marked places for recipients to sign, but no recipients are selected. Please add recipients or remove the marked places."
+				);
 				setLoading(false);
 				return;
 			}
@@ -138,7 +143,9 @@ export function FinalizePanel({
 				// For now, if sender signature fields exist, assume they're signed
 				// TODO: Fix the signature value saving issue
 				if (senderSignatureFields.length === 0) {
-					setLimitError("You must sign the document first. Please click the green pen icon to add your signature, or add recipients if you want them to sign.");
+					setLimitError(
+						"You must sign the document first. Please click the green pen icon to add your signature, or add recipients if you want them to sign."
+					);
 					setLoading(false);
 					return;
 				}
@@ -149,7 +156,9 @@ export function FinalizePanel({
 				// For now, if sender signature fields exist, assume they're signed
 				// TODO: Fix the signature value saving issue
 				if (senderSignatureFields.length === 0) {
-					setLimitError("You must sign the document before sending it to recipients. Please click the green pen icon to add your signature.");
+					setLimitError(
+						"You must sign the document before sending it to recipients. Please click the green pen icon to add your signature."
+					);
 					setLoading(false);
 					return;
 				}
@@ -175,15 +184,18 @@ export function FinalizePanel({
 				console.debug("Could not fetch saved signatures, falling back to generated images", msg);
 			}
 			// Generate signature images for sender's own fields (not placeholders)
-			const senderFields = template.signatureFields.filter((field) =>
-				!field.placeholder && // Exclude placeholder fields
-				(field.type === "signature" || field.type === "initial") && // Only signature/initial fields
-				(field.recipientId === user?.email || field.recipientId?.includes("current-user") || !field.recipientId)
+			const senderFields = template.signatureFields.filter(
+				(field) =>
+					!field.placeholder && // Exclude placeholder fields
+					(field.type === "signature" || field.type === "initial") && // Only signature/initial fields
+					(field.recipientId === user?.email ||
+						field.recipientId?.includes("current-user") ||
+						!field.recipientId)
 			);
 
 			const signaturePromises = senderFields.map(async (field) => {
 				// Check if field has a signature pad value (base64 image data)
-				if (field.value && field.value.startsWith('data:image/')) {
+				if (field.value && field.value.startsWith("data:image/")) {
 					return {
 						id: field.id,
 						fieldId: field.id,
@@ -201,11 +213,11 @@ export function FinalizePanel({
 				// 2. Else if initial field, use userInitials
 				// 3. Else (signature field), use userFullName
 				const text =
-					field.value && field.value.length > 0 && !field.value.startsWith('data:image/')
+					field.value && field.value.length > 0 && !field.value.startsWith("data:image/")
 						? field.value
 						: field.type === "initial"
-							? userInitials
-							: userFullName;
+						? userInitials
+						: userFullName;
 
 				const fontFamily = getFontFamily(field.fontId);
 				const width = Math.round((field.wPct / 100) * 800); // Assume 800px viewport width
@@ -255,24 +267,28 @@ export function FinalizePanel({
 			console.log(`Sending ${signatures.length} signature images to backend`);
 
 			// Get placeholder fields for recipients
-			const recipientPlaceholderFields = template.signatureFields.filter(field => field.placeholder);
+			const recipientPlaceholderFields = template.signatureFields.filter(
+				(field) => field.placeholder
+			);
 
 			// Use the unified signing endpoint that works for both senders and recipients
 			const unifiedPayload = {
-				signatures: signatures.map((sig) => ({
-					pageNumber: sig.pageNumber || 1,
-					xPct: template.signatureFields?.find(f => f.id === sig.fieldId)?.xPct || 0,
-					yPct: template.signatureFields?.find(f => f.id === sig.fieldId)?.yPct || 0,
-					wPct: template.signatureFields?.find(f => f.id === sig.fieldId)?.wPct || 20,
-					hPct: template.signatureFields?.find(f => f.id === sig.fieldId)?.hPct || 5,
-					signatureImageBuffer: sig.signatureImageBuffer || sig.image,
-					recipientId: sig.recipientId || "current-user",
-					type: sig.type || "signature",
-					fieldId: sig.fieldId || sig.id,
-				})).filter(sig => sig.signatureImageBuffer), // Only include signatures with actual data
+				signatures: signatures
+					.map((sig) => ({
+						pageNumber: sig.pageNumber || 1,
+						xPct: template.signatureFields?.find((f) => f.id === sig.fieldId)?.xPct || 0,
+						yPct: template.signatureFields?.find((f) => f.id === sig.fieldId)?.yPct || 0,
+						wPct: template.signatureFields?.find((f) => f.id === sig.fieldId)?.wPct || 20,
+						hPct: template.signatureFields?.find((f) => f.id === sig.fieldId)?.hPct || 5,
+						signatureImageBuffer: sig.signatureImageBuffer || sig.image,
+						recipientId: sig.recipientId || "current-user",
+						type: sig.type || "signature",
+						fieldId: sig.fieldId || sig.id,
+					}))
+					.filter((sig) => sig.signatureImageBuffer), // Only include signatures with actual data
 
 				// Include placeholder fields for recipients to fill
-				placeholderFields: recipientPlaceholderFields.map(field => ({
+				placeholderFields: recipientPlaceholderFields.map((field) => ({
 					id: field.id,
 					type: field.type,
 					pageNumber: field.pageNumber,
@@ -288,8 +304,6 @@ export function FinalizePanel({
 				recipients: recipients || [],
 				message: { subject: subject || "", body: body || "" },
 			};
-
-
 
 			const res = await apiClient.post(`/docusign/${template._id}/sign`, unifiedPayload);
 
@@ -336,8 +350,6 @@ export function FinalizePanel({
 					(r.finalPdfUrl as string) ||
 					"";
 
-
-
 				if (typeof finalPdfUrl === "string" && finalPdfUrl.length > 0) {
 					const absoluteUrl = toAbsoluteUrl(finalPdfUrl);
 
@@ -377,7 +389,9 @@ export function FinalizePanel({
 				} else {
 					// No valid response format found
 					console.error("Invalid response format:", res);
-					setLimitError("Failed to process the signed document. Please try again or contact support.");
+					setLimitError(
+						"Failed to process the signed document. Please try again or contact support."
+					);
 					setLoading(false);
 					return;
 				}
@@ -433,12 +447,7 @@ export function FinalizePanel({
 				onClick={generate}
 				disabled={loading}
 			>
-				{loading
-					? "Processing..."
-					: recipients.length > 0
-						? "Send for Signature"
-						: "Sign Document"
-				}
+				{loading ? "Processing..." : recipients.length > 0 ? "Send for Signature" : "Sign Document"}
 			</button>
 			<div className="mt-2">
 				{resultUrls === null ? null : resultUrls.length === 0 ? (

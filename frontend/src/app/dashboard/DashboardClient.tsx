@@ -87,7 +87,9 @@ export default function DashboardClient() {
 	const INBOX_LIMIT = 10;
 
 	// Signing progress state
-	const [documentsWithRecipients, setDocumentsWithRecipients] = useState<DocuSignTemplateData[]>([]);
+	const [documentsWithRecipients, setDocumentsWithRecipients] = useState<DocuSignTemplateData[]>(
+		[]
+	);
 	const [loadingDocuments, setLoadingDocuments] = useState(false);
 
 	// Auth guard - redirect to login if not authenticated
@@ -196,8 +198,8 @@ export default function DashboardClient() {
 			});
 
 			// Filter documents that have recipients
-			const docsWithRecipients = response.data.filter(doc =>
-				doc.recipients && doc.recipients.length > 0
+			const docsWithRecipients = response.data.filter(
+				(doc) => doc.recipients && doc.recipients.length > 0
 			);
 
 			console.log("Documents with recipients:", docsWithRecipients.length);
@@ -484,8 +486,8 @@ export default function DashboardClient() {
 															item.status === "final"
 																? "text-green-400"
 																: item.status === "active"
-																	? "text-yellow-400"
-																	: "text-blue-400"
+																? "text-yellow-400"
+																: "text-blue-400"
 														}
 													>
 														{item.status}
@@ -564,10 +566,11 @@ export default function DashboardClient() {
 													<button
 														key={pageNum}
 														onClick={() => loadDashboardData(pageNum)}
-														className={`px-3 py-1 rounded-md text-sm transition-colors ${inboxPage === pageNum
-															? "bg-blue-600 text-white"
-															: "bg-gray-700 hover:bg-gray-600 text-white"
-															}`}
+														className={`px-3 py-1 rounded-md text-sm transition-colors ${
+															inboxPage === pageNum
+																? "bg-blue-600 text-white"
+																: "bg-gray-700 hover:bg-gray-600 text-white"
+														}`}
 													>
 														{pageNum}
 													</button>
@@ -636,12 +639,13 @@ export default function DashboardClient() {
 							<div className="bg-gray-800/30 rounded-lg p-4">
 								<p className="text-gray-400 text-sm mb-1">Status</p>
 								<p
-									className={`font-semibold ${subscription.status === "active"
-										? "text-green-400"
-										: subscription.status === "canceled"
+									className={`font-semibold ${
+										subscription.status === "active"
+											? "text-green-400"
+											: subscription.status === "canceled"
 											? "text-red-400"
 											: "text-yellow-400"
-										}`}
+									}`}
 								>
 									{subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
 								</p>
@@ -775,9 +779,7 @@ export default function DashboardClient() {
 							{documentsWithRecipients.slice(0, 3).map((doc) => (
 								<div key={doc._id} className="card p-4">
 									<div className="mb-3">
-										<h3 className="text-lg font-semibold text-white truncate">
-											{doc.name}
-										</h3>
+										<h3 className="text-lg font-semibold text-white truncate">{doc.name}</h3>
 										<p className="text-sm text-gray-400">
 											Created {new Date(doc.createdAt).toLocaleDateString()}
 										</p>
