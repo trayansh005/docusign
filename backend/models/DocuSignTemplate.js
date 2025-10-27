@@ -277,7 +277,8 @@ templateSchema.methods.updateSigningStatus = function () {
 		}
 	}
 
-	return this.save();
+	// Don't save here - let the caller save
+	return this;
 };
 
 templateSchema.methods.canRecipientSign = function (recipientId) {

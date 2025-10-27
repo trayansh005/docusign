@@ -36,7 +36,7 @@ export default function SignDocumentClient() {
 	const [error, setError] = useState<string | null>(null);
 	const [isSaving, setIsSaving] = useState(false);
 	const [showSuccess, setShowSuccess] = useState(false);
-	const [canSign, setCanSign] = useState(true);
+	const [canSign, setCanSign] = useState(false); // Default to false, will be set to true if eligible
 	const [signingMessage, setSigningMessage] = useState<string>("");
 	const [limitError, setLimitError] = useState<string | null>(null);
 
@@ -58,15 +58,22 @@ export default function SignDocumentClient() {
 					// Template loaded
 					setTemplate(response.data);
 
-					// Check signing eligibility if user is a recipient
-					if (user?.email && response.data.recipients && response.data.recipients.length > 0) {
-						try {
-							const eligibility = await checkSigningEligibility(templateId, user.email);
-							setCanSign(eligibility.canSign);
-							setSigningMessage(eligibility.message);
-						} catch (eligibilityError) {
-							console.error("Error checking signing eligibility:", eligibilityError);
-							// Don't block signing if eligibility check fails
+					// Check signing eligibility
+					if (user?.email) {
+						// If there are recipients, check signing order
+						if (response.data.recipients && response.data.recipients.length > 0) {
+							try {
+								const eligibility = await checkSigningEligibility(templateId, user.email);
+								setCanSign(eligibility.canSign);
+								setSigningMessage(eligibility.message);
+							} catch (eligibilityError) {
+								console.error("Error checking signing eligibility:", eligibilityError);
+								// If eligibility check fails, allow signing (fail open for document owners)
+								setCanSign(true);
+							}
+						} else {
+							// No recipients means document owner is signing, allow it
+							setCanSign(true);
 						}
 					}
 				} else {

@@ -3,6 +3,9 @@ export const TOKEN_STORAGE_KEY = "accessToken";
 export const REFRESH_TOKEN_STORAGE_KEY = "refreshToken";
 export const USER_STORAGE_KEY = "user";
 
+// Track ongoing refresh request to prevent race conditions
+let refreshPromise: Promise<{ accessToken?: string; refreshToken?: string; error?: string }> | null = null;
+
 export const tokenUtils = {
 	// Get token from localStorage
 	getAccessToken: (): string | null => {
@@ -79,52 +82,66 @@ export const tokenUtils = {
 		}
 	},
 
-	// Refresh token API call
+	// Refresh token API call with race condition prevention
 	refreshAccessToken: async (
 		refreshToken: string
 	): Promise<{ accessToken?: string; refreshToken?: string; error?: string }> => {
-		try {
-			// Validate refresh token before making request
-			if (!refreshToken || tokenUtils.isTokenExpired(refreshToken)) {
-				return { error: "Invalid or expired refresh token" };
-			}
-
-			const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
-			// Backend exposes refresh under /api/auth/refresh-token
-			const response = await fetch(`${apiBase}/auth/refresh-token`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({ refreshToken }),
-				credentials: "include", // Important for cookies
-			});
-
-			if (!response.ok) {
-				// Handle specific HTTP status codes
-				if (response.status === 401) {
-					return { error: "Refresh token expired or invalid" };
-				} else if (response.status >= 500) {
-					return { error: "Server error during token refresh" };
-				}
-			}
-
-			const data = await response.json();
-
-			if (response.ok && data.success) {
-				return {
-					accessToken: data.data.accessToken,
-					refreshToken: data.data.refreshToken,
-				};
-			} else {
-				return { error: data.message || "Token refresh failed" };
-			}
-		} catch (error) {
-			console.error("Token refresh error:", error);
-			if (error instanceof TypeError && error.message.includes("fetch")) {
-				return { error: "Network error during token refresh" };
-			}
-			return { error: "Unexpected error during token refresh" };
+		// If there's already a refresh in progress, return that promise
+		if (refreshPromise) {
+			console.log("Refresh already in progress, waiting for existing request...");
+			return refreshPromise;
 		}
+
+		// Create new refresh promise
+		refreshPromise = (async () => {
+			try {
+				// Validate refresh token before making request
+				if (!refreshToken || tokenUtils.isTokenExpired(refreshToken)) {
+					return { error: "Invalid or expired refresh token" };
+				}
+
+				const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+				// Backend exposes refresh under /api/auth/refresh-token
+				const response = await fetch(`${apiBase}/auth/refresh-token`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({ refreshToken }),
+					credentials: "include", // Important for cookies
+				});
+
+				if (!response.ok) {
+					// Handle specific HTTP status codes
+					if (response.status === 401) {
+						return { error: "Refresh token expired or invalid" };
+					} else if (response.status >= 500) {
+						return { error: "Server error during token refresh" };
+					}
+				}
+
+				const data = await response.json();
+
+				if (response.ok && data.success) {
+					return {
+						accessToken: data.data.accessToken,
+						refreshToken: data.data.refreshToken,
+					};
+				} else {
+					return { error: data.message || "Token refresh failed" };
+				}
+			} catch (error) {
+				console.error("Token refresh error:", error);
+				if (error instanceof TypeError && error.message.includes("fetch")) {
+					return { error: "Network error during token refresh" };
+				}
+				return { error: "Unexpected error during token refresh" };
+			} finally {
+				// Clear the promise after completion
+				refreshPromise = null;
+			}
+		})();
+
+		return refreshPromise;
 	},
 };

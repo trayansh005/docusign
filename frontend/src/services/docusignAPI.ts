@@ -302,9 +302,8 @@ export const checkSigningEligibility = async (
 	} | null;
 	message: string;
 }> => {
-	const result = await serverApi.get(`/docusign/${templateId}/signing-eligibility`, {
-		params: { recipientEmail },
-	});
+	const url = buildUrl(`/docusign/${templateId}/signing-eligibility`, { recipientEmail });
+	const result = await serverApi.get(url);
 
 	if (!result.success) {
 		throw new Error(result.message || "Failed to check signing eligibility");

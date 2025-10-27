@@ -107,12 +107,81 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 		// Initialize auth from storage on app load
 		initializeAuth: async () => {
 			try {
-				const token = tokenUtils.getAccessToken();
-				const storedUser = tokenUtils.getStoredUser();
+				console.log("🔄 Initializing auth...");
+				let token = tokenUtils.getAccessToken();
+				let storedUser = tokenUtils.getStoredUser();
+
+				console.log("   Token from localStorage:", !!token);
+				console.log("   Stored user:", !!storedUser);
+
+				// If no token in localStorage, check cookies (fallback for cookie-only auth)
+				if (!token && typeof document !== "undefined") {
+					console.log("   Checking cookies...");
+					console.log("   All cookies:", document.cookie);
+
+					const cookieToken = document.cookie
+						.split("; ")
+						.find((row) => row.startsWith("accessToken="))
+						?.split("=")[1];
+
+					const cookieRefreshToken = document.cookie
+						.split("; ")
+						.find((row) => row.startsWith("refreshToken="))
+						?.split("=")[1];
+
+					if (cookieToken) {
+						console.log("   ✅ Found token in cookies, syncing to localStorage");
+						token = cookieToken;
+						tokenUtils.setTokens(cookieToken, cookieRefreshToken);
+
+						// Also need to get user data since we have a token but no stored user
+						storedUser = null; // Force user fetch from backend
+					} else {
+						console.log("   ❌ No accessToken cookie found");
+					}
+				}
+
+				// If we have a token (from localStorage or cookies) but no user, fetch user data
+				// This handles the case where httpOnly cookies exist but localStorage was cleared
+				if (token && !storedUser) {
+					console.log("   Have token but no user, fetching user data from backend...");
+					try {
+						// Use profile endpoint which works with httpOnly cookies
+						const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/auth/profile`, {
+							method: "GET",
+							headers: {
+								"Content-Type": "application/json",
+								...(token && { Authorization: `Bearer ${token}` }),
+							},
+							credentials: "include", // Important for httpOnly cookies
+						});
+
+						if (response.ok) {
+							const data = await response.json();
+							if (data.success && data.data?.user) {
+								console.log("   ✅ Got user from backend");
+								tokenUtils.setStoredUser(data.data.user);
+								storedUser = data.data.user;
+							} else {
+								console.log("   ❌ Invalid response from backend");
+								token = null;
+							}
+						} else {
+							console.log("   ❌ Failed to fetch user (status:", response.status, ")");
+							token = null;
+						}
+					} catch (err) {
+						console.error("   ❌ Error fetching user:", err);
+						token = null;
+					}
+				}
 
 				if (token && storedUser) {
+					const isExpired = tokenUtils.isTokenExpired(token);
+					console.log("   Token expired:", isExpired);
+
 					// Check if token is expired
-					if (tokenUtils.isTokenExpired(token)) {
+					if (isExpired) {
 						const refreshToken = tokenUtils.getRefreshToken();
 						if (refreshToken) {
 							// Try to refresh the token
@@ -140,13 +209,13 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 						return;
 					}
 
-					// Token is not expired, but validate it with backend to ensure it's still valid
-					const validation = await authAPI.validateToken();
-					if (validation.success && validation.user) {
-						// Update stored user data if backend has newer info
-						tokenUtils.setStoredUser(validation.user);
+					// Token is not expired, use stored user data
+					const storedUser = tokenUtils.getStoredUser();
+					if (storedUser) {
+						console.log("   ✅ Setting authenticated state with stored user");
+						// Use stored user data immediately
 						set({
-							user: validation.user as User,
+							user: storedUser as User,
 							token,
 							isLoading: false,
 							isAuthenticated: true,
@@ -154,15 +223,49 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 
 						// Schedule refresh for current token
 						scheduleSilentRefresh(token);
+
+						// Optionally validate in background (don't block UI)
+						authAPI.validateToken().then((validation) => {
+							if (validation.success && validation.user) {
+								// Update with fresh user data from backend
+								tokenUtils.setStoredUser(validation.user);
+								set({ user: validation.user as User });
+							}
+						}).catch((err) => {
+							console.error("Background token validation failed:", err);
+							// Don't clear auth on background validation failure
+						});
 					} else {
-						// Token validation failed, clear auth state
-						get().clearAuth();
+						// No stored user, try to validate with backend to get user data
+						console.log("   No stored user, fetching from backend...");
+						try {
+							const validation = await authAPI.validateToken();
+							if (validation.success && validation.user) {
+								console.log("   ✅ Got user from backend, setting authenticated state");
+								tokenUtils.setStoredUser(validation.user);
+								set({
+									user: validation.user as User,
+									token,
+									isLoading: false,
+									isAuthenticated: true,
+								});
+								scheduleSilentRefresh(token);
+							} else {
+								console.log("   ❌ Backend validation failed");
+								// Validation failed, clear auth
+								get().clearAuth();
+							}
+						} catch (err) {
+							console.error("   ❌ Token validation error:", err);
+							get().clearAuth();
+						}
 					}
 				} else {
-					set({ isLoading: false });
+					console.log("   ❌ No token or stored user, setting loading to false");
+					set({ isLoading: false, isAuthenticated: false });
 				}
 			} catch (error) {
-				console.error("Error initializing auth:", error);
+				console.error("❌ Error initializing auth:", error);
 				get().clearAuth();
 			}
 		},

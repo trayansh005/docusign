@@ -428,6 +428,9 @@ export const recipientSignDocument = async (req, res) => {
 			);
 
 			template.recipients = enrichedRecipients;
+
+			// Update signing status to ensure first recipient is pending
+			template.updateSigningStatus();
 		}
 
 		// Save message if provided
@@ -455,13 +458,17 @@ export const recipientSignDocument = async (req, res) => {
 
 		// Update recipient status and signing order (only for actual recipients, not template owners)
 		if (!isTemplateOwner) {
-			const recipientIndex = template.recipients.findIndex(
+			const recipient = template.recipients.find(
 				(r) => r.email === userEmail || r.userId?.toString() === userId?.toString()
 			);
 
-			if (recipientIndex !== -1) {
+			if (recipient) {
 				// Mark this recipient as signed
-				await template.markRecipientSigned(userEmail);
+				recipient.signatureStatus = "signed";
+				recipient.signedAt = new Date();
+
+				// Update signing status for remaining recipients (doesn't save)
+				template.updateSigningStatus();
 			}
 		}
 

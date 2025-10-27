@@ -90,8 +90,11 @@ export default function DashboardClient() {
 	const [loadingDocuments, setLoadingDocuments] = useState(false);
 
 	// Auth guard - redirect to login if not authenticated
+	// Only redirect after auth has finished loading to avoid redirect loops
 	useEffect(() => {
+		// Wait for auth to finish loading before checking
 		if (!isLoading && !isAuthenticated) {
+			console.log("🔒 Dashboard: Not authenticated, redirecting to login");
 			router.replace("/login");
 		}
 	}, [isAuthenticated, isLoading, router]);
@@ -267,10 +270,23 @@ export default function DashboardClient() {
 		}
 	};
 
-	if (isLoading || !isAuthenticated) {
+	// Show loading spinner while auth is initializing
+	if (isLoading) {
 		return (
 			<div className="min-h-screen flex items-center justify-center">
 				<div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
+				<span className="ml-4 text-white">Loading...</span>
+			</div>
+		);
+	}
+
+	// If not loading and not authenticated, the useEffect will handle redirect
+	// Show loading briefly to avoid flash of content
+	if (!isAuthenticated) {
+		return (
+			<div className="min-h-screen flex items-center justify-center">
+				<div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
+				<span className="ml-4 text-white">Redirecting...</span>
 			</div>
 		);
 	}

@@ -18,8 +18,8 @@ const cookieConfig = {
 		process.env.COOKIE_SAMESITE !== undefined
 			? process.env.COOKIE_SAMESITE
 			: process.env.NODE_ENV === "production"
-			? "strict"
-			: "lax",
+				? "strict"
+				: "lax",
 	...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
 	path: "/",
 };
@@ -428,10 +428,25 @@ export const refreshToken = async (req, res) => {
 
 		const { accessToken, refreshToken: newRefreshToken } = generateTokens(tokenPayload);
 
-		// Replace old refresh token with new one
-		user.refreshTokens = user.refreshTokens.filter((tokenObj) => tokenObj.token !== token);
-		manageRefreshTokens(user, newRefreshToken);
-		await user.save();
+		// Use atomic update to avoid version conflicts
+		// Remove old token and add new one in a single operation
+		const newTokenObj = {
+			token: newRefreshToken,
+			createdAt: new Date(),
+		};
+
+		// Filter out old refresh tokens (keep only recent ones) and the current token
+		const updatedTokens = user.refreshTokens
+			.filter((tokenObj) => tokenObj.token !== token)
+			.slice(-4); // Keep last 4 tokens
+		updatedTokens.push(newTokenObj);
+
+		// Update user with new tokens using findOneAndUpdate to avoid version conflicts
+		await User.findByIdAndUpdate(
+			user._id,
+			{ refreshTokens: updatedTokens },
+			{ new: true }
+		);
 
 		// Set new cookies
 		setAuthCookies(res, accessToken, newRefreshToken);
