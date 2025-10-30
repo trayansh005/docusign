@@ -1,5 +1,6 @@
 import express from "express";
 import { authenticateToken } from "../middleware/auth.js";
+import { checkFreeTierSigningLimit } from "../middleware/checkFreeTierLimit.js";
 
 // Import optimized controllers
 import { upload, uploadAndProcessDocument } from "../controllers/docusign/upload.controller.js";
@@ -89,11 +90,12 @@ router.delete("/:templateId/fields/:fieldId", deleteSignatureField);
 // ===== SIGNATURE ROUTES =====
 
 // Unified signing endpoint (handles both recipient and sender signing)
-router.post("/:templateId/sign", recipientSignDocument);
+// Apply free tier limit check before signing
+router.post("/:templateId/sign", checkFreeTierSigningLimit, recipientSignDocument);
 
 // Legacy signature application endpoint (deprecated - use /sign instead)
 // TODO: Remove this endpoint after frontend migration is complete
-router.post("/:templateId/apply-signatures", applySignatures);
+router.post("/:templateId/apply-signatures", checkFreeTierSigningLimit, applySignatures);
 router.get("/:templateId/signed", getSignedDocument);
 
 // ===== RECIPIENTS & SIGNING ORDER ROUTES =====

@@ -18,8 +18,8 @@ const cookieConfig = {
 		process.env.COOKIE_SAMESITE !== undefined
 			? process.env.COOKIE_SAMESITE
 			: process.env.NODE_ENV === "production"
-				? "strict"
-				: "lax",
+			? "strict"
+			: "lax",
 	...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
 	path: "/",
 };
@@ -174,7 +174,6 @@ export const register = async (req, res) => {
 				user: userResponse,
 				token: accessToken, // For backward compatibility
 				accessToken,
-				refreshToken,
 			},
 		});
 	} catch (error) {
@@ -259,7 +258,6 @@ export const login = async (req, res) => {
 			data: {
 				token: accessToken, // For backward compatibility
 				accessToken,
-				refreshToken,
 				user: userResponse,
 			},
 		});
@@ -396,7 +394,8 @@ export const changePassword = async (req, res) => {
 // Refresh token controller
 export const refreshToken = async (req, res) => {
 	try {
-		const { refreshToken: token } = req.cookies || req.body;
+		// Read refresh token only from httpOnly cookie (simpler, more secure)
+		const token = req.cookies && req.cookies.refreshToken;
 
 		if (!token) {
 			return res.status(401).json({
@@ -405,10 +404,16 @@ export const refreshToken = async (req, res) => {
 			});
 		}
 
-		// Verify refresh token
-		const decoded = jwt.verify(token, JWT_REFRESH_SECRET);
+		// Verify refresh token using the configured refresh secret
+		let decoded;
+		try {
+			decoded = jwt.verify(token, JWT_REFRESH_SECRET);
+		} catch (err) {
+			console.error("Refresh token verification failed:", err);
+			return res.status(401).json({ success: false, message: "Invalid refresh token" });
+		}
 
-		// Find user and validate refresh token
+		// Find user and validate refresh token exists in DB
 		const user = await User.findById(decoded.id);
 		if (!user || !user.refreshTokens?.some((tokenObj) => tokenObj.token === token)) {
 			return res.status(401).json({
@@ -442,11 +447,7 @@ export const refreshToken = async (req, res) => {
 		updatedTokens.push(newTokenObj);
 
 		// Update user with new tokens using findOneAndUpdate to avoid version conflicts
-		await User.findByIdAndUpdate(
-			user._id,
-			{ refreshTokens: updatedTokens },
-			{ new: true }
-		);
+		await User.findByIdAndUpdate(user._id, { refreshTokens: updatedTokens }, { new: true });
 
 		// Set new cookies
 		setAuthCookies(res, accessToken, newRefreshToken);
@@ -455,7 +456,6 @@ export const refreshToken = async (req, res) => {
 			success: true,
 			data: {
 				accessToken,
-				refreshToken: newRefreshToken,
 			},
 		});
 	} catch (error) {
@@ -470,16 +470,19 @@ export const refreshToken = async (req, res) => {
 // Logout controller
 export const logout = async (req, res) => {
 	try {
-		const { refreshToken: token } = req.cookies || req.body;
-
+		const token = req.cookies && req.cookies.refreshToken;
 		if (token) {
 			try {
 				// Try via authenticated user first
 				let user = req.user ? await User.findById(req.user.id) : null;
 				// Fallback: decode refresh token to identify user
 				if (!user) {
-					const decoded = jwt.verify(token, JWT_REFRESH_SECRET);
-					user = await User.findById(decoded.id);
+					try {
+						const decoded = jwt.verify(token, JWT_REFRESH_SECRET);
+						user = await User.findById(decoded.id);
+					} catch (err) {
+						// ignore
+					}
 				}
 				if (user) {
 					user.refreshTokens =

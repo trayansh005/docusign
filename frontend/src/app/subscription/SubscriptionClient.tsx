@@ -25,7 +25,19 @@ export default function SubscriptionClient({
 	const [modalOpen, setModalOpen] = useState(false);
 	const [modalMessage, setModalMessage] = useState("");
 	const [subscribedPlanId, setSubscribedPlanId] = useState<string | null>(null);
-	const [currentSubscriptionPlanId, setCurrentSubscriptionPlanId] = useState<string | null>(null);
+
+	// Initialize currentSubscriptionPlanId synchronously from the server-provided prop
+	const derivePlanId = (sub: UserSubscription | null) => {
+		if (!sub) return null;
+		const planId =
+			(typeof sub.planId === "object" && sub.planId?._id) ||
+			(typeof sub.planId === "string" ? sub.planId : null);
+		return planId ? String(planId) : null;
+	};
+
+	const [currentSubscriptionPlanId, setCurrentSubscriptionPlanId] = useState<string | null>(
+		derivePlanId(initialSubscription)
+	);
 	const [showCancelModal, setShowCancelModal] = useState(false);
 	const [cancelling, setCancelling] = useState(false);
 	const [confirmImmediate, setConfirmImmediate] = useState(false);
@@ -33,14 +45,9 @@ export default function SubscriptionClient({
 		initialSubscription
 	);
 
-	// Initialize subscription plan ID from initial data
+	// Keep subscription plan ID in sync if the server-provided prop changes
 	useEffect(() => {
-		if (initialSubscription) {
-			const planId =
-				(typeof initialSubscription.planId === "object" && initialSubscription.planId?._id) ||
-				(typeof initialSubscription.planId === "string" ? initialSubscription.planId : null);
-			setCurrentSubscriptionPlanId(planId ? String(planId) : null);
-		}
+		setCurrentSubscriptionPlanId(derivePlanId(initialSubscription));
 	}, [initialSubscription]);
 
 	// Handle Stripe returning to the page with session_id after Checkout
@@ -133,8 +140,24 @@ export default function SubscriptionClient({
 	const handleCancelSubscription = async () => {
 		if (!currentSubscription?._id) return;
 
+		// Save previous state so we can rollback on failure
+		const previousSubscription = currentSubscription;
+
 		try {
 			setCancelling(true);
+
+			// Optimistic update: reflect the expected UI immediately
+			if (confirmImmediate) {
+				// If cancelling immediately, remove subscription locally
+				setCurrentSubscription(null);
+				setCurrentSubscriptionPlanId(null);
+			} else {
+				// If scheduling cancellation, mark as cancelled at period end
+				setCurrentSubscription((prev) => (prev ? { ...prev, cancelAtPeriodEnd: true } : prev));
+			}
+
+			setShowCancelModal(false);
+
 			const json = await cancelSubscription(currentSubscription._id, confirmImmediate);
 
 			setModalMessage(
@@ -143,18 +166,20 @@ export default function SubscriptionClient({
 					: "Subscription will be cancelled at the end of billing period"
 			);
 			setModalOpen(true);
-			setShowCancelModal(false);
 
-			// Update current subscription state
+			// Reconcile with server response (ensure accurate state)
 			setCurrentSubscription(json.subscription || null);
 			const planId =
 				(typeof json.subscription?.planId === "object" && json.subscription?.planId?._id) ||
 				(typeof json.subscription?.planId === "string" ? json.subscription?.planId : null);
 			setCurrentSubscriptionPlanId(planId ? String(planId) : null);
 
-			// Refresh the page to update subscription status
+			// Refresh the page to update any server-rendered UI
 			router.refresh();
 		} catch (err) {
+			// Rollback optimistic update on error
+			setCurrentSubscription(previousSubscription);
+			setCurrentSubscriptionPlanId(derivePlanId(previousSubscription));
 			console.error("Error cancelling subscription:", err);
 			alert(
 				err instanceof Error ? err.message : "Failed to cancel subscription. Please try again."

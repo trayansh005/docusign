@@ -314,15 +314,20 @@ export default function DashboardClient() {
 							<div>
 								<p className="font-medium">You are on the Free plan</p>
 								<p className="text-sm mt-1">
-									Uploads: {usage.uploads?.used ?? 0} of {usage.uploads?.limit ?? 1} used • Signing:{" "}
-									{usage.signs?.used ?? 0} of {usage.signs?.limit ?? 1} used
+									Uploads: {usage.uploads?.used ?? 0} of {usage.uploads?.limit ?? 1} used • Document Signing:{" "}
+									{usage.signs?.used ?? 0} of {usage.signs?.limit ?? 2} used this month
 								</p>
+								{usage.signs && usage.signs.used >= usage.signs.limit && (
+									<p className="text-sm mt-2 text-red-300 font-medium">
+										⚠️ You've reached your monthly signing limit. Upgrade to continue signing documents.
+									</p>
+								)}
 							</div>
 							<Link
 								href="/subscription"
 								className="shrink-0 text-xs font-medium underline hover:opacity-90"
 							>
-								See plans
+								Upgrade Plan
 							</Link>
 						</div>
 					</div>
@@ -486,8 +491,8 @@ export default function DashboardClient() {
 															item.status === "final"
 																? "text-green-400"
 																: item.status === "active"
-																? "text-yellow-400"
-																: "text-blue-400"
+																	? "text-yellow-400"
+																	: "text-blue-400"
 														}
 													>
 														{item.status}
@@ -566,11 +571,10 @@ export default function DashboardClient() {
 													<button
 														key={pageNum}
 														onClick={() => loadDashboardData(pageNum)}
-														className={`px-3 py-1 rounded-md text-sm transition-colors ${
-															inboxPage === pageNum
+														className={`px-3 py-1 rounded-md text-sm transition-colors ${inboxPage === pageNum
 																? "bg-blue-600 text-white"
 																: "bg-gray-700 hover:bg-gray-600 text-white"
-														}`}
+															}`}
 													>
 														{pageNum}
 													</button>
@@ -639,13 +643,12 @@ export default function DashboardClient() {
 							<div className="bg-gray-800/30 rounded-lg p-4">
 								<p className="text-gray-400 text-sm mb-1">Status</p>
 								<p
-									className={`font-semibold ${
-										subscription.status === "active"
+									className={`font-semibold ${subscription.status === "active"
 											? "text-green-400"
 											: subscription.status === "canceled"
-											? "text-red-400"
-											: "text-yellow-400"
-									}`}
+												? "text-red-400"
+												: "text-yellow-400"
+										}`}
 								>
 									{subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
 								</p>

@@ -53,16 +53,10 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 			clearRefreshTimer();
 			refreshTimerRef = setTimeout(async () => {
 				try {
-					const rt = tokenUtils.getRefreshToken();
-					if (!rt) {
-						console.log("No refresh token available for silent refresh");
-						get().clearAuth();
-						return;
-					}
-
-					const refreshed = await tokenUtils.refreshAccessToken(rt);
-					if (refreshed.accessToken && refreshed.refreshToken) {
-						tokenUtils.setTokens(refreshed.accessToken, refreshed.refreshToken);
+					// Use cookie-based refresh; tokenUtils will send httpOnly cookie automatically
+					const refreshed = await tokenUtils.refreshAccessToken();
+					if (refreshed.accessToken) {
+						tokenUtils.setTokens(refreshed.accessToken);
 						set({
 							token: refreshed.accessToken,
 							isAuthenticated: true,
@@ -114,30 +108,21 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 				console.log("   Token from localStorage:", !!token);
 				console.log("   Stored user:", !!storedUser);
 
-				// If no token in localStorage, check cookies (fallback for cookie-only auth)
-				if (!token && typeof document !== "undefined") {
-					console.log("   Checking cookies...");
-					console.log("   All cookies:", document.cookie);
-
-					const cookieToken = document.cookie
-						.split("; ")
-						.find((row) => row.startsWith("accessToken="))
-						?.split("=")[1];
-
-					const cookieRefreshToken = document.cookie
-						.split("; ")
-						.find((row) => row.startsWith("refreshToken="))
-						?.split("=")[1];
-
-					if (cookieToken) {
-						console.log("   ✅ Found token in cookies, syncing to localStorage");
-						token = cookieToken;
-						tokenUtils.setTokens(cookieToken, cookieRefreshToken);
-
-						// Also need to get user data since we have a token but no stored user
-						storedUser = null; // Force user fetch from backend
-					} else {
-						console.log("   ❌ No accessToken cookie found");
+				// If no token in localStorage, attempt to refresh via httpOnly cookie
+				if (!token) {
+					console.log("   No local token found, attempting cookie-based refresh...");
+					try {
+						const refreshed = await tokenUtils.refreshAccessToken();
+						if (refreshed.accessToken) {
+							token = refreshed.accessToken;
+							console.log("   ✅ Successfully refreshed access token from cookie");
+							tokenUtils.setTokens(token);
+							storedUser = null; // force profile fetch
+						} else {
+							console.log("   ❌ Cookie-based refresh failed");
+						}
+					} catch (err) {
+						console.error("   ❌ Cookie-based refresh error:", err);
 					}
 				}
 
@@ -185,26 +170,23 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 
 					// Check if token is expired
 					if (isExpired) {
-						const refreshToken = tokenUtils.getRefreshToken();
-						if (refreshToken) {
-							// Try to refresh the token
-							const refreshResult = await tokenUtils.refreshAccessToken(refreshToken);
-							if (refreshResult.accessToken && refreshResult.refreshToken) {
-								tokenUtils.setTokens(refreshResult.accessToken, refreshResult.refreshToken);
+						// Try cookie-based refresh
+						const refreshResult = await tokenUtils.refreshAccessToken();
+						if (refreshResult.accessToken) {
+							tokenUtils.setTokens(refreshResult.accessToken);
 
-								// Validate the refreshed token with backend
-								const validation = await authAPI.validateToken();
-								if (validation.success && validation.user) {
-									tokenUtils.setStoredUser(validation.user as unknown as Record<string, unknown>);
-									set({
-										user: validation.user as User,
-										token: refreshResult.accessToken,
-										isLoading: false,
-										isAuthenticated: true,
-									});
-									scheduleSilentRefresh(refreshResult.accessToken);
-									return;
-								}
+							// Validate the refreshed token with backend
+							const validation = await authAPI.validateToken();
+							if (validation.success && validation.user) {
+								tokenUtils.setStoredUser(validation.user as unknown as Record<string, unknown>);
+								set({
+									user: validation.user as User,
+									token: refreshResult.accessToken,
+									isLoading: false,
+									isAuthenticated: true,
+								});
+								scheduleSilentRefresh(refreshResult.accessToken);
+								return;
 							}
 						}
 						// Refresh failed, clear auth state
@@ -283,7 +265,7 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 			const result = await authAPI.login(credentials);
 
 			if (result.success && result.token && result.user) {
-				tokenUtils.setTokens(result.token, result.refreshToken);
+				tokenUtils.setTokens(result.token);
 				tokenUtils.setStoredUser(result.user as unknown as Record<string, unknown>);
 
 				set({
@@ -311,7 +293,7 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 				if (result.success) {
 					// Check if registration includes auto-login (tokens provided)
 					if (result.token && result.user) {
-						tokenUtils.setTokens(result.token, result.refreshToken);
+						tokenUtils.setTokens(result.token);
 						tokenUtils.setStoredUser(result.user as unknown as Record<string, unknown>);
 						set({
 							user: result.user as User,
@@ -392,21 +374,16 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 
 		// Logout
 		logout: async (): Promise<void> => {
-			const refreshToken = tokenUtils.getRefreshToken();
-
 			// Always clear local state first to prevent any race conditions
 			get().clearAuth();
 			clearRefreshTimer();
 
-			// Then attempt backend cleanup
+			// Then attempt backend cleanup (always call logout so backend clears httpOnly cookies)
 			try {
-				if (refreshToken) {
-					await authAPI.logout();
-				}
+				await authAPI.logout();
 			} catch (error) {
 				console.error("Logout API error:", error);
 				// Backend cleanup failed, but local cleanup succeeded
-				// This is acceptable as the user is still logged out locally
 			}
 
 			// Redirect after cleanup

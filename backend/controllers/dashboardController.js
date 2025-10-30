@@ -76,6 +76,10 @@ export const getUserStats = async (req, res) => {
 		if (!activeSub) {
 			const { uploadLimit, signedLimit } = getFreeTierLimits();
 
+			// Calculate current month start date
+			const now = new Date();
+			const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
 			// Phase 2 Optimization: Get usage stats with aggregation (replaces 2 more queries)
 			const usageResult = await DocuSignTemplate.aggregate([
 				{
@@ -88,7 +92,20 @@ export const getUserStats = async (req, res) => {
 					$group: {
 						_id: null,
 						uploadsUsed: { $sum: 1 },
-						signUsed: { $sum: { $cond: [{ $eq: ["$status", "final"] }, 1, 0] } },
+						signUsed: {
+							$sum: {
+								$cond: [
+									{
+										$and: [
+											{ $eq: ["$status", "final"] },
+											{ $gte: ["$updatedAt", monthStart] },
+										],
+									},
+									1,
+									0,
+								],
+							},
+						},
 					},
 				},
 			]);
@@ -125,6 +142,53 @@ export const getUserStats = async (req, res) => {
 		return res
 			.status(500)
 			.json({ success: false, message: error.message || "Failed to compute stats" });
+	}
+};
+
+// GET /api/dashboard/pending-count
+// Get count of pending documents for the user as a recipient
+export const getPendingDocumentsCount = async (req, res) => {
+	try {
+		const userId = req.user?.id || req.user?._id;
+		const email = req.user?.email;
+
+		if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+
+		// Convert userId to ObjectId for MongoDB queries
+		const userObjectId = new mongoose.Types.ObjectId(userId);
+
+		// Find templates where the user is a recipient and hasn't signed yet
+		const assignedFilter = {
+			isArchived: { $ne: true },
+			status: { $ne: "final" }, // Only count documents that aren't fully completed
+			$or: [
+				// Match by signature field recipient ID
+				{ "signatureFields.recipientId": String(userId) },
+				// Match by recipients array - user ID
+				{ "recipients.userId": userObjectId },
+				// Match by recipients array - recipient ID string
+				{ "recipients.id": String(userId) },
+			],
+		};
+
+		// Also match by email if available
+		if (email) {
+			assignedFilter.$or.push({ "recipients.email": email });
+		}
+
+		const pendingCount = await DocuSignTemplate.countDocuments(assignedFilter);
+
+		return res.status(200).json({
+			success: true,
+			data: {
+				pendingCount,
+			},
+		});
+	} catch (error) {
+		console.error("getPendingDocumentsCount error", error);
+		return res
+			.status(500)
+			.json({ success: false, message: error.message || "Failed to get pending count" });
 	}
 };
 

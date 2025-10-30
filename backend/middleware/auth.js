@@ -1,6 +1,9 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
+// Use a local constant for the main JWT secret for consistency with controllers
+const JWT_SECRET = process.env.JWT_SECRET;
+
 // Authentication middleware
 export const authenticateToken = async (req, res, next) => {
 	try {
@@ -18,7 +21,7 @@ export const authenticateToken = async (req, res, next) => {
 			});
 		}
 
-		const decoded = jwt.verify(token, process.env.JWT_SECRET);
+		const decoded = jwt.verify(token, JWT_SECRET);
 		const user = await User.findById(decoded.id).select("-password");
 
 		if (!user) {
@@ -61,7 +64,7 @@ export const optionalAuth = async (req, res, next) => {
 		}
 
 		if (token) {
-			const decoded = jwt.verify(token, process.env.JWT_SECRET);
+			const decoded = jwt.verify(token, JWT_SECRET);
 			const user = await User.findById(decoded.id).select("-password");
 			req.user = user;
 		}

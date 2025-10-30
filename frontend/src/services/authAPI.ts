@@ -20,8 +20,8 @@ export const authAPI = {
 
 			// Access token may be returned as data.accessToken or legacy data.token
 			const accessToken: string | undefined = data?.data?.accessToken || data?.data?.token;
-			const refreshToken: string | undefined = data?.data?.refreshToken;
 
+			// Backend sets refresh token as an httpOnly cookie. Do not read/store it in JS.
 			if (response.ok && data.success && accessToken) {
 				const user = data.data.user || {
 					id: data.data.userId || "1",
@@ -36,7 +36,6 @@ export const authAPI = {
 					success: true,
 					message: data.message || "Login successful",
 					token: accessToken,
-					refreshToken,
 					user,
 				};
 			} else {
@@ -78,7 +77,6 @@ export const authAPI = {
 			if (response.ok && data.success) {
 				// Registration now returns tokens like login (backend auto-login after registration)
 				const accessToken: string | undefined = data?.data?.accessToken || data?.data?.token;
-				const refreshToken: string | undefined = data?.data?.refreshToken;
 				const user = data.data.user;
 
 				if (accessToken && user) {
@@ -86,7 +84,6 @@ export const authAPI = {
 						success: true,
 						message: data.message || "Registration successful",
 						token: accessToken,
-						refreshToken,
 						user,
 					};
 				} else {
@@ -214,17 +211,14 @@ export const authAPI = {
 
 	async validateToken(): Promise<{ success: boolean; user?: User }> {
 		try {
+			// Validate using server-side cookies or local access token; prefer cookies via credentials
 			const token = tokenUtils.getAccessToken();
-			if (!token) {
-				return { success: false };
-			}
+			const headers: Record<string, string> = { "Content-Type": "application/json" };
+			if (token) headers.Authorization = `Bearer ${token}`;
 
 			const response = await fetch(`${API_BASE_URL}/auth/validate-token`, {
 				method: "GET",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${token}`,
-				},
+				headers,
 				credentials: "include",
 			});
 

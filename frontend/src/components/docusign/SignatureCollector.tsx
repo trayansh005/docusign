@@ -18,6 +18,7 @@ interface CollectedSignature {
 	data: string;
 	type: "signature" | "date" | "initial" | "text";
 	pageNumber: number;
+	dataFontId?: string;
 }
 
 export const SignatureCollector: React.FC<SignatureCollectorProps> = ({
@@ -42,7 +43,11 @@ export const SignatureCollector: React.FC<SignatureCollectorProps> = ({
 	const currentRecipient = recipients[currentRecipientIndex];
 	const currentFields = currentRecipient ? fieldsByRecipient[currentRecipient.id] || [] : [];
 
-	const handleSignatureComplete = (fieldId: string, data: string) => {
+	const handleSignatureComplete = (
+		fieldId: string,
+		data: string,
+		meta?: { fontId?: string; isPlainText?: boolean }
+	) => {
 		const field = fields.find((f) => f.id === fieldId);
 		if (!field) return;
 
@@ -52,6 +57,8 @@ export const SignatureCollector: React.FC<SignatureCollectorProps> = ({
 			data,
 			type: field.type as "signature" | "date" | "initial" | "text",
 			pageNumber: field.pageNumber,
+			// attach fontId if provided (typed signatures)
+			...(meta?.fontId ? { dataFontId: meta.fontId } : {}),
 		};
 
 		setCollectedSignatures((prev) => [...prev.filter((s) => s.fieldId !== fieldId), signature]);
@@ -73,6 +80,7 @@ export const SignatureCollector: React.FC<SignatureCollectorProps> = ({
 					recipientId: sig.recipientId,
 					type: sig.type,
 					dataUrl: sig.data,
+					fontId: sig.dataFontId,
 				}));
 				onSignaturesComplete(signatureData);
 			}

@@ -5,7 +5,7 @@ const rawBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 const API_BASE_URL = rawBase.endsWith("/api") ? rawBase : rawBase.replace(/\/$/, "") + "/api";
 
 // Global refresh promise to prevent multiple simultaneous refresh attempts
-let refreshPromise: Promise<{ accessToken?: string; refreshToken?: string; error?: string }> | null = null;
+let refreshPromise: Promise<{ accessToken?: string; error?: string }> | null = null;
 
 class ApiClient {
 	private baseURL: string;
@@ -33,33 +33,30 @@ class ApiClient {
 
 			// Handle token refresh on 401
 			if (response.status === 401 && accessToken) {
-				const refreshToken = tokenUtils.getRefreshToken();
-				if (refreshToken) {
-					// Use global refresh promise to prevent multiple simultaneous refresh attempts
-					if (!refreshPromise) {
-						refreshPromise = tokenUtils.refreshAccessToken(refreshToken);
+				// Attempt cookie-based refresh
+				if (!refreshPromise) {
+					refreshPromise = tokenUtils.refreshAccessToken();
+				}
+
+				const refreshResult = await refreshPromise;
+				refreshPromise = null;
+
+				if (refreshResult.accessToken) {
+					tokenUtils.setTokens(refreshResult.accessToken);
+
+					// Retry the original request with new token
+					config.headers = {
+						...config.headers,
+						Authorization: `Bearer ${refreshResult.accessToken}`,
+					};
+					response = await fetch(url, config);
+				} else {
+					// Refresh failed, clear tokens and redirect to login
+					tokenUtils.clearTokens();
+					if (typeof window !== "undefined") {
+						window.location.href = "/login";
 					}
-
-					const refreshResult = await refreshPromise;
-					refreshPromise = null; // Reset after completion
-
-					if (refreshResult.accessToken && refreshResult.refreshToken) {
-						tokenUtils.setTokens(refreshResult.accessToken, refreshResult.refreshToken);
-
-						// Retry the original request with new token
-						config.headers = {
-							...config.headers,
-							Authorization: `Bearer ${refreshResult.accessToken}`,
-						};
-						response = await fetch(url, config);
-					} else {
-						// Refresh failed, clear tokens and redirect to login
-						tokenUtils.clearTokens();
-						if (typeof window !== "undefined") {
-							window.location.href = "/login";
-						}
-						throw new Error("Authentication failed");
-					}
+					throw new Error("Authentication failed");
 				}
 			}
 

@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { LoginCredentials, RegisterData, AuthResponse, AuthState, User } from "@/types/auth";
 import { tokenUtils } from "@/lib/tokenUtils";
 
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api/auth";
 
 export const useAuth = () => {
@@ -28,20 +27,17 @@ export const useAuth = () => {
 				if (token && user) {
 					// Check if token is expired
 					if (tokenUtils.isTokenExpired(token)) {
-						const refreshToken = tokenUtils.getRefreshToken();
-						if (refreshToken) {
-							// Try to refresh the token
-							const refreshResult = await tokenUtils.refreshAccessToken(refreshToken);
-							if (refreshResult.accessToken && refreshResult.refreshToken) {
-								tokenUtils.setTokens(refreshResult.accessToken, refreshResult.refreshToken);
-								setAuthState({
-									user: user as unknown as User,
-									token: refreshResult.accessToken,
-									isLoading: false,
-									isAuthenticated: true,
-								});
-								return;
-							}
+						// Try cookie-based refresh
+						const refreshResult = await tokenUtils.refreshAccessToken();
+						if (refreshResult.accessToken) {
+							tokenUtils.setTokens(refreshResult.accessToken);
+							setAuthState({
+								user: user as unknown as User,
+								token: refreshResult.accessToken,
+								isLoading: false,
+								isAuthenticated: true,
+							});
+							return;
 						}
 						// Refresh failed, clear auth state
 						clearAuth();
@@ -93,8 +89,8 @@ export const useAuth = () => {
 					updatedAt: new Date().toISOString(),
 				};
 
-				// Store tokens using tokenUtils (includes localStorage and cookies)
-				tokenUtils.setTokens(data.data.token, data.data.refreshToken);
+				// Store access token client-side; refresh token is httpOnly cookie set by the backend
+				tokenUtils.setTokens(data.data.token);
 				tokenUtils.setStoredUser(user);
 
 				setAuthState({

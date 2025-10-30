@@ -76,9 +76,17 @@ app.use(sanitizeInput);
 // Static files (frontend)
 app.use(express.static("../frontend"));
 
-// Static files (uploads) - middleware to set CORS headers
+// Static files (uploads) - middleware to set CORS headers and disable caching for signed PDFs
 app.use("/api/uploads", (req, res, next) => {
 	res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+
+	// Disable caching for signed PDFs (they get updated when recipients sign)
+	if (req.path.includes("/signatures/signed/")) {
+		res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+		res.setHeader("Pragma", "no-cache");
+		res.setHeader("Expires", "0");
+	}
+
 	next();
 });
 app.use("/api/uploads", express.static(path.join(process.cwd(), "uploads")));

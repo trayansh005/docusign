@@ -19,6 +19,7 @@ import { ensureAbsoluteUrl } from "@/lib/urlUtils";
 import { DocuSignTemplateData, SignatureField } from "@/types/docusign";
 import { useAuthStore } from "@/stores/authStore";
 import { SignaturePad } from "./SignaturePad";
+import { SIGNATURE_FONTS } from "@/constants/signatureFonts";
 import { SigningProgress } from "./SigningProgress";
 
 // Available field types for Mark Place
@@ -33,39 +34,6 @@ const FIELD_TYPES = [
 	{ id: "text", label: "Custom Text", icon: "📄", description: "Any custom text" },
 ];
 
-// Available signature fonts
-const SIGNATURE_FONTS = [
-	{
-		id: "dancing-script",
-		name: "Dancing Script",
-		fontFamily: "var(--font-dancing-script), 'Dancing Script', cursive",
-	},
-	{
-		id: "great-vibes",
-		name: "Great Vibes",
-		fontFamily: "var(--font-great-vibes), 'Great Vibes', cursive",
-	},
-	{ id: "allura", name: "Allura", fontFamily: "var(--font-allura), 'Allura', cursive" },
-	{
-		id: "alex-brush",
-		name: "Alex Brush",
-		fontFamily: "var(--font-alex-brush), 'Alex Brush', cursive",
-	},
-	{ id: "amatic-sc", name: "Amatic SC", fontFamily: "var(--font-amatic-sc), 'Amatic SC', cursive" },
-	{ id: "caveat", name: "Caveat", fontFamily: "var(--font-caveat), 'Caveat', cursive" },
-	{
-		id: "kaushan-script",
-		name: "Kaushan Script",
-		fontFamily: "var(--font-kaushan-script), 'Kaushan Script', cursive",
-	},
-	{ id: "pacifico", name: "Pacifico", fontFamily: "var(--font-pacifico), 'Pacifico', cursive" },
-	{ id: "satisfy", name: "Satisfy", fontFamily: "var(--font-satisfy), 'Satisfy', cursive" },
-	{
-		id: "permanent-marker",
-		name: "Permanent Marker",
-		fontFamily: "var(--font-permanent-marker), 'Permanent Marker', cursive",
-	},
-];
 
 // Dynamically import PDFPageCanvas to avoid SSR issues with DOMMatrix
 const PDFPageCanvas = dynamic(
@@ -124,6 +92,27 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 	// Get logged-in user
 	const user = useAuthStore((state) => state.user);
 
+	// Helper: robustly resolve template owner id whether `createdBy` is an ObjectId/string or populated object
+	const resolveTemplateOwnerId = useCallback((): string | null => {
+		if (!template) return null;
+		const cbRaw: unknown = (template as unknown as Record<string, unknown>)["createdBy"];
+		if (cbRaw == null) return null;
+		if (typeof cbRaw === "string" || typeof cbRaw === "number") return String(cbRaw);
+		if (typeof cbRaw === "object") {
+			const obj = cbRaw as Record<string, unknown>;
+			if (obj["_id"]) return String(obj["_id"]);
+			if (obj["id"]) return String(obj["id"]);
+			return null;
+		}
+		return null;
+	}, [template]);
+
+	const isOwner = useCallback(() => {
+		const ownerId = resolveTemplateOwnerId();
+		if (!ownerId || !user) return false;
+		return String(ownerId) === String(user?.id);
+	}, [resolveTemplateOwnerId, user]);
+
 	// Check if sender has signed (required before marking places)
 	const hasSenderSigned = useCallback(() => {
 		if (!template?.signatureFields) return false;
@@ -165,6 +154,16 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 	const handleFieldClick = useCallback(
 		(field: SignatureField, e: React.MouseEvent) => {
 			e.stopPropagation();
+			// DEBUG: Log clicks on fields to help diagnose why signature pad may not open
+			try {
+				console.debug("[MultiPageTemplateViewer] handleFieldClick", {
+					fieldId: field.id,
+					field,
+					editable,
+				});
+			} catch {
+				/* ignore */
+			}
 			// Check if this field belongs to the current user
 			const userId = (user as { id?: string })?.id || "";
 			const userEmail = user?.email || "";
@@ -196,22 +195,25 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 
 	// Handle signature completion from SignaturePad
 	const handleSignatureComplete = useCallback(
-		(fieldId: string, signatureData: string) => {
+		(fieldId: string, signatureData: string, meta?: { fontId?: string; isPlainText?: boolean }) => {
 			if (onFieldUpdate) {
 				const field = template.signatureFields.find((f) => f.id === fieldId);
 				const userId = (user as { id?: string })?.id || "";
 				const userEmail = user?.email || "";
 
 				// If it's a placeholder field, convert it to a regular field assigned to current user
+				const patch: Partial<SignatureField> = { value: signatureData };
+				if (meta?.fontId) patch.fontId = meta.fontId;
+
 				if (field?.placeholder && field.recipientId === "placeholder") {
 					onFieldUpdate(currentPage, fieldId, {
-						value: signatureData,
+						...patch,
 						recipientId: userEmail || userId || "current-user",
 						placeholder: false,
 						placeholderText: undefined,
 					});
 				} else {
-					onFieldUpdate(currentPage, fieldId, { value: signatureData });
+					onFieldUpdate(currentPage, fieldId, patch);
 				}
 			}
 			setActiveSignatureField(null);
@@ -273,7 +275,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 
 		// Only document owners can drag fields (including their placeholder fields)
 		// Recipients cannot drag any fields
-		const isDocumentOwner = template && user && template.createdBy?._id === user?.id;
+		const isDocumentOwner = isOwner();
 		const isDraggingDisabled = isResizing || !isDocumentOwner;
 
 		const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -451,9 +453,19 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 						}`}
 				>
 					<div className="flex flex-col items-center justify-center p-3 text-center min-w-0">
-						{(field.type === "signature" || field.type === "initial") &&
-						field.value &&
-						field.value.startsWith("data:image") ? (
+						{(() => {
+							const isImage = (field.type === "signature" || field.type === "initial") &&
+								field.value &&
+								field.value.startsWith("data:image");
+							console.log(`[MultiPageTemplateViewer] Field ${field.id}:`, {
+								type: field.type,
+								hasValue: !!field.value,
+								valueLength: field.value?.length,
+								isImage,
+								valuePreview: field.value?.substring(0, 50)
+							});
+							return isImage;
+						})() ? (
 							// eslint-disable-next-line @next/next/no-img-element
 							<img
 								src={field.value}
@@ -518,9 +530,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 				{editable &&
 					!field.placeholder &&
 					// Check if user is document owner (can delete any field)
-					template &&
-					user &&
-					template.createdBy?._id === user?.id && (
+					isOwner() && (
 						<>
 							{/* Delete button - only for document owners */}
 							<button
@@ -598,11 +608,43 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 		(e: React.MouseEvent<HTMLDivElement>) => {
 			if (!editable) return;
 
+			// DEBUG: Log canvas click coordinates and state for troubleshooting
+			try {
+				console.debug("[MultiPageTemplateViewer] handleCanvasClick fired", {
+					clientX: e.clientX,
+					clientY: e.clientY,
+					currentPage,
+					isMarkingMode,
+					selectedFieldType,
+				});
+			} catch {
+				/* ignore */
+			}
+
 			// Only document owners can add new fields by clicking on canvas
 			// Recipients should only fill existing placeholder fields
-			const isDocumentOwner = template && user && template.createdBy?._id === user?.id;
+			const isDocumentOwner = isOwner();
 
-			if (!isDocumentOwner) return;
+			// DEBUG: log ownership check so we know why clicks may be ignored
+			try {
+				console.debug("[MultiPageTemplateViewer] isDocumentOwner?", {
+					isDocumentOwner,
+					templateCreatedBy: template?.createdBy?._id,
+					userId: user?.id,
+				});
+			} catch {
+				/* ignore */
+			}
+
+			if (!isDocumentOwner) {
+				// DEBUG: indicate early return due to ownership
+				try {
+					console.debug("[MultiPageTemplateViewer] handleCanvasClick ignored - not document owner");
+				} catch {
+					/* ignore */
+				}
+				return;
+			}
 
 			// Don't add field if clicking on an existing field
 			const target = e.target as HTMLElement;
@@ -621,6 +663,28 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 			const x = ((e.clientX - rect.left) / width) * 100;
 			const y = ((e.clientY - rect.top) / height) * 100;
 
+			// Normalize and clamp
+			let xPct = Number.isFinite(x) ? Math.max(0, Math.min(100, x)) : 0;
+			let yPct = Number.isFinite(y) ? Math.max(0, Math.min(100, y)) : 0;
+			// Round to 4 decimals for storage/display
+			xPct = Math.round(xPct * 10000) / 10000;
+			yPct = Math.round(yPct * 10000) / 10000;
+
+			// DEBUG: log rect and computed percentages to diagnose percent vs decimal mismatch
+			try {
+				console.debug("[MultiPageTemplateViewer] Canvas click rect/coords", {
+					rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+					clientX: e.clientX,
+					clientY: e.clientY,
+					xPct,
+					yPct,
+					zoom,
+					rotation,
+				});
+			} catch {
+				/* ignore */
+			}
+
 			// Fixed field size for consistency
 			const wPct = 25; // 25% of page width
 			const hPct = 8; // 8% of page height
@@ -636,8 +700,8 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 					recipientId: "placeholder", // Special recipientId for placeholders
 					type: selectedFieldType as "signature" | "initial" | "date" | "text",
 					pageNumber: currentPage,
-					xPct: x,
-					yPct: y,
+					xPct: xPct,
+					yPct: yPct,
 					wPct: wPct,
 					hPct: hPct,
 					fontId: SIGNATURE_FONTS[0].id,
@@ -652,17 +716,35 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 					recipientId: userEmail || userId || "current-user",
 					type: "signature",
 					pageNumber: currentPage,
-					xPct: x,
-					yPct: y,
+					xPct: xPct,
+					yPct: yPct,
 					wPct: wPct,
 					hPct: hPct,
 					fontId: SIGNATURE_FONTS[0].id,
 				};
 			}
 
+			// DEBUG: log the new field object before sending to parent
+			try {
+				console.debug("[MultiPageTemplateViewer] New field to add", { newField });
+			} catch {
+				/* ignore */
+			}
+
 			onFieldAdd?.(currentPage, newField);
 		},
-		[editable, currentPage, onFieldAdd, isMarkingMode, selectedFieldType, user, template]
+		[
+			editable,
+			currentPage,
+			onFieldAdd,
+			isMarkingMode,
+			selectedFieldType,
+			user,
+			template,
+			zoom,
+			rotation,
+			isOwner,
+		]
 	);
 
 	const handlePageLoad = useCallback(() => {
@@ -740,7 +822,7 @@ export const MultiPageTemplateViewer: React.FC<MultiPageTemplateViewerProps> = (
 			</div>
 
 			{/* Mark Place Section - Only show for document owners/senders */}
-			{editable && template && user && template.createdBy?._id === user?.id && (
+			{editable && isOwner() && (
 				<div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-3">

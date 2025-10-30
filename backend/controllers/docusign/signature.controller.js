@@ -2,7 +2,8 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
-import { PDFDocument as PDFLibDocument } from "pdf-lib";
+import { PDFDocument as PDFLibDocument, StandardFonts } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
 import DocuSignTemplate from "../../models/DocuSignTemplate.js";
 import Subscription from "../../models/Subscription.js";
 import { getFreeTierLimits } from "../../utils/freeTierLimits.js";
@@ -39,8 +40,6 @@ function processSignatureData(signatures) {
 			// Support multiple formats for signature image data
 			const rawData =
 				signature.signatureImageBuffer || signature.image || signature.dataUrl || signature.dataURL;
-
-
 
 			if (typeof rawData === "string") {
 				// Handle base64 data URLs
@@ -180,6 +179,9 @@ async function applySignaturesPdfLib(template, fields, signatureMap, viewport) {
 		const pdfBytes = fs.readFileSync(pdfPath);
 		const pdfDoc = await PDFLibDocument.load(pdfBytes);
 
+		// Register fontkit to enable custom font embedding
+		pdfDoc.registerFontkit(fontkit);
+
 		// Process each signature field
 		for (const field of fields) {
 			try {
@@ -206,8 +208,6 @@ async function applySignaturesPdfLib(template, fields, signatureMap, viewport) {
 				]
 					.filter(Boolean)
 					.map(String);
-
-
 
 				let signatureBuffer = null;
 				for (const key of candidateKeys) {
@@ -249,21 +249,104 @@ async function applySignaturesPdfLib(template, fields, signatureMap, viewport) {
 							field.pageNumber
 						);
 
-						// Draw text in the field
-						const fontSize = Math.min(dims.height * 0.6, (dims.width / field.value.length) * 1.5);
-
-						// For signature/initial fields, use a script-like font if available
-						// For text fields, use standard font
+						// Draw text in the field with improved sizing/centering
 						try {
-							page.drawText(field.value, {
-								x: dims.left + 5,
-								y: pageHeight - dims.top - dims.height / 2 - fontSize / 3,
+							const paddingX = Math.max(6, Math.round(dims.width * 0.06));
+							const maxByHeight = Math.max(8, Math.min(Math.round(dims.height * 0.9), 200));
+
+							let embeddedFont = null;
+							// Try to embed a custom font if available
+							try {
+								const fontId = field.fontId;
+								const fontsDir = path.join(__dirname, "..", "..", "fonts");
+								let fontPath = path.join(fontsDir, `${fontId}.ttf`);
+								if (!fontId || !fs.existsSync(fontPath)) {
+									fontPath = path.join(fontsDir, `${String(fontId).replace(/-/g, "_")}.ttf`);
+								}
+								if (fontId && fs.existsSync(fontPath)) {
+									const fontBytes = fs.readFileSync(fontPath);
+									embeddedFont = await pdfDoc.embedFont(fontBytes);
+									console.log(
+										`[ApplySignaturesPdfLib] Embedded font for field ${field.id} fontId=${fontId}`
+									);
+								} else {
+									console.log(
+										`[ApplySignaturesPdfLib] No font file found for field ${field.id} fontId=${field.fontId}`
+									);
+								}
+							} catch (embedErr) {
+								console.warn(
+									`Failed to embed font for field ${field.id}:`,
+									embedErr?.message || embedErr
+								);
+							}
+
+							// Choose a font to measure text width: prefer embedded custom font, otherwise use StandardFonts.Helvetica
+							let measureFont = embeddedFont;
+							try {
+								if (!measureFont) {
+									measureFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+									console.log(
+										`[ApplySignaturesPdfLib] Using fallback StandardFonts.Helvetica for measuring`
+									);
+								}
+							} catch (mErr) {
+								console.warn(
+									`[ApplySignaturesPdfLib] Failed to embed fallback font:`,
+									mErr?.message || mErr
+								);
+								measureFont = null;
+							}
+
+							// Compute a starting font size (by height) and then shrink until text fits horizontally
+							let fontSize = Math.min(maxByHeight, 72);
+							if (measureFont) {
+								while (fontSize > 6) {
+									const textWidth = measureFont.widthOfTextAtSize(field.value, fontSize);
+									if (textWidth <= Math.max(1, dims.width - paddingX * 2)) break;
+									fontSize -= 1;
+								}
+								fontSize = Math.min(fontSize, Math.max(8, Math.round(dims.height * 0.9)));
+							} else {
+								// fallback heuristic
+								fontSize = Math.max(Math.min(Math.round(dims.height * 0.6), 72), 8);
+							}
+
+							// Measure width for centering
+							let measuredWidth = null;
+							try {
+								if (embeddedFont)
+									measuredWidth = embeddedFont.widthOfTextAtSize(field.value, fontSize);
+								else if (measureFont)
+									measuredWidth = measureFont.widthOfTextAtSize(field.value, fontSize);
+							} catch (mErr) {
+								measuredWidth = null;
+							}
+
+							const textX = measuredWidth
+								? dims.left + (dims.width - measuredWidth) / 2
+								: dims.left + 5;
+							const textY = pageHeight - dims.top - (dims.height + fontSize) / 2;
+
+							const drawOptions = {
+								x: textX,
+								y: textY,
 								size: fontSize,
 								color: { type: "RGB", red: 0, green: 0, blue: 0 },
-							});
-							console.log(`Drew text signature "${field.value}" for field ${field.id}`);
+							};
+
+							if (embeddedFont) drawOptions.font = embeddedFont;
+							else if (measureFont) drawOptions.font = measureFont;
+
+							page.drawText(field.value, drawOptions);
+							console.log(
+								`Drew text signature "${field.value}" for field ${field.id} size=${fontSize}`
+							);
 						} catch (textError) {
-							console.error(`Failed to draw text for field ${field.id}:`, textError.message);
+							console.error(
+								`Failed to draw text for field ${field.id}:`,
+								textError?.message || textError
+							);
 						}
 					}
 
@@ -376,12 +459,12 @@ export const applySignatures = async (req, res) => {
 			userEmail: req.user?.email,
 			signaturesCount: signatures?.length || 0,
 			fieldsCount: incomingFields?.length || 0,
-			signatures: signatures?.map(sig => ({
+			signatures: signatures?.map((sig) => ({
 				fieldId: sig.fieldId,
 				type: sig.type,
 				hasImageData: !!sig.signatureImageBuffer,
-				imageDataLength: sig.signatureImageBuffer?.length || 0
-			}))
+				imageDataLength: sig.signatureImageBuffer?.length || 0,
+			})),
 		});
 
 		if (!TemplateValidator.isValidObjectId(templateId)) {

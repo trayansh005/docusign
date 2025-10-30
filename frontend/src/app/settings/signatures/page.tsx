@@ -54,9 +54,16 @@ export default function SignaturesPage() {
 		}
 	};
 
-	const handleSignatureComplete = async (_fieldId: string, dataUrl: string) => {
+	const handleSignatureComplete = async (
+		_fieldId: string,
+		dataUrlOrText: string,
+		meta?: { fontId?: string; isPlainText?: boolean }
+	) => {
 		try {
-			await createSignatureFromDataUrl(dataUrl);
+			// createSignatureFromDataUrl accepts an optional fontId. When the
+			// signature pad returns typed text (isPlainText), pass the fontId
+			// so the server can create/store a font-backed signature if supported.
+			await createSignatureFromDataUrl(dataUrlOrText, undefined, meta?.fontId);
 			setShowPad(false);
 			await load();
 		} catch (e) {
@@ -130,7 +137,10 @@ export default function SignaturesPage() {
 							field={
 								{ id: "tmp", recipientId: "me", type: "signature", pageNumber: 1 } as SignatureField
 							}
-							onSignatureComplete={(id, dataUrl) => handleSignatureComplete(id, dataUrl)}
+							// forward the optional meta argument from SignaturePad
+							onSignatureComplete={(id, dataUrl, meta) =>
+								handleSignatureComplete(id, dataUrl, meta)
+							}
 							onClose={() => setShowPad(false)}
 						/>
 						<div className="mt-4 text-right">

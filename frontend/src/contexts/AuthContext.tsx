@@ -61,14 +61,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 				clearRefreshTimer();
 				refreshTimerRef.current = setTimeout(async () => {
 					try {
-						const rt = tokenUtils.getRefreshToken();
-						if (!rt) {
-							clearAuth();
-							return;
-						}
-						const refreshed = await tokenUtils.refreshAccessToken(rt);
-						if (refreshed.accessToken && refreshed.refreshToken) {
-							tokenUtils.setTokens(refreshed.accessToken, refreshed.refreshToken);
+						// Use cookie-based refresh
+						const refreshed = await tokenUtils.refreshAccessToken();
+						if (refreshed.accessToken) {
+							tokenUtils.setTokens(refreshed.accessToken);
 							setAuthState((prev) => ({
 								...prev,
 								token: refreshed.accessToken!,
@@ -100,20 +96,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 				if (token && user) {
 					// Check if token is expired
 					if (tokenUtils.isTokenExpired(token)) {
-						const refreshToken = tokenUtils.getRefreshToken();
-						if (refreshToken) {
-							// Try to refresh the token
-							const refreshResult = await tokenUtils.refreshAccessToken(refreshToken);
-							if (refreshResult.accessToken && refreshResult.refreshToken) {
-								tokenUtils.setTokens(refreshResult.accessToken, refreshResult.refreshToken);
-								setAuthState({
-									user: user as unknown as User,
-									token: refreshResult.accessToken,
-									isLoading: false,
-									isAuthenticated: true,
-								});
-								return;
-							}
+						// Try cookie-based refresh
+						const refreshResult = await tokenUtils.refreshAccessToken();
+						if (refreshResult.accessToken) {
+							tokenUtils.setTokens(refreshResult.accessToken);
+							setAuthState({
+								user: user as unknown as User,
+								token: refreshResult.accessToken,
+								isLoading: false,
+								isAuthenticated: true,
+							});
+							return;
 						}
 						// Refresh failed, clear auth state
 						clearAuth();
@@ -161,8 +154,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 		const result = await authAPI.login(credentials);
 
 		if (result.success && result.token && result.user) {
-			// Persist both tokens if available so we can refresh silently
-			tokenUtils.setTokens(result.token, result.refreshToken);
+			// Persist access token; refresh token is stored as httpOnly cookie by backend
+			tokenUtils.setTokens(result.token);
 			tokenUtils.setStoredUser(result.user as unknown as Record<string, unknown>);
 
 			setAuthState({
@@ -188,7 +181,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
 		if (result.success && result.token && result.user) {
 			// Auto-login after registration when backend provides tokens
-			tokenUtils.setTokens(result.token, result.refreshToken);
+			tokenUtils.setTokens(result.token);
 			tokenUtils.setStoredUser(result.user as unknown as Record<string, unknown>);
 			setAuthState({
 				user: result.user as User,

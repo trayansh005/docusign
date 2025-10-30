@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { serverApi } from "@/lib/serverApiClient";
 import { ApiError } from "@/lib/serverApiClient";
 
@@ -31,7 +32,7 @@ export interface UserSubscription {
 }
 
 export async function getPricingPlans(): Promise<PricingPlan[]> {
-	const result = await serverApi.get("/subscription/plans");
+	const result = await serverApi.get("/subscription/plans", { tags: ["plans"] });
 	const plans = result.plans || [];
 
 	// Sort with Professional plan first
@@ -44,7 +45,8 @@ export async function getPricingPlans(): Promise<PricingPlan[]> {
 
 export async function getUserSubscription(): Promise<UserSubscription | null> {
 	try {
-		const result = await serverApi.get("/subscription/me");
+		// Tag this fetch so it can be invalidated with updateTag/revalidateTag
+		const result = await serverApi.get("/subscription/me", { tags: ["subscription"] });
 		return result.subscription || null;
 	} catch (error) {
 		if (
@@ -92,5 +94,25 @@ export async function verifySession(sessionId: string) {
 
 export async function cancelSubscription(subscriptionId: string, cancelImmediately?: boolean) {
 	const body = cancelImmediately ? { cancelImmediately } : undefined;
-	return await serverApi.delete(`/subscription/${subscriptionId}`, { body });
+	const result = await serverApi.delete(`/subscription/${subscriptionId}`, { body });
+
+	// Prefer using updateTag (read-your-own-writes) when available (Next.js 16+).
+	// Fallback to revalidatePath for older Next versions.
+	try {
+		// Dynamically import `updateTag` when available (Next.js 16+). Using dynamic
+		// import avoids TypeScript/compile errors on older Next versions that don't
+		// export `updateTag` from 'next/cache'.
+		const cacheMod = await import("next/cache");
+		const updateTagFn = (cacheMod as unknown as { updateTag?: (tag: string) => void }).updateTag;
+		if (typeof updateTagFn === "function") {
+			updateTagFn("subscription");
+		} else {
+			revalidatePath("/subscription");
+		}
+	} catch (err) {
+		// Non-fatal: don't block cancel operation if cache APIs are unavailable
+		console.warn("Failed to update subscription cache tag/path:", err);
+	}
+
+	return result;
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import { useAuthStore } from "@/stores/authStore";
+import { PendingDocumentsNotification } from "@/components/PendingDocumentsNotification";
 
 export default function Header() {
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -68,6 +69,8 @@ export default function Header() {
 										<Link href="/fomiqsign/dashboard" className="nav-link">
 											Sign Document
 										</Link>
+										{/* Pending Documents Notification */}
+										<PendingDocumentsNotification />
 										{/* User Profile Section */}
 										<div className="flex items-center space-x-3 ml-4 pl-4 border-l border-white/20">
 											<Link
@@ -209,10 +212,11 @@ export default function Header() {
 										</Link>
 										<Link
 											href="/dashboard"
-											className="nav-link text-center"
+											className="nav-link text-center flex items-center justify-center gap-2"
 											onClick={() => setIsMenuOpen(false)}
 										>
 											Dashboard
+											<PendingDocumentsNotification badgeOnly />
 										</Link>
 										<Link
 											href="/dashboard/signing-progress"

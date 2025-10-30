@@ -40,7 +40,12 @@ const SIGNATURE_FONTS = [
 
 interface SignaturePadProps {
 	field: SignatureField;
-	onSignatureComplete: (fieldId: string, signatureData: string) => void;
+	// meta may include fontId and isPlainText when sending typed signatures
+	onSignatureComplete: (
+		fieldId: string,
+		signatureData: string,
+		meta?: { fontId?: string; text?: string }
+	) => void;
 	onClose: () => void;
 	className?: string;
 }
@@ -149,37 +154,49 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 					console.warn("[SignaturePad] No drawing to save!");
 				}
 			} else if (signatureMode === "type") {
-				// For type mode, render text into an image with signature fonts
+				// For type mode, render text to canvas with selected font, then save as image
 				if (textValue.trim()) {
 					const text = textValue.trim();
-					const width = 600;
-					const height = 200;
-					const pad = 20;
+					// Use larger canvas for better quality
+					const width = 1600;
+					const height = 480;
 					const off = document.createElement("canvas");
 					off.width = width;
 					off.height = height;
 					const ctx = off.getContext("2d");
 					if (!ctx) return;
-					// Keep transparent background in exported PNG
-					// Fit font size to canvas width
-					const fontFamily =
-						SIGNATURE_FONTS.find((f) => f.id === selectedFontId)?.fontFamily ||
-						"'Dancing Script', cursive";
-					let fontSize = 100;
-					const minSize = 18;
-					while (fontSize > minSize) {
-						ctx.font = `${fontSize}px ${fontFamily}`;
-						const metrics = ctx.measureText(text);
-						if (metrics.width <= width - pad * 2) break;
-						fontSize -= 2;
-					}
+
+					// Clear to transparent background
+					ctx.clearRect(0, 0, width, height);
+
+					// Get the selected font family
+					const selectedFont = SIGNATURE_FONTS.find((f) => f.id === selectedFontId);
+					const fontFamily = selectedFont ? selectedFont.fontFamily : SIGNATURE_FONTS[0].fontFamily;
+
+					// Calculate optimal font size
+					let fontSize = height * 0.7;
 					ctx.font = `${fontSize}px ${fontFamily}`;
+
+					// Measure and adjust if text is too wide
+					let textMetrics = ctx.measureText(text);
+					const padding = width * 0.1;
+					const maxTextWidth = width - padding * 2;
+
+					if (textMetrics.width > maxTextWidth) {
+						fontSize = fontSize * (maxTextWidth / textMetrics.width);
+						ctx.font = `${fontSize}px ${fontFamily}`;
+						textMetrics = ctx.measureText(text);
+					}
+
+					// Draw text centered
 					ctx.fillStyle = "#000000";
 					ctx.textBaseline = "middle";
 					ctx.textAlign = "center";
 					ctx.fillText(text, width / 2, height / 2);
+
 					const dataUrl = off.toDataURL("image/png");
-					onSignatureComplete(field.id, dataUrl);
+					// Send image along with text and fontId for UI display
+					onSignatureComplete(field.id, dataUrl, { fontId: selectedFontId, text: text });
 				} else {
 					console.warn("[SignaturePad] No text to save!");
 				}
@@ -355,7 +372,13 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 	}
 
 	// Text-based fields: text, name, email, phone, address
-	if (field.type === "text" || field.type === "name" || field.type === "email" || field.type === "phone" || field.type === "address") {
+	if (
+		field.type === "text" ||
+		field.type === "name" ||
+		field.type === "email" ||
+		field.type === "phone" ||
+		field.type === "address"
+	) {
 		return (
 			<div className={`bg-white rounded-lg shadow-lg p-6 ${className}`}>
 				<div className="flex items-center gap-2 mb-4">
@@ -594,7 +617,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 					disabled={
 						signatureMode === "draw"
 							? !hasDrawing
-							: (signatureMode === "type" || signatureMode === "custom")
+							: signatureMode === "type" || signatureMode === "custom"
 								? !textValue.trim()
 								: false
 					}

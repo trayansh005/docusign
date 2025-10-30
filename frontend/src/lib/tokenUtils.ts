@@ -1,10 +1,9 @@
 // Token management utilities
 export const TOKEN_STORAGE_KEY = "accessToken";
-export const REFRESH_TOKEN_STORAGE_KEY = "refreshToken";
 export const USER_STORAGE_KEY = "user";
 
 // Track ongoing refresh request to prevent race conditions
-let refreshPromise: Promise<{ accessToken?: string; refreshToken?: string; error?: string }> | null = null;
+let refreshPromise: Promise<{ accessToken?: string; error?: string }> | null = null;
 
 export const tokenUtils = {
 	// Get token from localStorage
@@ -13,43 +12,20 @@ export const tokenUtils = {
 		return localStorage.getItem(TOKEN_STORAGE_KEY);
 	},
 
-	// Get refresh token from localStorage
-	getRefreshToken: (): string | null => {
-		if (typeof window === "undefined") return null;
-		return localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
-	},
+	// NOTE: refresh token is stored as an httpOnly cookie by the backend and is not readable from JS.
+	// No JS storage/accessors are provided for refresh tokens in a cookie-first flow.
 
-	// Set tokens in localStorage and cookies
-	setTokens: (accessToken: string, refreshToken?: string): void => {
+	// Set access token in localStorage. Refresh token is httpOnly cookie and should not be stored in JS.
+	setTokens: (accessToken: string): void => {
 		if (typeof window === "undefined") return;
-
-		// Store in localStorage for client-side use
 		localStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
-		if (refreshToken) {
-			localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, refreshToken);
-		}
-
-		// Also set non-httpOnly cookies for Next middleware checks (backend also sets httpOnly cookies)
-		document.cookie = `${TOKEN_STORAGE_KEY}=${accessToken}; path=/; max-age=${15 * 60
-			}; SameSite=lax`;
-		if (refreshToken) {
-			document.cookie = `${REFRESH_TOKEN_STORAGE_KEY}=${refreshToken}; path=/; max-age=${7 * 24 * 60 * 60
-				}; SameSite=lax`;
-		}
 	},
 
-	// Remove tokens from localStorage and cookies
+	// Remove tokens from localStorage (httpOnly refresh cookie will be cleared by backend on logout)
 	clearTokens: (): void => {
 		if (typeof window === "undefined") return;
-
-		// Clear localStorage
 		localStorage.removeItem(TOKEN_STORAGE_KEY);
-		localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
 		localStorage.removeItem(USER_STORAGE_KEY);
-
-		// Clear cookies
-		document.cookie = `${TOKEN_STORAGE_KEY}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-		document.cookie = `${REFRESH_TOKEN_STORAGE_KEY}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
 	},
 
 	// Get user from localStorage
@@ -82,62 +58,36 @@ export const tokenUtils = {
 		}
 	},
 
-	// Refresh token API call with race condition prevention
-	refreshAccessToken: async (
-		refreshToken: string
-	): Promise<{ accessToken?: string; refreshToken?: string; error?: string }> => {
-		// If there's already a refresh in progress, return that promise
+	// Refresh token API call. Refresh token is stored as httpOnly cookie; frontend should not send it in the body.
+	// Returns only the new access token (if successful).
+	refreshAccessToken: async (): Promise<{ accessToken?: string; error?: string }> => {
 		if (refreshPromise) {
 			console.log("Refresh already in progress, waiting for existing request...");
 			return refreshPromise;
 		}
 
-		// Create new refresh promise
 		refreshPromise = (async () => {
 			try {
-				// Validate refresh token before making request
-				if (!refreshToken || tokenUtils.isTokenExpired(refreshToken)) {
-					return { error: "Invalid or expired refresh token" };
-				}
-
 				const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
-				// Backend exposes refresh under /api/auth/refresh-token
 				const response = await fetch(`${apiBase}/auth/refresh-token`, {
 					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-					},
-					body: JSON.stringify({ refreshToken }),
-					credentials: "include", // Important for cookies
+					credentials: "include", // Important so browser sends httpOnly refresh cookie
 				});
 
 				if (!response.ok) {
-					// Handle specific HTTP status codes
-					if (response.status === 401) {
-						return { error: "Refresh token expired or invalid" };
-					} else if (response.status >= 500) {
-						return { error: "Server error during token refresh" };
-					}
+					if (response.status === 401) return { error: "Refresh token expired or invalid" };
+					if (response.status >= 500) return { error: "Server error during token refresh" };
 				}
 
 				const data = await response.json();
-
 				if (response.ok && data.success) {
-					return {
-						accessToken: data.data.accessToken,
-						refreshToken: data.data.refreshToken,
-					};
-				} else {
-					return { error: data.message || "Token refresh failed" };
+					return { accessToken: data.data.accessToken };
 				}
+				return { error: data.message || "Token refresh failed" };
 			} catch (error) {
 				console.error("Token refresh error:", error);
-				if (error instanceof TypeError && error.message.includes("fetch")) {
-					return { error: "Network error during token refresh" };
-				}
 				return { error: "Unexpected error during token refresh" };
 			} finally {
-				// Clear the promise after completion
 				refreshPromise = null;
 			}
 		})();

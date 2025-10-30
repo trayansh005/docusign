@@ -40,24 +40,35 @@ export interface DocuSignTemplateData {
 	};
 }
 
+export type FieldType = 
+  | "signature" 
+  | "date" 
+  | "initial" 
+  | "text" 
+  | "name" 
+  | "email" 
+  | "phone" 
+  | "address";
+
 export interface SignatureField {
 	id: string;
-	recipientId: string;
-	type: "signature" | "date" | "initial" | "text" | "name" | "email" | "phone" | "address";
-	pageNumber: number;
+	type: FieldType;
 	xPct: number;
 	yPct: number;
 	wPct: number;
 	hPct: number;
+	pageNumber: number;
 	value?: string;
+	fontId?: string;
+	isPlainText?: boolean;
+	recipientId?: string;
 	required?: boolean;
-	fontId?: string; // Font selection for signature/initial fields
 	x?: number;
 	y?: number;
 	width?: number;
 	height?: number;
-	placeholder?: boolean; // Mark as placeholder for recipients
-	placeholderText?: string; // Display text for placeholder
+	placeholder?: boolean;
+	placeholderText?: string;
 }
 
 export interface TemplateMetadata {
@@ -126,6 +137,7 @@ export interface SignatureData {
 	image?: string;
 	dataUrl?: string;
 	dataURL?: string;
+	fontId?: string;
 }
 
 export interface ViewportData {
