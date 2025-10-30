@@ -235,8 +235,9 @@ export const SignatureField: React.FC<SignatureFieldProps> = ({
 
 			// Add visual feedback
 			document.body.style.pointerEvents = "none";
+			// eslint-disable-next-line react-hooks/exhaustive-deps
 		},
-		[editable, field, containerRef, onSelect, handleMouseMove, handleMouseUp]
+		[editable, field, containerRef, onSelect]
 	);
 
 	const handleResizeMouseDown = useCallback(
@@ -264,8 +265,9 @@ export const SignatureField: React.FC<SignatureFieldProps> = ({
 			document.body.style.cursor = "se-resize";
 			document.body.style.userSelect = "none";
 			document.body.style.pointerEvents = "none";
+			// eslint-disable-next-line react-hooks/exhaustive-deps
 		},
-		[editable, field, onSelect, handleMouseMove, handleMouseUp]
+		[editable, field, onSelect]
 	);
 
 	const handleMouseMove = useCallback(

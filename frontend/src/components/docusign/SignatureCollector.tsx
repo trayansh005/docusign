@@ -33,10 +33,11 @@ export const SignatureCollector: React.FC<SignatureCollectorProps> = ({
 
 	// Group fields by recipient
 	const fieldsByRecipient = fields.reduce((acc, field) => {
-		if (!acc[field.recipientId]) {
-			acc[field.recipientId] = [];
+		const recipientId = field.recipientId || "unknown";
+		if (!acc[recipientId]) {
+			acc[recipientId] = [];
 		}
-		acc[field.recipientId].push(field);
+		acc[recipientId].push(field);
 		return acc;
 	}, {} as Record<string, SignatureField[]>);
 
@@ -53,7 +54,7 @@ export const SignatureCollector: React.FC<SignatureCollectorProps> = ({
 
 		const signature: CollectedSignature = {
 			fieldId,
-			recipientId: field.recipientId,
+			recipientId: field.recipientId || "unknown",
 			data,
 			type: field.type as "signature" | "date" | "initial" | "text",
 			pageNumber: field.pageNumber,
@@ -143,11 +144,10 @@ export const SignatureCollector: React.FC<SignatureCollectorProps> = ({
 						<div
 							className="bg-blue-600 h-2 rounded-full transition-all duration-300"
 							style={{
-								width: `${
-									(collectedSignatures.filter((s) => s.recipientId === currentRecipient.id).length /
-										currentFields.length) *
+								width: `${(collectedSignatures.filter((s) => s.recipientId === currentRecipient.id).length /
+									currentFields.length) *
 									100
-								}%`,
+									}%`,
 							}}
 						/>
 					</div>
@@ -161,11 +161,10 @@ export const SignatureCollector: React.FC<SignatureCollectorProps> = ({
 					{currentFields.map((field) => (
 						<div
 							key={field.id}
-							className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
-								isFieldCompleted(field.id)
-									? "bg-green-50 border-green-200"
-									: "bg-gray-50 border-gray-200 hover:bg-gray-100"
-							}`}
+							className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${isFieldCompleted(field.id)
+								? "bg-green-50 border-green-200"
+								: "bg-gray-50 border-gray-200 hover:bg-gray-100"
+								}`}
 						>
 							<div className="flex items-center gap-3">
 								{getFieldIcon(field.type)}

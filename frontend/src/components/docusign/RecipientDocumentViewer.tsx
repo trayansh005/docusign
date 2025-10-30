@@ -79,7 +79,7 @@ const RecipientDocumentViewer = forwardRef<RecipientDocumentViewerRef, Recipient
         const isTypedSignature = meta?.text && meta?.fontId;
 
         const pendingData = {
-          value: isTypedSignature ? meta.text : signatureData, // Store text for typed, image for drawn
+          value: isTypedSignature ? (meta.text || "") : signatureData, // Store text for typed, image for drawn
           fontId: meta?.fontId,
           text: meta?.text,
           imageData: signatureData // Keep image data for later conversion
@@ -127,7 +127,7 @@ const RecipientDocumentViewer = forwardRef<RecipientDocumentViewerRef, Recipient
     const applyPendingSignatures = useCallback(() => {
       if (!onFieldUpdate) return;
 
-      Object.entries(pendingSignatures).forEach(([fieldId, sigData]) => {
+      Object.entries(pendingSignaturesRef.current).forEach(([fieldId, sigData]) => {
         const field = template.signatureFields.find((f) => f.id === fieldId);
         if (!field) return;
 

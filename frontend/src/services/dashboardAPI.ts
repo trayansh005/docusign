@@ -1,4 +1,4 @@
-import { apiClient } from "@/lib/apiClient";
+import apiClient from "@/lib/apiClient";
 
 export interface DashboardStats {
     totalDocuments: number;
@@ -48,7 +48,7 @@ export interface PendingDocumentsCount {
  * Get user dashboard statistics
  */
 export async function getDashboardStats(): Promise<DashboardStats> {
-    const response = await apiClient.get("/dashboard/stats");
+    const response = await apiClient.get<{ data: DashboardStats }>("/dashboard/stats");
     return response.data;
 }
 
@@ -64,7 +64,15 @@ export async function getInbox(page: number = 1, limit: number = 10): Promise<{
         limit: number;
     };
 }> {
-    const response = await apiClient.get(`/dashboard/inbox?page=${page}&limit=${limit}`);
+    const response = await apiClient.get<{
+        data: InboxItem[];
+        pagination: {
+            current: number;
+            total: number;
+            pages: number;
+            limit: number;
+        };
+    }>(`/dashboard/inbox?page=${page}&limit=${limit}`);
     return response;
 }
 
@@ -72,6 +80,6 @@ export async function getInbox(page: number = 1, limit: number = 10): Promise<{
  * Get count of pending documents for the user
  */
 export async function getPendingDocumentsCount(): Promise<PendingDocumentsCount> {
-    const response = await apiClient.get("/dashboard/pending-count");
+    const response = await apiClient.get<{ data: PendingDocumentsCount }>("/dashboard/pending-count");
     return response.data;
 }
