@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Eye, Clock, CheckCircle, AlertCircle, Users, FileText, Calendar } from "lucide-react";
+import { Clock, CheckCircle, AlertCircle, Users, FileText, Calendar } from "lucide-react";
 import { DocuSignTemplateData } from "@/types/docusign";
 import { SigningProgress } from "./SigningProgress";
-import { getTemplates, getSigningProgress } from "@/services/docusignAPI";
+import { getTemplates } from "@/services/docusignAPI";
 import { useAuthStore } from "@/stores/authStore";
 
 interface DocumentWithProgress extends DocuSignTemplateData {
@@ -72,11 +72,11 @@ export const SenderDashboard: React.FC = () => {
 						completionPercentage,
 						nextRecipient: nextRecipient
 							? {
-									id: nextRecipient.id,
-									name: nextRecipient.name,
-									email: nextRecipient.email,
-									signingOrder: nextRecipient.signingOrder,
-							  }
+								id: nextRecipient.id,
+								name: nextRecipient.name,
+								email: nextRecipient.email,
+								signingOrder: nextRecipient.signingOrder,
+							}
 							: null,
 						isComplete: signedRecipients === totalRecipients,
 					};
@@ -226,11 +226,10 @@ export const SenderDashboard: React.FC = () => {
 								<button
 									key={tab.key}
 									onClick={() => setFilter(tab.key as "all" | "pending" | "completed")}
-									className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-										filter === tab.key
-											? "border-blue-500 text-blue-400"
-											: "border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600"
-									}`}
+									className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${filter === tab.key
+										? "border-blue-500 text-blue-400"
+										: "border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600"
+										}`}
 								>
 									{tab.label} ({tab.count})
 								</button>
@@ -260,13 +259,12 @@ export const SenderDashboard: React.FC = () => {
 									</div>
 									{doc.recipients && doc.recipients.length > 0 && (
 										<span
-											className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ml-2 flex-shrink-0 ${
-												doc.progress?.isComplete
-													? "bg-green-100 text-green-800"
-													: doc.progress && doc.progress.signedRecipients > 0
+											className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ml-2 flex-shrink-0 ${doc.progress?.isComplete
+												? "bg-green-100 text-green-800"
+												: doc.progress && doc.progress.signedRecipients > 0
 													? "bg-blue-100 text-blue-800"
 													: "bg-orange-100 text-orange-800"
-											}`}
+												}`}
 										>
 											{doc.progress?.isComplete ? "Complete" : "In Progress"}
 										</span>
@@ -316,16 +314,15 @@ export const SenderDashboard: React.FC = () => {
 											<div className="bg-gray-800/30 border border-gray-700 rounded-lg p-3">
 												<div className="text-xs font-medium text-gray-300 mb-2">Recipients:</div>
 												<div className="space-y-1">
-													{doc.recipients.slice(0, 3).map((recipient, idx) => (
+													{doc.recipients.slice(0, 3).map((recipient) => (
 														<div key={recipient.id} className="flex items-center text-xs">
 															<span
-																className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-medium mr-2 flex-shrink-0 ${
-																	recipient.signatureStatus === "signed"
-																		? "bg-green-500"
-																		: recipient.signatureStatus === "pending"
+																className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-medium mr-2 flex-shrink-0 ${recipient.signatureStatus === "signed"
+																	? "bg-green-500"
+																	: recipient.signatureStatus === "pending"
 																		? "bg-blue-500"
 																		: "bg-gray-400"
-																}`}
+																	}`}
 															>
 																{recipient.signingOrder}
 															</span>

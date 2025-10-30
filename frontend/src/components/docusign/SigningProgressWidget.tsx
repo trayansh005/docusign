@@ -6,14 +6,12 @@ import { RecipientData } from "@/types/docusign";
 
 interface SigningProgressWidgetProps {
     recipients: RecipientData[];
-    templateId: string;
     onViewDetails?: () => void;
     className?: string;
 }
 
 export const SigningProgressWidget: React.FC<SigningProgressWidgetProps> = ({
     recipients,
-    templateId,
     onViewDetails,
     className = "",
 }) => {
@@ -113,10 +111,10 @@ export const SigningProgressWidget: React.FC<SigningProgressWidgetProps> = ({
                 {sortedRecipients.slice(0, 3).map((recipient) => (
                     <div key={recipient.id} className="flex items-center text-xs">
                         <span className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-medium mr-2 flex-shrink-0 ${recipient.signatureStatus === "signed"
-                                ? "bg-green-500"
-                                : recipient.signatureStatus === "pending"
-                                    ? "bg-blue-500"
-                                    : "bg-gray-400"
+                            ? "bg-green-500"
+                            : recipient.signatureStatus === "pending"
+                                ? "bg-blue-500"
+                                : "bg-gray-400"
                             }`}>
                             {recipient.signingOrder}
                         </span>

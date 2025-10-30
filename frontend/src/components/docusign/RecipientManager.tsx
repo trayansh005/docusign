@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus, Trash2, GripVertical, Mail, User, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Trash2, Mail, User, ArrowUp, ArrowDown } from "lucide-react";
 import { RecipientData } from "@/types/docusign";
 
 interface RecipientManagerProps {
@@ -159,10 +159,10 @@ export const RecipientManager: React.FC<RecipientManagerProps> = ({
                             {/* Status */}
                             <div className="flex-shrink-0">
                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${recipient.signatureStatus === "signed"
-                                        ? "bg-green-100 text-green-800"
-                                        : recipient.signatureStatus === "pending"
-                                            ? "bg-blue-100 text-blue-800"
-                                            : "bg-gray-100 text-gray-800"
+                                    ? "bg-green-100 text-green-800"
+                                    : recipient.signatureStatus === "pending"
+                                        ? "bg-blue-100 text-blue-800"
+                                        : "bg-gray-100 text-gray-800"
                                     }`}>
                                     {recipient.signatureStatus === "signed" ? "Signed" :
                                         recipient.signatureStatus === "pending" ? "Ready" : "Waiting"}

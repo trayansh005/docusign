@@ -1,4 +1,4 @@
-import { Upload, FileText, Eye, BarChart3, History, Settings, Activity } from "lucide-react";
+import { Upload, FileText, Eye, BarChart3, History, Activity } from "lucide-react";
 import { Tab } from "./types";
 
 export const tabs: Tab[] = [

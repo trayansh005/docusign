@@ -110,7 +110,7 @@ export const SigningProgress: React.FC<SigningProgressProps> = ({
 
             {/* Recipients list */}
             <div className="space-y-3">
-                {sortedRecipients.map((recipient, index) => (
+                {sortedRecipients.map((recipient) => (
                     <div
                         key={recipient.id}
                         className={`flex items-center gap-4 p-4 border rounded-lg transition-all duration-200 ${getStatusColor(recipient)}`}

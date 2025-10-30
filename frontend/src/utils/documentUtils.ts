@@ -27,11 +27,8 @@ export function isPdfDocument(template: DocuSignTemplateData): boolean {
 /**
  * Get the PDF URL for a template (both PDFs and Word docs are served as PDFs)
  */
-// _pageNumber is intentionally unused (function resolves general URL regardless of page)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function getTemplatePageImageUrl(
-	template: DocuSignTemplateData,
-	_pageNumber: number
+	template: DocuSignTemplateData
 ): string {
 	// All documents (PDF and Word) are now served as PDFs
 	// Word documents are converted to PDF on the backend

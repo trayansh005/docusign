@@ -1,19 +1,17 @@
 "use client";
 
 import React, { useState, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
-import { PenTool, ZoomIn, ZoomOut, RotateCw } from "lucide-react";
+import { PenTool } from "lucide-react";
 import { ensureAbsoluteUrl } from "@/lib/urlUtils";
 import { DocuSignTemplateData, SignatureField } from "@/types/docusign";
 import { SIGNATURE_FONTS } from "@/constants/signatureFonts";
 import { useAuthStore } from "@/stores/authStore";
 import { SignaturePad } from "./SignaturePad";
 import { PDFPageCanvas } from "./PDFPageCanvas";
-import { SigningProgress } from "./SigningProgress";
 
 interface RecipientDocumentViewerProps {
   template: DocuSignTemplateData;
   onFieldUpdate?: (pageNumber: number, fieldId: string, patch: Partial<SignatureField>) => void;
-  showSigningProgress?: boolean;
 }
 
 export interface RecipientDocumentViewerRef {
@@ -22,12 +20,12 @@ export interface RecipientDocumentViewerRef {
 }
 
 const RecipientDocumentViewer = forwardRef<RecipientDocumentViewerRef, RecipientDocumentViewerProps>(
-  ({ template, onFieldUpdate, showSigningProgress = true }, ref) => {
+  ({ template, onFieldUpdate }, ref) => {
     const user = useAuthStore((state) => state.user);
-    const [currentPage, setCurrentPage] = useState(1);
+    const [currentPage] = useState(1);
     const [activeSignatureField, setActiveSignatureField] = useState<SignatureField | null>(null);
-    const [zoom, setZoom] = useState(1);
-    const [rotation, setRotation] = useState(0);
+    const [zoom] = useState(1);
+    const [rotation] = useState(0);
     // Use ref instead of state to persist across re-renders
     const pendingSignaturesRef = useRef<Record<string, { value: string; fontId?: string; text?: string; imageData?: string }>>({});
     const [, forceUpdate] = useState({});
@@ -328,10 +326,7 @@ const RecipientDocumentViewer = forwardRef<RecipientDocumentViewerRef, Recipient
 
 
 
-    // PDF controls
-    const handleZoomIn = useCallback(() => setZoom((prev) => Math.min(prev + 0.25, 3)), []);
-    const handleZoomOut = useCallback(() => setZoom((prev) => Math.max(prev - 0.25, 0.25)), []);
-    const handleRotate = useCallback(() => setRotation((prev) => (prev + 90) % 360), []);
+
 
     return (
       <div className="flex flex-col h-full">
