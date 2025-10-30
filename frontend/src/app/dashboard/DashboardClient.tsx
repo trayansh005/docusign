@@ -789,7 +789,7 @@ export default function DashboardClient() {
 									</div>
 									<SigningProgressWidget
 										recipients={doc.recipients}
-										templateId={doc._id}
+
 										onViewDetails={() => router.push(`/dashboard/signing-progress`)}
 										className="bg-gray-800/30 border-gray-700"
 									/>
