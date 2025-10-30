@@ -235,9 +235,8 @@ export const SignatureField: React.FC<SignatureFieldProps> = ({
 
 			// Add visual feedback
 			document.body.style.pointerEvents = "none";
-			// eslint-disable-next-line react-hooks/exhaustive-deps
 		},
-		[editable, field, containerRef, onSelect]
+		[editable, field, containerRef, onSelect, handleMouseMove, handleMouseUp]
 	);
 
 	const handleResizeMouseDown = useCallback(
@@ -265,9 +264,8 @@ export const SignatureField: React.FC<SignatureFieldProps> = ({
 			document.body.style.cursor = "se-resize";
 			document.body.style.userSelect = "none";
 			document.body.style.pointerEvents = "none";
-			// eslint-disable-next-line react-hooks/exhaustive-deps
 		},
-		[editable, field, onSelect]
+		[editable, field, onSelect, handleMouseMove, handleMouseUp]
 	);
 
 	const handleMouseMove = useCallback(
@@ -373,15 +371,15 @@ export const SignatureField: React.FC<SignatureFieldProps> = ({
 			? isSelected
 				? "2px solid #3b82f6"
 				: isHovered || isDragging
-				? "2px dashed #60a5fa"
-				: "2px dashed rgba(59,130,246,0.4)"
+					? "2px dashed #60a5fa"
+					: "2px dashed rgba(59,130,246,0.4)"
 			: "1px solid rgba(0,0,0,0.1)",
 		backgroundColor: editable
 			? isSelected || isDragging
 				? "rgba(59, 130, 246, 0.15)"
 				: isHovered
-				? "rgba(59, 130, 246, 0.1)"
-				: "rgba(59, 130, 246, 0.05)"
+					? "rgba(59, 130, 246, 0.1)"
+					: "rgba(59, 130, 246, 0.05)"
 			: "rgba(255, 255, 255, 0.9)",
 		borderRadius: "6px",
 		cursor: editable ? (isDragging ? "grabbing" : isHovered ? "grab" : "move") : "default",
@@ -390,8 +388,8 @@ export const SignatureField: React.FC<SignatureFieldProps> = ({
 			? isSelected || isDragging
 				? "0 4px 12px rgba(59, 130, 246, 0.3)"
 				: isHovered
-				? "0 2px 8px rgba(0,0,0,0.15)"
-				: "0 1px 4px rgba(0,0,0,0.1)"
+					? "0 2px 8px rgba(0,0,0,0.15)"
+					: "0 1px 4px rgba(0,0,0,0.1)"
 			: "0 1px 2px rgba(0,0,0,0.05)",
 		zIndex: isSelected || isDragging ? 20 : isHovered ? 15 : 10,
 		transform: isDragging ? "scale(1.02)" : "scale(1)",

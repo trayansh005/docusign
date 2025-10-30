@@ -319,7 +319,7 @@ export default function DashboardClient() {
 								</p>
 								{usage.signs && usage.signs.used >= usage.signs.limit && (
 									<p className="text-sm mt-2 text-red-300 font-medium">
-										⚠️ You've reached your monthly signing limit. Upgrade to continue signing documents.
+										⚠️ You&apos;ve reached your monthly signing limit. Upgrade to continue signing documents.
 									</p>
 								)}
 							</div>
@@ -572,8 +572,8 @@ export default function DashboardClient() {
 														key={pageNum}
 														onClick={() => loadDashboardData(pageNum)}
 														className={`px-3 py-1 rounded-md text-sm transition-colors ${inboxPage === pageNum
-																? "bg-blue-600 text-white"
-																: "bg-gray-700 hover:bg-gray-600 text-white"
+															? "bg-blue-600 text-white"
+															: "bg-gray-700 hover:bg-gray-600 text-white"
 															}`}
 													>
 														{pageNum}
@@ -644,10 +644,10 @@ export default function DashboardClient() {
 								<p className="text-gray-400 text-sm mb-1">Status</p>
 								<p
 									className={`font-semibold ${subscription.status === "active"
-											? "text-green-400"
-											: subscription.status === "canceled"
-												? "text-red-400"
-												: "text-yellow-400"
+										? "text-green-400"
+										: subscription.status === "canceled"
+											? "text-red-400"
+											: "text-yellow-400"
 										}`}
 								>
 									{subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}

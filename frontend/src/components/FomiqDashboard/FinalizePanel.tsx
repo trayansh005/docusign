@@ -216,8 +216,8 @@ export function FinalizePanel({
 					field.value && field.value.length > 0 && !field.value.startsWith("data:image/")
 						? field.value
 						: field.type === "initial"
-						? userInitials
-						: userFullName;
+							? userInitials
+							: userFullName;
 
 				const fontFamily = getFontFamily(field.fontId);
 				const width = Math.round((field.wPct / 100) * 800); // Assume 800px viewport width
@@ -253,6 +253,7 @@ export function FinalizePanel({
 			const signatures = await Promise.all(signaturePromises);
 
 			// The backend expects signature images + fields; include recipients and message
+			// eslint-disable-next-line @typescript-eslint/no-unused-vars
 			const payload = {
 				fields: template.signatureFields || [],
 				signatures: signatures,
