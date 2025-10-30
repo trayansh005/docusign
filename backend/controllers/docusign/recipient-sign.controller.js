@@ -469,7 +469,6 @@ async function applySignaturesToPdf(template, signatures) {
 				const y = pageHeight - targetTop - drawHeight - yOffset;
 
 				console.log(`[ApplySignatures] Image dimensions: original=${imgDims.width}x${imgDims.height}, scaled=${drawWidth.toFixed(2)}x${drawHeight.toFixed(2)}`);
-				console.log(`[ApplySignatures] Scale factors: scaleX=${scaleX.toFixed(4)}, scaleY=${scaleY.toFixed(4)}, chosen scale=${scale.toFixed(4)}`);
 				console.log(`[ApplySignatures] Target box (top-based): left=${targetLeft.toFixed(2)}, top=${targetTop.toFixed(2)}, width=${targetWidth.toFixed(2)}, height=${targetHeight.toFixed(2)}`);
 				console.log(`[ApplySignatures] Offsets: xOffset=${xOffset.toFixed(2)}, yOffset=${yOffset.toFixed(2)}`);
 				console.log(`[ApplySignatures] Drawing image for ${sig.fieldId} at x=${x.toFixed(2)}, y=${y.toFixed(2)}, width=${drawWidth.toFixed(2)}, height=${drawHeight.toFixed(2)}`);
