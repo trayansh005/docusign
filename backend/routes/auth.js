@@ -1,16 +1,17 @@
 import express from "express";
 import { body } from "express-validator";
 import { validate } from "../middlewares/validation.js";
-import { authenticateToken } from "../middleware/auth.js";
+import { authenticateSession } from "../middleware/sessionAuth.js";
 import {
 	register,
 	login,
 	getProfile,
 	updateProfile,
 	changePassword,
-	refreshToken,
 	logout,
-	validateToken,
+	getSessions,
+	deleteSession,
+	logoutAll,
 } from "../controllers/authController.js";
 
 const router = express.Router();
@@ -104,22 +105,25 @@ const changePasswordValidation = [
 		.withMessage("New password must contain uppercase, lowercase, and numeric characters"),
 ];
 
-// Routes
+// Public routes (no authentication required)
 router.post("/register", registerValidation, validate, register);
 router.post("/login", loginValidation, validate, login);
-router.get("/profile", authenticateToken, getProfile);
-router.put("/profile", authenticateToken, updateProfileValidation, validate, updateProfile);
+
+// Protected routes (require session authentication)
+router.get("/profile", authenticateSession, getProfile);
+router.put("/profile", authenticateSession, updateProfileValidation, validate, updateProfile);
 router.put(
 	"/change-password",
-	authenticateToken,
+	authenticateSession,
 	changePasswordValidation,
 	validate,
 	changePassword
 );
+router.post("/logout", authenticateSession, logout);
 
-// New enhanced auth routes
-router.post("/refresh-token", refreshToken);
-router.post("/logout", logout);
-router.get("/validate-token", authenticateToken, validateToken);
+// Session management routes
+router.get("/sessions", authenticateSession, getSessions);
+router.delete("/sessions/:sessionId", authenticateSession, deleteSession);
+router.post("/logout-all", authenticateSession, logoutAll);
 
 export default router;

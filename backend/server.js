@@ -67,6 +67,12 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 // Cookie parser middleware
 app.use(cookieParser());
 
+// Debug middleware to test if /api/ middlewares are being called
+app.use("/api/", (req, res, next) => {
+	console.log("🔥 DEBUG: /api/ middleware called for:", req.method, req.originalUrl);
+	next();
+});
+
 // Rate limiting
 app.use("/api/", apiRateLimit);
 

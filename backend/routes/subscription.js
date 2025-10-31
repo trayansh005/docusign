@@ -1,5 +1,5 @@
 import express from "express";
-import { authenticate } from "../middleware/auth.js";
+import { authenticateSession } from "../middleware/sessionAuth.js";
 import {
 	getPlans,
 	getUserSubscription,
@@ -19,22 +19,22 @@ const router = express.Router();
 router.get("/plans", getPlans);
 
 // User subscription
-router.get("/me", authenticate, getUserSubscription);
+router.get("/me", authenticateSession, getUserSubscription);
 
 // Create (manual) subscription
-router.post("/", authenticate, createSubscription);
+router.post("/", authenticateSession, createSubscription);
 
 // Cancel
-router.post("/cancel", authenticate, cancelSubscription);
+router.post("/cancel", authenticateSession, cancelSubscription);
 
 // Delete subscription by ID (admin/user action)
-router.delete("/:id", authenticate, deleteSubscription);
+router.delete("/:id", authenticateSession, deleteSubscription);
 
 // Stripe checkout creation
-router.post("/checkout", authenticate, createCheckoutSession);
+router.post("/checkout", authenticateSession, createCheckoutSession);
 
 // Verify session (manual / fallback)
-router.post("/verify", authenticate, verifySession);
+router.post("/verify", authenticateSession, verifySession);
 
 // Webhook - needs raw body when mounted; Wire expects express.json by default in server.js
 router.post("/webhook", express.raw({ type: "application/json" }), stripeWebhook);

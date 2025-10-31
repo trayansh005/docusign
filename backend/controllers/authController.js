@@ -1,9 +1,8 @@
-import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import User from "../models/User.js";
+import Session from "../models/Session.js";
+import { parseDeviceName } from "../utils/deviceParser.js";
 import { customValidations } from "../middlewares/validation.js";
-
-const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + "_refresh";
 
 // Cookie configuration (env-overridable for cross-site deployments)
 // If your frontend and backend are on different domains, set:
@@ -18,68 +17,10 @@ const cookieConfig = {
 		process.env.COOKIE_SAMESITE !== undefined
 			? process.env.COOKIE_SAMESITE
 			: process.env.NODE_ENV === "production"
-			? "strict"
-			: "lax",
+				? "strict"
+				: "lax",
 	...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
 	path: "/",
-};
-
-// Token expiration times
-const ACCESS_TOKEN_EXPIRY = "15m";
-const REFRESH_TOKEN_EXPIRY = "7d";
-const MAX_REFRESH_TOKENS = 5;
-
-// Generate tokens
-const generateTokens = (payload) => {
-	const accessToken = jwt.sign(payload, JWT_SECRET, {
-		expiresIn: ACCESS_TOKEN_EXPIRY,
-	});
-	const refreshToken = jwt.sign(payload, JWT_REFRESH_SECRET, {
-		expiresIn: REFRESH_TOKEN_EXPIRY,
-	});
-	return { accessToken, refreshToken };
-};
-
-// Helper to clean expired refresh tokens
-const cleanExpiredTokens = (refreshTokens) => {
-	const now = new Date();
-	return refreshTokens.filter((tokenObj) => tokenObj.expires > now);
-};
-
-// Helper to manage refresh token storage
-const manageRefreshTokens = (user, newRefreshToken) => {
-	if (!user.refreshTokens) {
-		user.refreshTokens = [];
-	}
-
-	// Clean expired tokens first
-	user.refreshTokens = cleanExpiredTokens(user.refreshTokens);
-
-	// Add new token
-	user.refreshTokens.push({
-		token: newRefreshToken,
-		expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-		createdAt: new Date(),
-	});
-
-	// Keep only the most recent tokens (FIFO)
-	if (user.refreshTokens.length > MAX_REFRESH_TOKENS) {
-		user.refreshTokens = user.refreshTokens
-			.sort((a, b) => b.createdAt - a.createdAt)
-			.slice(0, MAX_REFRESH_TOKENS);
-	}
-};
-
-// Helper function to set auth cookies
-const setAuthCookies = (res, accessToken, refreshToken) => {
-	res.cookie("accessToken", accessToken, {
-		...cookieConfig,
-		maxAge: 15 * 60 * 1000, // 15 minutes
-	});
-	res.cookie("refreshToken", refreshToken, {
-		...cookieConfig,
-		maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-	});
 };
 
 // Register controller
@@ -140,40 +81,48 @@ export const register = async (req, res) => {
 		const user = new User(userData);
 		await user.save();
 
-		// Auto-login after registration
-		const tokenPayload = {
-			id: user._id,
-			firstName: user.firstName,
-			lastName: user.lastName,
-			email: user.email,
-			userType: "user",
-		};
+		// Auto-login after registration with session-based authentication
+		// Generate UUID for sessionId
+		const sessionId = crypto.randomUUID();
 
-		// Generate tokens
-		const { accessToken, refreshToken } = generateTokens(tokenPayload);
+		// Parse device info from request headers
+		const userAgent = req.headers["user-agent"] || "Unknown";
+		const ip = req.ip || req.connection.remoteAddress || "Unknown";
+		const deviceName = parseDeviceName(userAgent);
 
-		// Store refresh token in the database
-		manageRefreshTokens(user, refreshToken);
+		// Create Session document in database
+		const session = new Session({
+			sessionId,
+			userId: user._id,
+			deviceInfo: {
+				userAgent,
+				ip,
+				deviceName,
+			},
+			expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+		});
+
+		await session.save();
 
 		// Update last login
 		user.lastLogin = new Date();
 		await user.save();
 
-		// Set cookies
-		setAuthCookies(res, accessToken, refreshToken);
+		// Set httpOnly cookie with sessionId
+		res.cookie("sessionId", sessionId, {
+			...cookieConfig,
+			maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+		});
 
-		// Remove password and refresh tokens from response
+		// Remove password from response
 		const userResponse = user.toObject();
 		delete userResponse.password;
-		delete userResponse.refreshTokens;
 
 		res.status(201).json({
 			success: true,
 			message: "User registered and logged in successfully",
 			data: {
 				user: userResponse,
-				token: accessToken, // For backward compatibility
-				accessToken,
 			},
 		});
 	} catch (error) {
@@ -194,10 +143,10 @@ export const register = async (req, res) => {
 	}
 };
 
-// Login controller with enhanced features
+// Login controller with session-based authentication
 export const login = async (req, res) => {
 	try {
-		const { email, password, userType = "user" } = req.body;
+		const { email, password } = req.body;
 
 		// Validate required fields
 		if (!email || !password) {
@@ -225,39 +174,46 @@ export const login = async (req, res) => {
 			});
 		}
 
-		// Create token payload
-		const tokenPayload = {
-			id: user._id,
-			firstName: user.firstName,
-			lastName: user.lastName,
-			email: user.email,
-			userType: userType,
-		};
+		// Generate UUID for sessionId
+		const sessionId = crypto.randomUUID();
 
-		// Generate tokens
-		const { accessToken, refreshToken } = generateTokens(tokenPayload);
+		// Parse device info from request headers
+		const userAgent = req.headers["user-agent"] || "Unknown";
+		const ip = req.ip || req.connection.remoteAddress || "Unknown";
+		const deviceName = parseDeviceName(userAgent);
 
-		// Store refresh token in the database
-		manageRefreshTokens(user, refreshToken);
+		// Create Session document in database
+		const session = new Session({
+			sessionId,
+			userId: user._id,
+			deviceInfo: {
+				userAgent,
+				ip,
+				deviceName,
+			},
+			expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+		});
+
+		await session.save();
 
 		// Update last login
 		user.lastLogin = new Date();
 		await user.save();
 
-		// Set cookies
-		setAuthCookies(res, accessToken, refreshToken);
+		// Set httpOnly cookie with sessionId
+		res.cookie("sessionId", sessionId, {
+			...cookieConfig,
+			maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+		});
 
 		// Prepare user response
 		const userResponse = user.toObject();
 		delete userResponse.password;
-		delete userResponse.refreshTokens;
 
 		res.status(200).json({
 			success: true,
 			message: "Login successful",
 			data: {
-				token: accessToken, // For backward compatibility
-				accessToken,
 				user: userResponse,
 			},
 		});
@@ -391,112 +347,24 @@ export const changePassword = async (req, res) => {
 	}
 };
 
-// Refresh token controller
-export const refreshToken = async (req, res) => {
-	try {
-		// Read refresh token only from httpOnly cookie (simpler, more secure)
-		const token = req.cookies && req.cookies.refreshToken;
 
-		if (!token) {
-			return res.status(401).json({
-				success: false,
-				message: "Refresh token required",
-			});
-		}
-
-		// Verify refresh token using the configured refresh secret
-		let decoded;
-		try {
-			decoded = jwt.verify(token, JWT_REFRESH_SECRET);
-		} catch (err) {
-			console.error("Refresh token verification failed:", err);
-			return res.status(401).json({ success: false, message: "Invalid refresh token" });
-		}
-
-		// Find user and validate refresh token exists in DB
-		const user = await User.findById(decoded.id);
-		if (!user || !user.refreshTokens?.some((tokenObj) => tokenObj.token === token)) {
-			return res.status(401).json({
-				success: false,
-				message: "Invalid refresh token",
-			});
-		}
-
-		// Generate new tokens
-		const tokenPayload = {
-			id: user._id,
-			firstName: user.firstName,
-			lastName: user.lastName,
-			email: user.email,
-			userType: decoded.userType,
-		};
-
-		const { accessToken, refreshToken: newRefreshToken } = generateTokens(tokenPayload);
-
-		// Use atomic update to avoid version conflicts
-		// Remove old token and add new one in a single operation
-		const newTokenObj = {
-			token: newRefreshToken,
-			createdAt: new Date(),
-		};
-
-		// Filter out old refresh tokens (keep only recent ones) and the current token
-		const updatedTokens = user.refreshTokens
-			.filter((tokenObj) => tokenObj.token !== token)
-			.slice(-4); // Keep last 4 tokens
-		updatedTokens.push(newTokenObj);
-
-		// Update user with new tokens using findOneAndUpdate to avoid version conflicts
-		await User.findByIdAndUpdate(user._id, { refreshTokens: updatedTokens }, { new: true });
-
-		// Set new cookies
-		setAuthCookies(res, accessToken, newRefreshToken);
-
-		res.status(200).json({
-			success: true,
-			data: {
-				accessToken,
-			},
-		});
-	} catch (error) {
-		console.error("Refresh token error:", error);
-		res.status(401).json({
-			success: false,
-			message: "Invalid refresh token",
-		});
-	}
-};
 
 // Logout controller
 export const logout = async (req, res) => {
 	try {
-		const token = req.cookies && req.cookies.refreshToken;
-		if (token) {
-			try {
-				// Try via authenticated user first
-				let user = req.user ? await User.findById(req.user.id) : null;
-				// Fallback: decode refresh token to identify user
-				if (!user) {
-					try {
-						const decoded = jwt.verify(token, JWT_REFRESH_SECRET);
-						user = await User.findById(decoded.id);
-					} catch (err) {
-						// ignore
-					}
-				}
-				if (user) {
-					user.refreshTokens =
-						user.refreshTokens?.filter((tokenObj) => tokenObj.token !== token) || [];
-					await user.save();
-				}
-			} catch (e) {
-				// Ignore decoding errors here; we'll still clear cookies below
-			}
+		// Extract sessionId from cookie
+		const sessionId = req.cookies?.sessionId;
+
+		if (sessionId) {
+			// Find and delete session from database
+			await Session.findOneAndDelete({ sessionId });
 		}
 
-		// Clear cookies
-		res.clearCookie("accessToken", cookieConfig);
-		res.clearCookie("refreshToken", cookieConfig);
+		// Clear sessionId cookie by setting maxAge to 0
+		res.cookie("sessionId", "", {
+			...cookieConfig,
+			maxAge: 0,
+		});
 
 		res.status(200).json({
 			success: true,
@@ -511,6 +379,129 @@ export const logout = async (req, res) => {
 	}
 };
 
+// Get active sessions controller
+export const getSessions = async (req, res) => {
+	try {
+		const userId = req.user._id;
+		const currentSessionId = req.cookies?.sessionId;
+
+		// Query all active sessions for authenticated user
+		const sessions = await Session.find({
+			userId,
+			isActive: true,
+		})
+			.sort({ lastActivity: -1 }) // Order by lastActivity descending
+			.lean();
+
+		// Transform sessions to client-safe format
+		const sessionList = sessions.map((session) => ({
+			id: session._id.toString(),
+			deviceInfo: {
+				deviceName: session.deviceInfo.deviceName,
+				userAgent: session.deviceInfo.userAgent,
+				ip: session.deviceInfo.ip,
+			},
+			createdAt: session.createdAt,
+			lastActivity: session.lastActivity,
+			expiresAt: session.expiresAt,
+			isCurrentSession: session.sessionId === currentSessionId, // Mark current session
+		}));
+
+		res.status(200).json({
+			success: true,
+			data: {
+				sessions: sessionList,
+			},
+		});
+	} catch (error) {
+		console.error("Get sessions error:", error);
+		res.status(500).json({
+			success: false,
+			message: "Failed to fetch sessions",
+			...(process.env.NODE_ENV === "development" && { error: error.message }),
+		});
+	}
+};
+
+// Delete specific session controller
+export const deleteSession = async (req, res) => {
+	try {
+		const userId = req.user._id;
+		const sessionIdToDelete = req.params.sessionId;
+
+		if (!sessionIdToDelete) {
+			return res.status(400).json({
+				success: false,
+				message: "Session ID is required",
+			});
+		}
+
+		// Find the session by _id (MongoDB ObjectId)
+		const session = await Session.findById(sessionIdToDelete);
+
+		if (!session) {
+			return res.status(404).json({
+				success: false,
+				message: "Session not found",
+			});
+		}
+
+		// Verify session belongs to authenticated user
+		if (session.userId.toString() !== userId.toString()) {
+			return res.status(403).json({
+				success: false,
+				message: "Cannot delete another user's session",
+			});
+		}
+
+		// Delete session from database
+		await Session.findByIdAndDelete(sessionIdToDelete);
+
+		res.status(200).json({
+			success: true,
+			message: "Session deleted successfully",
+		});
+	} catch (error) {
+		console.error("Delete session error:", error);
+		res.status(500).json({
+			success: false,
+			message: "Failed to delete session",
+			...(process.env.NODE_ENV === "development" && { error: error.message }),
+		});
+	}
+};
+
+// Logout from all devices controller
+export const logoutAll = async (req, res) => {
+	try {
+		const userId = req.user._id;
+
+		// Find all sessions for authenticated user
+		const result = await Session.deleteMany({ userId });
+
+		// Clear current sessionId cookie
+		res.cookie("sessionId", "", {
+			...cookieConfig,
+			maxAge: 0,
+		});
+
+		res.status(200).json({
+			success: true,
+			message: "Logged out from all devices successfully",
+			data: {
+				terminatedSessions: result.deletedCount,
+			},
+		});
+	} catch (error) {
+		console.error("Logout all error:", error);
+		res.status(500).json({
+			success: false,
+			message: "Failed to logout from all devices",
+			...(process.env.NODE_ENV === "development" && { error: error.message }),
+		});
+	}
+};
+
 // Validate token controller
 export const validateToken = async (req, res) => {
 	try {
@@ -518,7 +509,6 @@ export const validateToken = async (req, res) => {
 
 		const userResponse = user.toObject();
 		delete userResponse.password;
-		delete userResponse.refreshTokens;
 
 		res.status(200).json({
 			success: true,

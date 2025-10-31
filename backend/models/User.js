@@ -80,22 +80,10 @@ const userSchema = new mongoose.Schema(
 		lockUntil: {
 			type: Date,
 		},
-		refreshTokens: [
-			{
-				token: {
-					type: String,
-					required: true,
-				},
-				expires: {
-					type: Date,
-					required: true,
-				},
-				createdAt: {
-					type: Date,
-					default: Date.now,
-				},
-			},
-		],
+		lastNotificationReadAt: {
+			type: Date,
+			default: null,
+		},
 	},
 	{
 		timestamps: true,

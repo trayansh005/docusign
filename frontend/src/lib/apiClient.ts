@@ -1,11 +1,5 @@
-import { tokenUtils } from "./tokenUtils";
-
-// Ensure API base URL always points to the backend API root (include /api).
 const rawBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 const API_BASE_URL = rawBase.endsWith("/api") ? rawBase : rawBase.replace(/\/$/, "") + "/api";
-
-// Global refresh promise to prevent multiple simultaneous refresh attempts
-let refreshPromise: Promise<{ accessToken?: string; error?: string }> | null = null;
 
 class ApiClient {
 	private baseURL: string;
@@ -16,58 +10,32 @@ class ApiClient {
 
 	private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
 		const url = `${this.baseURL}${endpoint}`;
-		const accessToken = tokenUtils.getAccessToken();
 
 		const config: RequestInit = {
 			...options,
 			headers: {
 				"Content-Type": "application/json",
-				...(accessToken && { Authorization: `Bearer ${accessToken}` }),
 				...options.headers,
 			},
-			credentials: "include", // Important for cookies
+			credentials: "include",
 		};
 
 		try {
-			let response = await fetch(url, config);
+			const response = await fetch(url, config);
 
-			// Handle token refresh on 401
-			if (response.status === 401 && accessToken) {
-				// Attempt cookie-based refresh
-				if (!refreshPromise) {
-					refreshPromise = tokenUtils.refreshAccessToken();
-				}
-
-				const refreshResult = await refreshPromise;
-				refreshPromise = null;
-
-				if (refreshResult.accessToken) {
-					tokenUtils.setTokens(refreshResult.accessToken);
-
-					// Retry the original request with new token
-					config.headers = {
-						...config.headers,
-						Authorization: `Bearer ${refreshResult.accessToken}`,
-					};
-					response = await fetch(url, config);
-				} else {
-					// Refresh failed, clear tokens and redirect to login
-					tokenUtils.clearTokens();
-					if (typeof window !== "undefined") {
-						window.location.href = "/login";
-					}
-					throw new Error("Authentication failed");
-				}
+			// Handle 401 Unauthorized - session expired or invalid
+			if (response.status === 401) {
+				const error = new Error("Unauthorized") as Error & { status: number };
+				error.status = 401;
+				throw error;
 			}
 
-			// Read text first so we can give a helpful error message when the server returns HTML (e.g. an index.html)
 			const text = await response.text();
 			let data: unknown = null;
 			if (text) {
 				try {
 					data = JSON.parse(text);
 				} catch {
-					// Received non-JSON (probably HTML). Surface a clear error rather than crashing on JSON.parse
 					const snippet = text.slice(0, 200).replace(/\s+/g, " ");
 					const msg = `Expected JSON response but received non-JSON (status ${response.status}). Response start: ${snippet}`;
 					throw new Error(msg);

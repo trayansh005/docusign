@@ -8,7 +8,6 @@ import { PendingDocumentsNotification } from "@/components/PendingDocumentsNotif
 
 export default function Header() {
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
-	const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 	const user = useAuthStore((state) => state.user);
 	const logout = useAuthStore((state) => state.logout);
 	const isLoading = useAuthStore((state) => state.isLoading);
@@ -40,7 +39,7 @@ export default function Header() {
 							</div>
 						) : (
 							<>
-								{!isAuthenticated ? (
+								{!user ? (
 									<>
 										<Link href="/subscription" className="nav-link">
 											Pricing
@@ -152,7 +151,7 @@ export default function Header() {
 							</div>
 						) : (
 							<>
-								{!isAuthenticated ? (
+								{!user ? (
 									<>
 										<Link
 											href="/subscription"

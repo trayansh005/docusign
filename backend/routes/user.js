@@ -1,9 +1,9 @@
 import express from "express";
-import { authenticateToken } from "../middleware/auth.js";
+import { authenticateSession } from "../middleware/sessionAuth.js";
 import { listUsers } from "../controllers/userController.js";
 
 const router = express.Router();
 
-router.get("/", authenticateToken, listUsers);
+router.get("/", authenticateSession, listUsers);
 
 export default router;

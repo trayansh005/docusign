@@ -34,7 +34,8 @@ export function FinalizePanel({
 		user?.firstName && user?.lastName ? `${user.firstName[0]}${user.lastName[0]}` : "YI";
 
 	/**
-	 * Generate signature image from text and font with proper sizing
+	 * Generate signature image from text and font with proper sizing and cropping
+	 * Matches the SignaturePad component's approach
 	 */
 	const generateSignatureImage = async (
 		text: string,
@@ -43,31 +44,31 @@ export function FinalizePanel({
 		height: number
 	): Promise<string> => {
 		return new Promise((resolve) => {
+			// Use larger canvas for better quality (same as SignaturePad)
+			const canvasWidth = 1600;
+			const canvasHeight = 480;
+
 			const canvas = document.createElement("canvas");
+			canvas.width = canvasWidth;
+			canvas.height = canvasHeight;
+
 			const ctx = canvas.getContext("2d");
 			if (!ctx) {
 				resolve("");
 				return;
 			}
 
-			// Set canvas size with higher resolution for quality (2x for retina)
-			const scale = 2;
-			canvas.width = width * scale;
-			canvas.height = height * scale;
-			ctx.scale(scale, scale);
-
 			// Clear canvas with transparent background
-			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
-			// Calculate optimal font size based on text length and field dimensions
-			// Start with 70% of height, then adjust based on text width
-			let fontSize = height * 0.7;
+			// Calculate optimal font size - use most of the height
+			let fontSize = canvasHeight * 0.8;
 			ctx.font = `${fontSize}px ${fontFamily}`;
 
-			// Measure text width and scale down if it exceeds field width
+			// Measure text width and scale down if it exceeds canvas width
 			let textMetrics = ctx.measureText(text);
-			const padding = width * 0.1; // 10% padding on each side
-			const maxTextWidth = width - padding * 2;
+			const padding = 40; // Small fixed padding
+			const maxTextWidth = canvasWidth - padding * 2;
 
 			if (textMetrics.width > maxTextWidth) {
 				// Scale font size down proportionally
@@ -82,12 +83,55 @@ export function FinalizePanel({
 			ctx.textAlign = "center";
 
 			// Draw text centered both horizontally and vertically
-			const centerX = width / 2;
-			const centerY = height / 2;
-			ctx.fillText(text, centerX, centerY);
+			ctx.fillText(text, canvasWidth / 2, canvasHeight / 2);
+
+			// Crop to content bounds to remove excess transparent space
+			const imageData = ctx.getImageData(0, 0, canvasWidth, canvasHeight);
+			const pixels = imageData.data;
+			let minX = canvasWidth, minY = canvasHeight, maxX = 0, maxY = 0;
+
+			// Find bounds of non-transparent pixels
+			for (let y = 0; y < canvasHeight; y++) {
+				for (let x = 0; x < canvasWidth; x++) {
+					const alpha = pixels[(y * canvasWidth + x) * 4 + 3];
+					if (alpha > 0) {
+						if (x < minX) minX = x;
+						if (x > maxX) maxX = x;
+						if (y < minY) minY = y;
+						if (y > maxY) maxY = y;
+					}
+				}
+			}
+
+			// Add padding around the text
+			const cropPadding = 20;
+			minX = Math.max(0, minX - cropPadding);
+			minY = Math.max(0, minY - cropPadding);
+			maxX = Math.min(canvasWidth - 1, maxX + cropPadding);
+			maxY = Math.min(canvasHeight - 1, maxY + cropPadding);
+
+			const cropWidth = maxX - minX + 1;
+			const cropHeight = maxY - minY + 1;
+
+			// Create cropped canvas
+			const croppedCanvas = document.createElement("canvas");
+			croppedCanvas.width = cropWidth;
+			croppedCanvas.height = cropHeight;
+			const croppedCtx = croppedCanvas.getContext("2d");
+			if (!croppedCtx) {
+				resolve(canvas.toDataURL("image/png"));
+				return;
+			}
+
+			// Copy cropped region
+			croppedCtx.putImageData(
+				ctx.getImageData(minX, minY, cropWidth, cropHeight),
+				0,
+				0
+			);
 
 			// Convert to data URL
-			resolve(canvas.toDataURL("image/png"));
+			resolve(croppedCanvas.toDataURL("image/png"));
 		});
 	};
 

@@ -2,13 +2,18 @@
 
 import { useEffect } from "react";
 import { useAuthStore } from "@/stores/authStore";
+import { cleanupOldAuthData } from "@/lib/cleanupOldAuth";
 
 export function AuthInitializer() {
-	const initializeAuth = useAuthStore((state) => state.initializeAuth);
+	const initialize = useAuthStore((state) => state.initialize);
 
 	useEffect(() => {
-		initializeAuth();
-	}, [initializeAuth]);
+		// Clean up any old localStorage auth data first
+		cleanupOldAuthData();
+
+		// Then initialize auth from cookies
+		initialize();
+	}, [initialize]);
 
 	return null;
 }

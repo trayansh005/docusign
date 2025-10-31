@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useAuthStore } from "@/stores/authStore";
@@ -18,6 +18,8 @@ export default function Login() {
 	const login = useAuthStore((state) => state.login);
 	const isLoading = useAuthStore((state) => state.isLoading);
 	const router = useRouter();
+	const searchParams = useSearchParams();
+	const redirectTo = searchParams.get("redirect") || "/dashboard";
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -33,9 +35,10 @@ export default function Login() {
 
 		if (result.success) {
 			toast.success("Login Successful", {
-				description: "Welcome back! Redirecting to your dashboard.",
+				description: "Welcome back!",
 			});
-			setTimeout(() => router.push("/dashboard"), 1500);
+			// Redirect to the intended page or dashboard
+			router.push(redirectTo);
 		} else {
 			toast.error("Login Failed", {
 				description: result.message,

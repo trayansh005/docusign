@@ -11,12 +11,12 @@ import { TabType, Recipient } from "./types";
 import apiClient from "@/lib/apiClient";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-interface DashboardClientProps {}
+interface DashboardClientProps { }
 
-export default function DashboardClient({}: DashboardClientProps) {
+export default function DashboardClient({ }: DashboardClientProps) {
 	const router = useRouter();
+	const user = useAuthStore((state) => state.user);
 	const isLoading = useAuthStore((state) => state.isLoading);
-	const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 	const [activeTab, setActiveTab] = useState<TabType>("upload");
 	const [selectedTemplate, setSelectedTemplate] = useState<DocuSignTemplateData | null>(null);
 	const [recipients, setRecipients] = useState<Recipient[]>([]);
@@ -31,10 +31,10 @@ export default function DashboardClient({}: DashboardClientProps) {
 
 	// Auth guard - redirect to login if not authenticated
 	useEffect(() => {
-		if (!isLoading && !isAuthenticated) {
+		if (!isLoading && !user) {
 			router.replace("/login");
 		}
-	}, [isAuthenticated, isLoading, router]);
+	}, [user, isLoading, router]);
 
 	useEffect(() => {
 		let mounted = true;
@@ -91,18 +91,42 @@ export default function DashboardClient({}: DashboardClientProps) {
 		<div className="space-y-6">
 			{/* Free plan usage banner */}
 			{usage && usage.hasActiveSubscription === false && (
-				<div className="rounded-lg border border-yellow-400/40 bg-yellow-50/80 p-4 text-yellow-900">
+				<div className={`rounded-lg border p-4 ${(usage.uploads && usage.uploads.used >= usage.uploads.limit) ||
+						(usage.signs && usage.signs.used >= usage.signs.limit)
+						? "border-red-400/40 bg-red-50/80 text-red-900"
+						: "border-yellow-400/40 bg-yellow-50/80 text-yellow-900"
+					}`}>
 					<div className="flex items-start justify-between gap-3">
-						<div>
+						<div className="flex-1">
 							<p className="font-medium">You are on the Free plan</p>
-							<p className="mt-1 text-sm">
-								Uploads: {usage.uploads?.used ?? 0} of {usage.uploads?.limit ?? 1} used • Signing:{" "}
-								{usage.signs?.used ?? 0} of {usage.signs?.limit ?? 1} used
-							</p>
+							<div className="mt-2 text-sm space-y-1">
+								<div className="flex items-center gap-2">
+									<span className={usage.uploads && usage.uploads.used >= usage.uploads.limit ? "font-semibold" : ""}>
+										📄 Uploads: {usage.uploads?.used ?? 0} of {usage.uploads?.limit ?? 1} used
+									</span>
+									{usage.uploads && usage.uploads.used >= usage.uploads.limit && (
+										<span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded-full">Limit reached</span>
+									)}
+								</div>
+								<div className="flex items-center gap-2">
+									<span className={usage.signs && usage.signs.used >= usage.signs.limit ? "font-semibold" : ""}>
+										✍️ Signing: {usage.signs?.used ?? 0} of {usage.signs?.limit ?? 2} used this month
+									</span>
+									{usage.signs && usage.signs.used >= usage.signs.limit && (
+										<span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded-full">Limit reached</span>
+									)}
+								</div>
+							</div>
+							{((usage.uploads && usage.uploads.used >= usage.uploads.limit) ||
+								(usage.signs && usage.signs.used >= usage.signs.limit)) && (
+									<p className="text-sm mt-2 font-medium">
+										⚠️ Upgrade to continue using all features.
+									</p>
+								)}
 						</div>
 						<a
 							href="/subscription"
-							className="shrink-0 rounded-md bg-yellow-600 px-3 py-2 text-sm font-medium text-white hover:bg-yellow-700"
+							className="shrink-0 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
 						>
 							Upgrade
 						</a>

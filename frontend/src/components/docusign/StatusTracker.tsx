@@ -104,9 +104,8 @@ export const StatusTracker: React.FC<StatusTrackerProps> = ({
 			const data = await getSignedDocument(templateId);
 			if (data.finalPdfUrl) {
 				const link = document.createElement("a");
-				link.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${
-					data.finalPdfUrl
-				}`;
+				link.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${data.finalPdfUrl
+					}`;
 				link.target = "_blank";
 				link.download = `signed-document-${data.template.name}.pdf`;
 				document.body.appendChild(link);
@@ -146,16 +145,14 @@ export const StatusTracker: React.FC<StatusTrackerProps> = ({
 						<button
 							key={status}
 							onClick={() => setStatusFilter(status)}
-							className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
-								isActive ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-200 hover:bg-gray-600"
-							}`}
+							className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${isActive ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-200 hover:bg-gray-600"
+								}`}
 						>
 							<Icon className="h-3 w-3" />
 							<span>{config.label}</span>
 							<span
-								className={`px-1 py-0.5 rounded text-xs ${
-									isActive ? "bg-blue-500" : "bg-gray-600"
-								}`}
+								className={`px-1 py-0.5 rounded text-xs ${isActive ? "bg-blue-500" : "bg-gray-600"
+									}`}
 							>
 								{count}
 							</span>

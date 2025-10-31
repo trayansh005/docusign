@@ -7,9 +7,9 @@ import {
 	createSignatureFromDataUrl,
 	listSignatures,
 	deleteSignature,
- 	setDefaultSignature,
+	setDefaultSignature,
 } from "../controllers/signatureController.js";
-import { authenticateToken } from "../middleware/auth.js";
+import { authenticateSession } from "../middleware/sessionAuth.js";
 import { requireActiveSubscription } from "../middleware/requireSubscription.js";
 
 const router = express.Router();
@@ -28,14 +28,14 @@ const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 // Require an active subscription for signature creation endpoints
 router.post(
 	"/upload",
-	authenticateToken,
+	authenticateSession,
 	requireActiveSubscription,
 	upload.single("file"),
 	uploadSignatureFile
 );
-router.post("/from-dataurl", authenticateToken, requireActiveSubscription, createSignatureFromDataUrl);
-router.get("/", authenticateToken, listSignatures);
-router.delete("/:id", authenticateToken, deleteSignature);
-router.post("/:id/default", authenticateToken, setDefaultSignature);
+router.post("/from-dataurl", authenticateSession, requireActiveSubscription, createSignatureFromDataUrl);
+router.get("/", authenticateSession, listSignatures);
+router.delete("/:id", authenticateSession, deleteSignature);
+router.post("/:id/default", authenticateSession, setDefaultSignature);
 
 export default router;

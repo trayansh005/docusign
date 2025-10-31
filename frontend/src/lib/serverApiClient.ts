@@ -34,24 +34,36 @@ export async function serverApiClient(endpoint: string, options: ServerApiOption
 	try {
 		// Get cookies for server-side request
 		const cookieStore = await cookies();
-		const cookieHeader = cookieStore.toString();
+
+		// Get session cookie only
+		const sessionId = cookieStore.get("sessionId")?.value;
+
+		// Debug logging
+		console.log(`[ServerAPI] ${method} ${endpoint}`);
+		console.log(`[ServerAPI] Has sessionId:`, !!sessionId);
+
+		// Build cookie header with session cookie
+		const cookieHeader = sessionId ? `sessionId=${sessionId}` : "";
+
+		console.log(`[ServerAPI] Cookie header:`, cookieHeader ? "present" : "MISSING");
 
 		const fetchOptions: RequestInit = {
 			method,
 			headers: {
 				"Content-Type": "application/json",
 				...headers,
-				// Include cookies in server-side request
+				// Forward session cookie to backend
 				...(cookieHeader && { Cookie: cookieHeader }),
 			},
+			credentials: 'include',
 			...(cache && { cache }),
 			...(revalidate !== undefined || tags
 				? {
-						next: {
-							...(revalidate !== undefined && { revalidate }),
-							...(tags && { tags }),
-						},
-				  }
+					next: {
+						...(revalidate !== undefined && { revalidate }),
+						...(tags && { tags }),
+					},
+				}
 				: {}),
 		};
 
@@ -76,11 +88,18 @@ export async function serverApiClient(endpoint: string, options: ServerApiOption
 				.catch(() => ({ message: "An unknown error occurred" }));
 			console.error(`API Error: ${response.status} ${response.statusText}`, errorData);
 
+			// If 401 Unauthorized, it means auth failed - signal to redirect to login
+			if (response.status === 401) {
+				// Embed special AUTH_REQUIRED marker in error message
+				// Client will catch this and redirect to login
+				const errorMessage = `AUTH_REQUIRED:${errorData.message || "Authentication required"}`;
+				throw new ApiError(errorMessage, "AUTH_REQUIRED", errorData);
+			}
+
 			// Embed code in error message to survive server action serialization
 			const errorMessage = errorData.code
-				? `[${errorData.code}] ${
-						errorData.message || `HTTP ${response.status}: ${response.statusText}`
-				  }`
+				? `[${errorData.code}] ${errorData.message || `HTTP ${response.status}: ${response.statusText}`
+				}`
 				: errorData.message || `HTTP ${response.status}: ${response.statusText}`;
 
 			console.log(

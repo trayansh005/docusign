@@ -44,7 +44,7 @@ interface SignaturePadProps {
 	onSignatureComplete: (
 		fieldId: string,
 		signatureData: string,
-		meta?: { fontId?: string; text?: string }
+		meta?: { fontId?: string; isPlainText?: boolean }
 	) => void;
 	onClose: () => void;
 	className?: string;
@@ -154,49 +154,40 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 					console.warn("[SignaturePad] No drawing to save!");
 				}
 			} else if (signatureMode === "type") {
-				// For type mode, render text to canvas with selected font, then save as image
+				// For type mode, render the typed text into an offscreen canvas using the
+				// selected signature font and send a PNG data URL so the backend and
+				// PDF pipeline receive an image (same behaviour as sender flow).
 				if (textValue.trim()) {
 					const text = textValue.trim();
-					// Use larger canvas for better quality
-					const width = 1600;
-					const height = 480;
+					const width = 800;
+					const height = 240;
+					const pad = 24;
 					const off = document.createElement("canvas");
 					off.width = width;
 					off.height = height;
 					const ctx = off.getContext("2d");
 					if (!ctx) return;
-
-					// Clear to transparent background
+					// Transparent background
 					ctx.clearRect(0, 0, width, height);
-
-					// Get the selected font family
+					// Resolve selected font family from local constant list
 					const selectedFont = SIGNATURE_FONTS.find((f) => f.id === selectedFontId);
-					const fontFamily = selectedFont ? selectedFont.fontFamily : SIGNATURE_FONTS[0].fontFamily;
-
-					// Calculate optimal font size
-					let fontSize = height * 0.7;
-					ctx.font = `${fontSize}px ${fontFamily}`;
-
-					// Measure and adjust if text is too wide
-					let textMetrics = ctx.measureText(text);
-					const padding = width * 0.1;
-					const maxTextWidth = width - padding * 2;
-
-					if (textMetrics.width > maxTextWidth) {
-						fontSize = fontSize * (maxTextWidth / textMetrics.width);
+					const fontFamily = selectedFont ? selectedFont.fontFamily.replace(/"|'/g, "") : "Arial";
+					// Start large and reduce until it fits
+					let fontSize = 120;
+					const minSize = 18;
+					while (fontSize > minSize) {
 						ctx.font = `${fontSize}px ${fontFamily}`;
-						textMetrics = ctx.measureText(text);
+						const metrics = ctx.measureText(text);
+						if (metrics.width <= width - pad * 2) break;
+						fontSize -= 2;
 					}
-
-					// Draw text centered
-					ctx.fillStyle = "#000000";
+					ctx.font = `${fontSize}px ${fontFamily}`;
+					ctx.fillStyle = "#000";
 					ctx.textBaseline = "middle";
 					ctx.textAlign = "center";
 					ctx.fillText(text, width / 2, height / 2);
-
 					const dataUrl = off.toDataURL("image/png");
-					// Send image along with text and fontId for UI display
-					onSignatureComplete(field.id, dataUrl, { fontId: selectedFontId, text: text });
+					onSignatureComplete(field.id, dataUrl, { fontId: selectedFontId });
 				} else {
 					console.warn("[SignaturePad] No text to save!");
 				}
@@ -413,10 +404,11 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 			<div className="flex gap-2 mb-4 border-b border-gray-200">
 				<button
 					onClick={() => setSignatureMode("draw")}
-					className={`flex items-center gap-2 px-4 py-2 font-medium transition-colors border-b-2 ${signatureMode === "draw"
-						? "border-blue-600 text-blue-600"
-						: "border-transparent text-gray-500 hover:text-gray-700"
-						}`}
+					className={`flex items-center gap-2 px-4 py-2 font-medium transition-colors border-b-2 ${
+						signatureMode === "draw"
+							? "border-blue-600 text-blue-600"
+							: "border-transparent text-gray-500 hover:text-gray-700"
+					}`}
 					style={{ color: signatureMode === "draw" ? "#2563eb" : "#6b7280" }}
 				>
 					<PenTool className="h-4 w-4" />
@@ -424,10 +416,11 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 				</button>
 				<button
 					onClick={() => setSignatureMode("custom")}
-					className={`flex items-center gap-2 px-4 py-2 font-medium transition-colors border-b-2 ${signatureMode === "custom"
-						? "border-blue-600 text-blue-600"
-						: "border-transparent text-gray-500 hover:text-gray-700"
-						}`}
+					className={`flex items-center gap-2 px-4 py-2 font-medium transition-colors border-b-2 ${
+						signatureMode === "custom"
+							? "border-blue-600 text-blue-600"
+							: "border-transparent text-gray-500 hover:text-gray-700"
+					}`}
 					style={{ color: signatureMode === "custom" ? "#2563eb" : "#6b7280" }}
 				>
 					<svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -442,10 +435,11 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 				</button>
 				<button
 					onClick={() => setSignatureMode("type")}
-					className={`flex items-center gap-2 px-4 py-2 font-medium transition-colors border-b-2 ${signatureMode === "type"
-						? "border-blue-600 text-blue-600"
-						: "border-transparent text-gray-500 hover:text-gray-700"
-						}`}
+					className={`flex items-center gap-2 px-4 py-2 font-medium transition-colors border-b-2 ${
+						signatureMode === "type"
+							? "border-blue-600 text-blue-600"
+							: "border-transparent text-gray-500 hover:text-gray-700"
+					}`}
 					style={{ color: signatureMode === "type" ? "#2563eb" : "#6b7280" }}
 				>
 					<svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -516,10 +510,11 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 								<button
 									key={font.id}
 									onClick={() => setSelectedFontId(font.id)}
-									className={`p-3 border-2 rounded-lg transition-all text-left ${selectedFontId === font.id
-										? "border-blue-600 bg-blue-50 shadow-md"
-										: "border-gray-200 hover:border-gray-300 hover:shadow"
-										}`}
+									className={`p-3 border-2 rounded-lg transition-all text-left ${
+										selectedFontId === font.id
+											? "border-blue-600 bg-blue-50 shadow-md"
+											: "border-gray-200 hover:border-gray-300 hover:shadow"
+									}`}
 								>
 									<p
 										className="text-2xl truncate"
@@ -618,8 +613,8 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 						signatureMode === "draw"
 							? !hasDrawing
 							: signatureMode === "type" || signatureMode === "custom"
-								? !textValue.trim()
-								: false
+							? !textValue.trim()
+							: false
 					}
 					className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 					style={{ color: "#ffffff" }}

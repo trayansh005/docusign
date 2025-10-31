@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useAuthStore } from "@/stores/authStore";
+import { handleAuthError } from "@/lib/handleAuthError";
 
 interface ProfileData {
 	firstName: string;
@@ -22,7 +23,6 @@ export default function Profile() {
 	const updateProfile = useAuthStore((state) => state.updateProfile);
 	const changePassword = useAuthStore((state) => state.changePassword);
 	const isLoading = useAuthStore((state) => state.isLoading);
-	const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 	const router = useRouter();
 
 	const [formData, setFormData] = useState<ProfileData>({
@@ -41,10 +41,10 @@ export default function Profile() {
 
 	// Auth guard - redirect to login if not authenticated
 	useEffect(() => {
-		if (!isLoading && !isAuthenticated) {
+		if (!isLoading && !user) {
 			router.replace("/login");
 		}
-	}, [isAuthenticated, isLoading, router]);
+	}, [user, isLoading, router]);
 
 	useEffect(() => {
 		if (user) {
@@ -132,6 +132,10 @@ export default function Profile() {
 				});
 			}
 		} catch (error) {
+			// Handle 401 errors (session expired)
+			if (handleAuthError(error)) {
+				return; // Error handler will redirect to login
+			}
 			console.error("Profile update error:", error);
 			toast.error("Failed to update profile", {
 				description: "An unexpected error occurred. Please try again.",
@@ -167,6 +171,10 @@ export default function Profile() {
 				});
 			}
 		} catch (error) {
+			// Handle 401 errors (session expired)
+			if (handleAuthError(error)) {
+				return; // Error handler will redirect to login
+			}
 			console.error("Password update error:", error);
 			toast.error("Failed to update password", {
 				description: "An unexpected error occurred. Please try again.",
@@ -207,11 +215,10 @@ export default function Profile() {
 							<div className="flex flex-col space-y-2">
 								<button
 									onClick={() => setActiveTab("profile")}
-									className={`text-left px-4 py-2 rounded-lg transition-colors ${
-										activeTab === "profile"
-											? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
-											: "text-gray-400 hover:text-white hover:bg-gray-800/50"
-									}`}
+									className={`text-left px-4 py-2 rounded-lg transition-colors ${activeTab === "profile"
+										? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+										: "text-gray-400 hover:text-white hover:bg-gray-800/50"
+										}`}
 								>
 									<div className="flex items-center">
 										<svg
@@ -232,11 +239,10 @@ export default function Profile() {
 								</button>
 								<button
 									onClick={() => setActiveTab("password")}
-									className={`text-left px-4 py-2 rounded-lg transition-colors ${
-										activeTab === "password"
-											? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
-											: "text-gray-400 hover:text-white hover:bg-gray-800/50"
-									}`}
+									className={`text-left px-4 py-2 rounded-lg transition-colors ${activeTab === "password"
+										? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+										: "text-gray-400 hover:text-white hover:bg-gray-800/50"
+										}`}
 								>
 									<div className="flex items-center">
 										<svg

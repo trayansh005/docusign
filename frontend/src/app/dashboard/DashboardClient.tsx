@@ -65,7 +65,6 @@ interface InboxItem {
 export default function DashboardClient() {
 	const user = useAuthStore((state) => state.user);
 	const isLoading = useAuthStore((state) => state.isLoading);
-	const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 	const router = useRouter();
 	const [stats, setStats] = useState<UserStats | null>({
 		totalDocuments: 0,
@@ -96,11 +95,11 @@ export default function DashboardClient() {
 	// Only redirect after auth has finished loading to avoid redirect loops
 	useEffect(() => {
 		// Wait for auth to finish loading before checking
-		if (!isLoading && !isAuthenticated) {
+		if (!isLoading && !user) {
 			console.log("🔒 Dashboard: Not authenticated, redirecting to login");
 			router.replace("/login");
 		}
-	}, [isAuthenticated, isLoading, router]);
+	}, [user, isLoading, router]);
 
 	// Phase 1 Optimization: Reuse server-prefetched activities (remove duplicate fetch)
 	const { data: activitiesData } = useQuery({
@@ -205,6 +204,12 @@ export default function DashboardClient() {
 			console.log("Documents with recipients:", docsWithRecipients.length);
 			setDocumentsWithRecipients(docsWithRecipients);
 		} catch (error) {
+			// Check if it's an auth error
+			if (error instanceof Error && error.message.startsWith("AUTH_REQUIRED:")) {
+				console.log("[Dashboard] Auth required, redirecting to login");
+				router.push(`/login?redirect=/dashboard`);
+				return;
+			}
 			console.error("Failed to load documents with recipients:", error);
 		} finally {
 			setLoadingDocuments(false);
@@ -285,7 +290,7 @@ export default function DashboardClient() {
 
 	// If not loading and not authenticated, the useEffect will handle redirect
 	// Show loading briefly to avoid flash of content
-	if (!isAuthenticated) {
+	if (!user) {
 		return (
 			<div className="min-h-screen flex items-center justify-center">
 				<div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
@@ -309,25 +314,44 @@ export default function DashboardClient() {
 
 				{/* Free plan usage banner (shows when there is no active subscription) */}
 				{usage && usage.hasActiveSubscription === false && (
-					<div className="mb-8 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-yellow-200">
+					<div className={`mb-8 rounded-lg border px-4 py-3 ${(usage.uploads && usage.uploads.used >= usage.uploads.limit) ||
+							(usage.signs && usage.signs.used >= usage.signs.limit)
+							? "border-red-500/30 bg-red-500/10 text-red-200"
+							: "border-yellow-500/30 bg-yellow-500/10 text-yellow-200"
+						}`}>
 						<div className="flex items-start justify-between gap-4">
-							<div>
+							<div className="flex-1">
 								<p className="font-medium">You are on the Free plan</p>
-								<p className="text-sm mt-1">
-									Uploads: {usage.uploads?.used ?? 0} of {usage.uploads?.limit ?? 1} used • Document Signing:{" "}
-									{usage.signs?.used ?? 0} of {usage.signs?.limit ?? 2} used this month
-								</p>
-								{usage.signs && usage.signs.used >= usage.signs.limit && (
-									<p className="text-sm mt-2 text-red-300 font-medium">
-										⚠️ You&apos;ve reached your monthly signing limit. Upgrade to continue signing documents.
-									</p>
-								)}
+								<div className="text-sm mt-2 space-y-1">
+									<div className="flex items-center gap-2">
+										<span className={usage.uploads && usage.uploads.used >= usage.uploads.limit ? "text-red-300 font-semibold" : ""}>
+											📄 Uploads: {usage.uploads?.used ?? 0} of {usage.uploads?.limit ?? 1} used
+										</span>
+										{usage.uploads && usage.uploads.used >= usage.uploads.limit && (
+											<span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded-full">Limit reached</span>
+										)}
+									</div>
+									<div className="flex items-center gap-2">
+										<span className={usage.signs && usage.signs.used >= usage.signs.limit ? "text-red-300 font-semibold" : ""}>
+											✍️ Document Signing: {usage.signs?.used ?? 0} of {usage.signs?.limit ?? 2} used this month
+										</span>
+										{usage.signs && usage.signs.used >= usage.signs.limit && (
+											<span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded-full">Limit reached</span>
+										)}
+									</div>
+								</div>
+								{((usage.uploads && usage.uploads.used >= usage.uploads.limit) ||
+									(usage.signs && usage.signs.used >= usage.signs.limit)) && (
+										<p className="text-sm mt-3 font-medium">
+											⚠️ You&apos;ve reached your free plan limit. Upgrade to continue using all features.
+										</p>
+									)}
 							</div>
 							<Link
 								href="/subscription"
-								className="shrink-0 text-xs font-medium underline hover:opacity-90"
+								className="shrink-0 px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
 							>
-								Upgrade Plan
+								Upgrade
 							</Link>
 						</div>
 					</div>

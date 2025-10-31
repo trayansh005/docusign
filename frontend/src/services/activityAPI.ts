@@ -21,11 +21,11 @@ export async function getRecentActivities(): Promise<{
 	try {
 		const result = await serverApi.get("/activity/recent", {
 			tags: ["activities"],
-			revalidate: 300,
+			revalidate: 0, // Don't cache on server
 		});
 		return { success: true, activities: result.data };
 	} catch (error: unknown) {
-		console.error("Error fetching activities:", error);
+		// Don't log every error, just return failure
 		return {
 			success: false,
 			message: error instanceof Error ? error.message : "Failed to fetch activities.",

@@ -137,7 +137,7 @@ export default function SignDocumentClient() {
         const finalValue = pending?.imageData || field.value || "";
         const isImage = finalValue.startsWith("data:image");
 
-        console.log(`Field ${field.id}: value type = ${isImage ? 'IMAGE' : 'TEXT'}, has pending imageData = ${!!pending?.imageData}`);
+        console.log(`Field ${field.id}: value type = ${isImage ? 'IMAGE' : 'TEXT'}, has pending imageData = ${!!pending?.imageData}, has text = ${!!pending?.text}`);
 
         return {
           pageNumber: field.pageNumber || 1,
@@ -150,6 +150,7 @@ export default function SignDocumentClient() {
           type: field.type || "signature",
           fieldId: field.id,
           fontId: pending?.fontId || field.fontId, // Include fontId for typed signatures
+          text: pending?.text, // Include plain text for typed signatures so backend can render with font
         };
       });
 

@@ -4,7 +4,6 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { PDFDocument as PDFLibDocument, StandardFonts } from "pdf-lib";
-import fontkit from "@pdf-lib/fontkit";
 import sharp from "sharp";
 import { fileURLToPath } from "url";
 import { resolveTemplatePdfPath, getSignedPdfPath } from "../../utils/pdfPathResolver.js";
@@ -44,9 +43,6 @@ async function applySignaturesToPdf(template, signatures) {
 		const pdfBytes = fs.readFileSync(pdfPath);
 		const pdfDoc = await PDFLibDocument.load(pdfBytes);
 
-		// Register fontkit to enable custom font embedding
-		pdfDoc.registerFontkit(fontkit);
-
 		console.log(
 			`[ApplySignatures] Received ${signatures.length} signature entries for template ${template._id}`
 		);
@@ -61,8 +57,7 @@ async function applySignaturesToPdf(template, signatures) {
 				}
 
 				const { width: pageWidth, height: pageHeight } = page.getSize();
-				console.log(`[ApplySignatures] Page ${sig.pageNumber} size: ${pageWidth} x ${pageHeight}`);
-				console.log(`[ApplySignatures] Signature input: xPct=${sig.xPct}, yPct=${sig.yPct}, wPct=${sig.wPct}, hPct=${sig.hPct}`);
+				// Page size available: pageWidth x pageHeight
 
 				// Determine target rectangle in PDF coordinates
 				// Support three cases:
@@ -204,27 +199,10 @@ async function applySignaturesToPdf(template, signatures) {
 				}
 
 				console.log(
-					`Processing field ${sig.fieldId || sig.fieldId} type=${sig.type
+					`Processing field ${sig.fieldId || sig.fieldId} type=${
+						sig.type
 					} - buffer=${!!buffer} plainText=${!!plainText}`
 				);
-
-				// DEBUG: Log buffer details
-				if (buffer) {
-					console.log(`[ApplySignatures] Buffer details for ${sig.fieldId}: length=${buffer.length}, isBuffer=${Buffer.isBuffer(buffer)}`);
-					console.log(`[ApplySignatures] Target coordinates: left=${targetLeft}, top=${targetTop}, width=${targetWidth}, height=${targetHeight}`);
-					console.log(`[ApplySignatures] Coordinate validity: left=${!isNaN(targetLeft)}, top=${!isNaN(targetTop)}, width=${!isNaN(targetWidth)}, height=${!isNaN(targetHeight)}`);
-
-					// Check if coordinates are valid numbers
-					if (isNaN(targetLeft) || isNaN(targetTop) || isNaN(targetWidth) || isNaN(targetHeight)) {
-						console.error(`[ApplySignatures] Invalid coordinates for field ${sig.fieldId}, skipping`);
-						continue;
-					}
-
-					if (targetWidth <= 0 || targetHeight <= 0) {
-						console.error(`[ApplySignatures] Invalid dimensions for field ${sig.fieldId}: width=${targetWidth}, height=${targetHeight}, skipping`);
-						continue;
-					}
-				}
 
 				if (!buffer) {
 					// If we have plain-text for a signature-like field, draw it
@@ -261,7 +239,6 @@ async function applySignaturesToPdf(template, signatures) {
 							const maxByHeight = Math.max(8, Math.min(Math.round(targetHeight * 0.9), 200));
 
 							let embeddedFont = null;
-							let usedFontName = fontId;
 							try {
 								const fontsDir = path.join(__dirname, "..", "..", "fonts");
 								let fontPath = path.join(fontsDir, `${fontId}.ttf`);
@@ -285,17 +262,6 @@ async function applySignaturesToPdf(template, signatures) {
 									`[ApplySignatures] Failed to embed font ${fontId}:`,
 									fontErr?.message || fontErr
 								);
-								// Clear the font so we use fallback
-								embeddedFont = null;
-
-								// Try using a cursive standard font as fallback
-								try {
-									embeddedFont = await pdfDoc.embedFont(StandardFonts.TimesRomanItalic);
-									usedFontName = 'TimesRomanItalic (fallback)';
-									console.log(`[ApplySignatures] Using TimesRomanItalic as fallback for ${fontId}`);
-								} catch (fallbackErr) {
-									console.warn(`[ApplySignatures] Fallback font also failed:`, fallbackErr?.message);
-								}
 							}
 
 							// Start with a size limited by height, then shrink until the text width fits within targetWidth - padding
@@ -320,25 +286,13 @@ async function applySignaturesToPdf(template, signatures) {
 
 								if (measureFont) {
 									// Reduce fontSize until measured width fits the target width with padding
-									// Wrap in try-catch in case widthOfTextAtSize fails (buffer errors with some fonts)
-									try {
-										while (fontSize > 6) {
-											const textWidth = measureFont.widthOfTextAtSize(plainText, fontSize);
-											if (textWidth <= Math.max(1, targetWidth - paddingX * 2)) break;
-											fontSize -= 1;
-										}
-										// Ensure not larger than height-based constraint (use a slightly smaller multiplier to match sender)
-										fontSize = Math.min(fontSize, Math.max(8, Math.round(targetHeight * 0.6)));
-									} catch (widthErr) {
-										console.warn(
-											`[ApplySignatures] Error measuring text width with ${usedFontName}:`,
-											widthErr?.message || widthErr
-										);
-										// Fall back to heuristic sizing
-										fontSize = Math.max(Math.min(Math.round(targetHeight * 0.6), 72), 8);
-										// Clear the embedded font so we use standard font for drawing
-										embeddedFont = null;
+									while (fontSize > 6) {
+										const textWidth = measureFont.widthOfTextAtSize(plainText, fontSize);
+										if (textWidth <= Math.max(1, targetWidth - paddingX * 2)) break;
+										fontSize -= 1;
 									}
+									// Ensure not larger than height-based constraint (use a slightly smaller multiplier to match sender)
+									fontSize = Math.min(fontSize, Math.max(8, Math.round(targetHeight * 0.6)));
 								} else {
 									// Fallback heuristic when no measure font is available
 									fontSize = Math.max(Math.min(Math.round(targetHeight * 0.6), 72), 8);
@@ -349,35 +303,19 @@ async function applySignaturesToPdf(template, signatures) {
 									sizeErr?.message || sizeErr
 								);
 								fontSize = Math.max(Math.min(Math.round(targetHeight * 0.6), 72), 8);
-								embeddedFont = null;
 							}
 
 							// Compute horizontal centering based on measured text width when possible
 							let measuredWidth = null;
 							try {
-								if (embeddedFont) {
-									try {
-										measuredWidth = embeddedFont.widthOfTextAtSize(plainText, fontSize);
-									} catch (widthErr) {
-										console.warn(
-											`[ApplySignatures] Error measuring width for centering with ${usedFontName}:`,
-											widthErr?.message || widthErr
-										);
-										// Clear embedded font and use fallback
-										embeddedFont = null;
-									}
-								}
-
-								if (!measuredWidth && typeof pdfDoc.embedFont === "function") {
+								if (embeddedFont)
+									measuredWidth = embeddedFont.widthOfTextAtSize(plainText, fontSize);
+								else if (typeof pdfDoc.embedFont === "function") {
 									// We may have already embedded the fallback Helvetica as measureFont above; attempt to re-embed for drawing
 									const fallback = await pdfDoc.embedFont(StandardFonts.Helvetica);
 									measuredWidth = fallback.widthOfTextAtSize(plainText, fontSize);
 								}
 							} catch (mErr) {
-								console.warn(
-									`[ApplySignatures] Error in width measurement:`,
-									mErr?.message || mErr
-								);
 								measuredWidth = null;
 							}
 
@@ -407,7 +345,8 @@ async function applySignaturesToPdf(template, signatures) {
 							page.drawText(plainText, drawOptions);
 
 							console.log(
-								`[ApplySignatures] Drew plain-text signature for field ${sig.fieldId
+								`[ApplySignatures] Drew plain-text signature for field ${
+									sig.fieldId
 								} (fontId=${fontId}) size=${fontSize} x=${textX.toFixed(1)} y=${textY.toFixed(1)}`
 							);
 						} catch (textErr) {
@@ -424,54 +363,38 @@ async function applySignaturesToPdf(template, signatures) {
 					continue;
 				}
 
-				// If we reach here, we have a buffer with image data for a signature/initial field
-				console.log(`[ApplySignatures] Processing image signature for field ${sig.fieldId}, buffer length: ${buffer.length}`);
-
 				// Embed image (try PNG first, fallback to JPG, then convert via sharp)
-				console.log(`[ApplySignatures] Attempting to embed image for field ${sig.fieldId}`);
 				let embeddedImage = null;
 				try {
 					embeddedImage = await pdfDoc.embedPng(buffer);
-					console.log(`[ApplySignatures] Successfully embedded PNG for field ${sig.fieldId}`);
 				} catch (pngErr) {
-					console.log(`[ApplySignatures] PNG embed failed for ${sig.fieldId}, trying JPG: ${pngErr.message}`);
 					try {
 						embeddedImage = await pdfDoc.embedJpg(buffer);
-						console.log(`[ApplySignatures] Successfully embedded JPG for field ${sig.fieldId}`);
 					} catch (jpgErr) {
-						console.log(`[ApplySignatures] JPG embed failed for ${sig.fieldId}, converting with sharp: ${jpgErr.message}`);
 						try {
 							const coerced = await sharp(buffer).png().toBuffer();
 							embeddedImage = await pdfDoc.embedPng(coerced);
-							console.log(`[ApplySignatures] Successfully embedded converted PNG for field ${sig.fieldId}`);
 						} catch (convErr) {
-							console.error(`[ApplySignatures] All image embed attempts failed for ${sig.fieldId}:`, convErr.message);
+							console.warn(`[ApplySignatures] Failed to embed image:`, convErr.message);
 							continue;
 						}
 					}
 				}
 
-				// Calculate image scaling to fit field
-				// For recipient signatures, fill the entire field box to maximize visibility
+				// Calculate final draw dimensions (preserve aspect ratio) within target box
 				const imgDims = embeddedImage.scale(1);
+				const scaleX = targetWidth / imgDims.width;
+				const scaleY = targetHeight / imgDims.height;
+				const scale = Math.min(scaleX, scaleY);
 
-				// Use 95% of the field box to leave small padding
-				const drawWidth = targetWidth * 0.95;
-				const drawHeight = targetHeight * 0.95;
+				const drawWidth = Math.max(1, imgDims.width * scale);
+				const drawHeight = Math.max(1, imgDims.height * scale);
 
-				// Center the image within the field if it's smaller than the field
-				// due to aspect ratio preservation
-				const xOffset = (targetWidth - drawWidth) / 2;
-				const yOffset = (targetHeight - drawHeight) / 2;
+				// Convert from top-based coordinates to PDF bottom-left origin
+				const x = targetLeft;
+				const y = pageHeight - targetTop - drawHeight;
 
-				// PDF coordinate origin is bottom-left
-				const x = targetLeft + xOffset;
-				const y = pageHeight - targetTop - drawHeight - yOffset;
-
-				console.log(`[ApplySignatures] Image dimensions: original=${imgDims.width}x${imgDims.height}, scaled=${drawWidth.toFixed(2)}x${drawHeight.toFixed(2)}`);
-				console.log(`[ApplySignatures] Target box (top-based): left=${targetLeft.toFixed(2)}, top=${targetTop.toFixed(2)}, width=${targetWidth.toFixed(2)}, height=${targetHeight.toFixed(2)}`);
-				console.log(`[ApplySignatures] Offsets: xOffset=${xOffset.toFixed(2)}, yOffset=${yOffset.toFixed(2)}`);
-				console.log(`[ApplySignatures] Drawing image for ${sig.fieldId} at x=${x.toFixed(2)}, y=${y.toFixed(2)}, width=${drawWidth.toFixed(2)}, height=${drawHeight.toFixed(2)}`);
+				// Drawing image in computed box
 
 				page.drawImage(embeddedImage, {
 					x,
@@ -480,7 +403,6 @@ async function applySignaturesToPdf(template, signatures) {
 					height: drawHeight,
 				});
 
-				console.log(`[ApplySignatures] Successfully drew signature image for field ${sig.fieldId}`);
 				// Signature embedded for this field
 			} catch (fieldError) {
 				console.error(`[ApplySignatures] Error processing signature:`, fieldError);
@@ -495,10 +417,7 @@ async function applySignaturesToPdf(template, signatures) {
 		const outBytes = await pdfDoc.save();
 		fs.writeFileSync(outPath, Buffer.from(outBytes));
 
-		console.log(`[ApplySignatures] PDF saved successfully to: ${outPath}`);
-		console.log(`[ApplySignatures] PDF size: ${outBytes.length} bytes`);
-		console.log(`[ApplySignatures] File exists: ${fs.existsSync(outPath)}`);
-
+		// PDF saved at outPath
 		return outPath;
 	} catch (error) {
 		console.error("[ApplySignatures] Error:", error);
@@ -716,11 +635,7 @@ export const recipientSignDocument = async (req, res) => {
 			const pdfUrl = signedPdfPath
 				.replace(path.join(__dirname, "..", ".."), "")
 				.replace(/\\/g, "/");
-			// Add timestamp to bust browser cache
-			const cacheBuster = `?t=${Date.now()}`;
-			template.finalPdfUrl = (pdfUrl.startsWith("/") ? pdfUrl : `/${pdfUrl}`) + cacheBuster;
-			console.log(`[RecipientSign] Updated template.finalPdfUrl to: ${template.finalPdfUrl}`);
-			console.log(`[RecipientSign] Signed PDF path: ${signedPdfPath}`);
+			template.finalPdfUrl = pdfUrl.startsWith("/") ? pdfUrl : `/${pdfUrl}`;
 		}
 
 		// Update recipient status and signing order (only for actual recipients, not template owners)
@@ -772,8 +687,6 @@ export const recipientSignDocument = async (req, res) => {
 		await template.save();
 
 		// Sign process completed for user
-		console.log(`[RecipientSign] Signing complete. Template status: ${template.status}, finalPdfUrl: ${template.finalPdfUrl}`);
-
 		res.json({
 			success: true,
 			message: "Document signed successfully",
@@ -782,8 +695,8 @@ export const recipientSignDocument = async (req, res) => {
 				recipientStatus: isTemplateOwner
 					? null
 					: template.recipients.find(
-						(r) => r.email === userEmail || r.userId?.toString() === userId?.toString()
-					) || null,
+							(r) => r.email === userEmail || r.userId?.toString() === userId?.toString()
+					  ) || null,
 				allSigned: allRecipientsSigned,
 				signerType: isTemplateOwner ? "owner" : "recipient",
 			},

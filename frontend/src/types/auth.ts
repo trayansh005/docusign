@@ -20,6 +20,10 @@ export interface User {
 	email: string;
 	phoneNumber?: string;
 	company?: string;
+	role: 'user' | 'admin';
+	lastLogin?: string;
+	emailVerified: boolean;
+	isActive: boolean;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -27,13 +31,24 @@ export interface User {
 export interface AuthResponse {
 	success: boolean;
 	message: string;
-	token?: string;
 	user?: User;
+}
+
+export interface Session {
+	id: string;
+	deviceInfo: {
+		deviceName: string;
+		userAgent: string;
+		ip: string;
+	};
+	createdAt: string;
+	lastActivity: string;
+	expiresAt: string;
+	isCurrentSession: boolean;
 }
 
 export interface AuthState {
 	user: User | null;
-	token: string | null;
 	isLoading: boolean;
-	isAuthenticated: boolean;
+	isInitialized: boolean;
 }

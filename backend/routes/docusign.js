@@ -1,5 +1,5 @@
 import express from "express";
-import { authenticateToken } from "../middleware/auth.js";
+import { authenticateSession } from "../middleware/sessionAuth.js";
 import { checkFreeTierSigningLimit } from "../middleware/checkFreeTierLimit.js";
 
 // Import optimized controllers
@@ -44,7 +44,7 @@ import {
 const router = express.Router();
 
 // Apply authentication to all routes
-router.use(authenticateToken);
+router.use(authenticateSession);
 
 // ===== OPTIMIZED ROUTES =====
 

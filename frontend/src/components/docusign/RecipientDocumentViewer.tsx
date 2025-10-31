@@ -32,6 +32,7 @@ const RecipientDocumentViewer = forwardRef<RecipientDocumentViewerRef, Recipient
     const contentRef = useRef<HTMLDivElement>(null);
     const userId = (user as { id?: string })?.id || "";
     const userEmail = user?.email || "";
+    const recipientFullName = user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() : "";
 
     // PDF controls will be defined later in the component
 
@@ -331,30 +332,40 @@ const RecipientDocumentViewer = forwardRef<RecipientDocumentViewerRef, Recipient
     return (
       <div className="flex flex-col h-full">
         {/* Document content */}
-        <div className="flex-1 overflow-auto relative" ref={contentRef}>
-          <div
-            className="relative mx-auto"
-            style={{
-              transform: `scale(${zoom}) rotate(${rotation}deg)`,
-              transformOrigin: "center top",
-              transition: "transform 0.2s ease-in-out",
-            }}
-          >
-            <PDFPageCanvas
-              pdfUrl={ensureAbsoluteUrl(
-                template.finalPdfUrl ||
-                template.pdfUrl ||
-                template.metadata?.originalPdfPath ||
-                ""
-              )}
-              pageNumber={currentPage}
-              zoom={1} // Apply zoom via parent transform for consistent overlay sizing
-              rotation={0} // Apply rotation via parent transform
-              onPageLoad={() => { }}
-            />
+        <div
+          className="flex-1 overflow-auto relative bg-gray-100 flex items-start justify-center"
+          ref={contentRef}
+          style={{
+            minHeight: "600px",
+            padding: "20px",
+          }}
+        >
+          <div className="relative" style={{ maxWidth: "850px", width: "100%" }}>
+            <div
+              className="relative w-full"
+              style={{
+                transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                transformOrigin: "center top",
+                transition: "transform 0.2s ease-in-out",
+              }}
+            >
+              <PDFPageCanvas
+                pdfUrl={ensureAbsoluteUrl(
+                  template.finalPdfUrl ||
+                  template.pdfUrl ||
+                  template.metadata?.originalPdfPath ||
+                  ""
+                )}
+                pageNumber={currentPage}
+                zoom={1} // Apply zoom via parent transform for consistent overlay sizing
+                rotation={0} // Apply rotation via parent transform
+                onPageLoad={() => { }}
+                className="w-full"
+              />
 
-            {/* Fields overlay */}
-            {currentPageFields.map(renderField)}
+              {/* Fields overlay */}
+              {currentPageFields.map(renderField)}
+            </div>
           </div>
         </div>
 
@@ -365,6 +376,7 @@ const RecipientDocumentViewer = forwardRef<RecipientDocumentViewerRef, Recipient
               field={activeSignatureField}
               onClose={() => setActiveSignatureField(null)}
               onSignatureComplete={handleSignatureComplete}
+              recipientName={recipientFullName}
             />
           </div>
         )}

@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import DocuSignTemplate from "../models/DocuSignTemplate.js";
 import Subscription from "../models/Subscription.js";
+import User from "../models/User.js";
 import { getFreeTierLimits } from "../utils/freeTierLimits.js";
 
 // GET /api/dashboard/stats
@@ -80,42 +81,24 @@ export const getUserStats = async (req, res) => {
 			const now = new Date();
 			const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-			// Phase 2 Optimization: Get usage stats with aggregation (replaces 2 more queries)
-			const usageResult = await DocuSignTemplate.aggregate([
-				{
-					$match: {
-						createdBy: userId,
-						isArchived: { $ne: true },
-					},
-				},
-				{
-					$group: {
-						_id: null,
-						uploadsUsed: { $sum: 1 },
-						signUsed: {
-							$sum: {
-								$cond: [
-									{
-										$and: [
-											{ $eq: ["$status", "final"] },
-											{ $gte: ["$updatedAt", monthStart] },
-										],
-									},
-									1,
-									0,
-								],
-							},
-						},
-					},
-				},
-			]);
+			// Count total uploads (lifetime, non-archived) - this matches the upload limit check
+			const uploadsUsed = await DocuSignTemplate.countDocuments({
+				createdBy: userObjectId,
+				isArchived: { $ne: true },
+			});
 
-			const usageData = usageResult[0] || { uploadsUsed: 0, signUsed: 0 };
+			// Count signed documents this month
+			const signUsed = await DocuSignTemplate.countDocuments({
+				createdBy: userObjectId,
+				isArchived: { $ne: true },
+				status: "final",
+				updatedAt: { $gte: monthStart },
+			});
 
 			usage = {
 				hasActiveSubscription: false,
-				uploads: { used: usageData.uploadsUsed, limit: uploadLimit },
-				signs: { used: usageData.signUsed, limit: signedLimit },
+				uploads: { used: uploadsUsed, limit: uploadLimit },
+				signs: { used: signUsed, limit: signedLimit },
 			};
 		} else {
 			usage = { hasActiveSubscription: true };
@@ -157,7 +140,7 @@ export const getPendingDocumentsCount = async (req, res) => {
 		// Convert userId to ObjectId for MongoDB queries
 		const userObjectId = new mongoose.Types.ObjectId(userId);
 
-		// Find templates where the user is a recipient and hasn't signed yet
+		// Find templates where the user is a recipient
 		const assignedFilter = {
 			isArchived: { $ne: true },
 			status: { $ne: "final" }, // Only count documents that aren't fully completed
@@ -176,12 +159,38 @@ export const getPendingDocumentsCount = async (req, res) => {
 			assignedFilter.$or.push({ "recipients.email": email });
 		}
 
-		const pendingCount = await DocuSignTemplate.countDocuments(assignedFilter);
+		// Get all assigned documents
+		const templates = await DocuSignTemplate.find(assignedFilter).select("recipients updatedAt").lean();
+
+		// Filter to only count documents where THIS user hasn't signed yet
+		const pendingTemplates = templates.filter((template) => {
+			const myRecipient = template.recipients?.find(
+				(r) =>
+					r.userId?.toString() === userId.toString() ||
+					r.id === String(userId) ||
+					r.email === email
+			);
+			// Only count if user's signature status is pending or waiting
+			return myRecipient && (myRecipient.signatureStatus === "pending" || myRecipient.signatureStatus === "waiting");
+		});
+
+		const pendingCount = pendingTemplates.length;
+
+		// Get user's last notification read time
+		const user = await User.findById(userId).select("lastNotificationReadAt").lean();
+		const lastReadAt = user?.lastNotificationReadAt;
+
+		// Count unread (documents updated after last read time)
+		let unreadCount = pendingCount;
+		if (lastReadAt) {
+			unreadCount = pendingTemplates.filter((t) => new Date(t.updatedAt) > new Date(lastReadAt)).length;
+		}
 
 		return res.status(200).json({
 			success: true,
 			data: {
 				pendingCount,
+				unreadCount,
 			},
 		});
 	} catch (error) {
@@ -189,6 +198,31 @@ export const getPendingDocumentsCount = async (req, res) => {
 		return res
 			.status(500)
 			.json({ success: false, message: error.message || "Failed to get pending count" });
+	}
+};
+
+// POST /api/dashboard/mark-notifications-read
+// Mark all notifications as read for the current user
+export const markNotificationsRead = async (req, res) => {
+	try {
+		const userId = req.user?.id || req.user?._id;
+
+		if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
+
+		// Update user's lastNotificationReadAt to current time
+		await User.findByIdAndUpdate(userId, {
+			lastNotificationReadAt: new Date(),
+		});
+
+		return res.status(200).json({
+			success: true,
+			message: "Notifications marked as read",
+		});
+	} catch (error) {
+		console.error("markNotificationsRead error", error);
+		return res
+			.status(500)
+			.json({ success: false, message: error.message || "Failed to mark notifications as read" });
 	}
 };
 
