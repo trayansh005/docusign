@@ -48,6 +48,7 @@ interface SignaturePadProps {
 	) => void;
 	onClose: () => void;
 	className?: string;
+	recipientName?: string;
 }
 
 export const SignaturePad: React.FC<SignaturePadProps> = ({
@@ -55,6 +56,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 	onSignatureComplete,
 	onClose,
 	className = "",
+	recipientName,
 }) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const [isDrawing, setIsDrawing] = useState(false);
@@ -388,7 +390,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 				<div className="flex items-center gap-2">
 					{getFieldIcon()}
 					<h3 className="text-lg font-semibold text-gray-900" style={{ color: "#111827" }}>
-						Add your {getFieldLabel()}
+						Add your {getFieldLabel()}{recipientName ? ` — ${recipientName}` : ""}
 					</h3>
 				</div>
 				<button

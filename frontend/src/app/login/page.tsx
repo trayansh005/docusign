@@ -1,7 +1,9 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useAuthStore } from "@/stores/authStore";
@@ -18,8 +20,18 @@ export default function Login() {
 	const login = useAuthStore((state) => state.login);
 	const isLoading = useAuthStore((state) => state.isLoading);
 	const router = useRouter();
-	const searchParams = useSearchParams();
-	const redirectTo = searchParams.get("redirect") || "/dashboard";
+	const [redirectTo, setRedirectTo] = useState<string>("/dashboard");
+
+	// Read redirect query param from the browser location on client-side
+	useEffect(() => {
+		try {
+			const params = new URLSearchParams(window.location.search);
+			const redirect = params.get("redirect");
+			if (redirect) setRedirectTo(redirect);
+		} catch {
+			// ignore
+		}
+	}, []);
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
