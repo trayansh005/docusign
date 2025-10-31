@@ -215,17 +215,43 @@ async function applySignaturesToPdf(template, signatures) {
 							// This prevents recipient viewer coordinates from producing oversized boxes
 							if (fieldDef) {
 								try {
-									const fxPct = fieldDef.xPct != null ? (Number(fieldDef.xPct) > 1 ? Number(fieldDef.xPct) / 100 : Number(fieldDef.xPct)) : null;
-									const fyPct = fieldDef.yPct != null ? (Number(fieldDef.yPct) > 1 ? Number(fieldDef.yPct) / 100 : Number(fieldDef.yPct)) : null;
-									const fwPct = fieldDef.wPct != null ? (Number(fieldDef.wPct) > 1 ? Number(fieldDef.wPct) / 100 : Number(fieldDef.wPct)) : null;
-									const fhPct = fieldDef.hPct != null ? (Number(fieldDef.hPct) > 1 ? Number(fieldDef.hPct) / 100 : Number(fieldDef.hPct)) : null;
+									const fxPct =
+										fieldDef.xPct != null
+											? Number(fieldDef.xPct) > 1
+												? Number(fieldDef.xPct) / 100
+												: Number(fieldDef.xPct)
+											: null;
+									const fyPct =
+										fieldDef.yPct != null
+											? Number(fieldDef.yPct) > 1
+												? Number(fieldDef.yPct) / 100
+												: Number(fieldDef.yPct)
+											: null;
+									const fwPct =
+										fieldDef.wPct != null
+											? Number(fieldDef.wPct) > 1
+												? Number(fieldDef.wPct) / 100
+												: Number(fieldDef.wPct)
+											: null;
+									const fhPct =
+										fieldDef.hPct != null
+											? Number(fieldDef.hPct) > 1
+												? Number(fieldDef.hPct) / 100
+												: Number(fieldDef.hPct)
+											: null;
 
 									if (fxPct != null && fyPct != null && fwPct != null && fhPct != null) {
 										targetLeft = fxPct * pageWidth;
 										targetTop = fyPct * pageHeight;
 										targetWidth = fwPct * pageWidth;
 										targetHeight = fhPct * pageHeight;
-										console.log(`[ApplySignatures] Overriding target box with template field ${fieldDef.id} proportions: ${targetLeft.toFixed(1)},${targetTop.toFixed(1)} ${targetWidth.toFixed(1)}x${targetHeight.toFixed(1)}`);
+										console.log(
+											`[ApplySignatures] Overriding target box with template field ${
+												fieldDef.id
+											} proportions: ${targetLeft.toFixed(1)},${targetTop.toFixed(
+												1
+											)} ${targetWidth.toFixed(1)}x${targetHeight.toFixed(1)}`
+										);
 									}
 								} catch (e) {
 									// ignore and continue with computed sig box
