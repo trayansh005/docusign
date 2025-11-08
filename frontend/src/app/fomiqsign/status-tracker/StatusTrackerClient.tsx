@@ -19,7 +19,6 @@ import {
 import {
 	getTemplatesByStatus,
 	getTemplateStatusHistory,
-	getSignedDocument,
 	updateTemplateStatus,
 } from "@/services/docusignAPI";
 import { DocuSignTemplateData } from "@/types/docusign";
@@ -70,22 +69,28 @@ export default function StatusTrackerClient() {
 		enabled: !!selectedTemplate && showHistory,
 	});
 
-	const downloadMutation = useMutation({
-		mutationFn: (templateId: string) => getSignedDocument(templateId),
-		onSuccess: (data) => {
-			// Handle download - open final PDF in new tab or trigger download
-			if (data.finalPdfUrl) {
-				const link = document.createElement("a");
-				link.href = `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${data.finalPdfUrl
-					}`;
-				link.target = "_blank";
-				link.download = `signed-document-${data.template.name}.pdf`;
-				document.body.appendChild(link);
-				link.click();
-				document.body.removeChild(link);
-			}
-		},
-	});
+	const handleDownload = (template: DocuSignTemplateData) => {
+		// Use finalPdfUrl for completed documents, otherwise use pdfUrl
+		const pdfUrl = template.finalPdfUrl || template.pdfUrl;
+
+		if (pdfUrl) {
+			// Create absolute URL if it's a relative path
+			const absoluteUrl = pdfUrl.startsWith("http")
+				? pdfUrl
+				: `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}${pdfUrl}`;
+
+			// Create a temporary link and trigger download
+			const link = document.createElement("a");
+			link.href = absoluteUrl;
+			link.target = "_blank";
+			link.download = `${template.metadata.filename || template.name || "document"}.pdf`;
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+		} else {
+			alert("PDF file not available for download.");
+		}
+	};
 
 	const statusUpdateMutation = useMutation({
 		mutationFn: ({ templateId, status }: { templateId: string; status: string }) =>
@@ -171,16 +176,18 @@ export default function StatusTrackerClient() {
 							<button
 								key={status}
 								onClick={() => setStatusFilter(status)}
-								className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive
-									? "bg-blue-600 text-white"
-									: "bg-gray-700 text-gray-300 hover:bg-gray-600"
-									}`}
+								className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+									isActive
+										? "bg-blue-600 text-white"
+										: "bg-gray-700 text-gray-300 hover:bg-gray-600"
+								}`}
 							>
 								<Icon className="h-4 w-4" />
 								<span>{config.label}</span>
 								<span
-									className={`px-2 py-0.5 rounded-full text-xs ${isActive ? "bg-blue-500" : "bg-gray-600"
-										}`}
+									className={`px-2 py-0.5 rounded-full text-xs ${
+										isActive ? "bg-blue-500" : "bg-gray-600"
+									}`}
 								>
 									{count}
 								</span>
@@ -249,12 +256,15 @@ export default function StatusTrackerClient() {
 										</div>
 
 										<div className="flex items-center gap-2">
-											{template.status === "final" && (
+											{(template.finalPdfUrl || template.pdfUrl) && (
 												<button
-													onClick={() => downloadMutation.mutate(template._id)}
-													disabled={downloadMutation.isPending}
+													onClick={() => handleDownload(template)}
 													className="p-2 text-gray-400 hover:text-green-400 hover:bg-green-400/10 rounded-lg transition-colors"
-													title="Download signed document"
+													title={
+														template.status === "final"
+															? "Download signed document"
+															: "Download document"
+													}
 												>
 													<Download className="h-4 w-4" />
 												</button>
@@ -327,7 +337,7 @@ export default function StatusTrackerClient() {
 									</div>
 									<div>
 										<span className="text-gray-400">Signature Fields:</span>
-										<p className="text-white">{selectedTemplate.signatureFields.length}</p>
+										<p className="text-white">{selectedTemplate.signatureFields?.length || 0}</p>
 									</div>
 									<div>
 										<span className="text-gray-400">Created:</span>
@@ -341,7 +351,7 @@ export default function StatusTrackerClient() {
 							</div>
 
 							{/* Status History */}
-							{showHistory && statusHistory && (
+							{showHistory && statusHistory && statusHistory.auditTrail && (
 								<div>
 									<h3 className="text-lg font-medium text-white mb-3">Status History</h3>
 									<div className="space-y-3">
@@ -379,16 +389,26 @@ export default function StatusTrackerClient() {
 								</div>
 							)}
 
+							{/* No History Available */}
+							{showHistory && (!statusHistory || !statusHistory.auditTrail) && (
+								<div>
+									<h3 className="text-lg font-medium text-white mb-3">Status History</h3>
+									<div className="text-center py-6 text-gray-400">
+										<History className="mx-auto h-8 w-8 mb-2 opacity-50" />
+										<p>No status history available for this document.</p>
+									</div>
+								</div>
+							)}
+
 							{/* Actions */}
 							<div className="flex gap-3">
-								{selectedTemplate.status === "final" && (
+								{(selectedTemplate.finalPdfUrl || selectedTemplate.pdfUrl) && (
 									<button
-										onClick={() => downloadMutation.mutate(selectedTemplate._id)}
-										disabled={downloadMutation.isPending}
+										onClick={() => handleDownload(selectedTemplate)}
 										className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
 									>
 										<Download className="h-4 w-4" />
-										Download Signed
+										{selectedTemplate.status === "final" ? "Download Signed" : "Download Document"}
 									</button>
 								)}
 

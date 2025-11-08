@@ -1,4 +1,4 @@
-import { Upload, FileText, Eye, BarChart3, History, Activity } from "lucide-react";
+import { Upload, FileText, BarChart3, History, Activity } from "lucide-react";
 import { Tab } from "./types";
 
 export const tabs: Tab[] = [
@@ -13,12 +13,6 @@ export const tabs: Tab[] = [
 		label: "Templates",
 		icon: FileText,
 		description: "Manage your document templates",
-	},
-	{
-		id: "viewer",
-		label: "Viewer",
-		icon: Eye,
-		description: "View and edit document templates",
 	},
 	{
 		id: "status",

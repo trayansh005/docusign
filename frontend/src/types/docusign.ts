@@ -40,15 +40,15 @@ export interface DocuSignTemplateData {
 	};
 }
 
-export type FieldType = 
-  | "signature" 
-  | "date" 
-  | "initial" 
-  | "text" 
-  | "name" 
-  | "email" 
-  | "phone" 
-  | "address";
+export type FieldType =
+	| "signature"
+	| "date"
+	| "initial"
+	| "text"
+	| "name"
+	| "email"
+	| "phone"
+	| "address";
 
 export interface SignatureField {
 	id: string;
@@ -62,6 +62,7 @@ export interface SignatureField {
 	fontId?: string;
 	isPlainText?: boolean;
 	recipientId?: string;
+	recipientName?: string; // Display name of recipient for this field
 	required?: boolean;
 	x?: number;
 	y?: number;
@@ -79,6 +80,7 @@ export interface TemplateMetadata {
 	fileSize: number;
 	document?: string; // ObjectId reference to DocuSignDocument
 	originalPdfPath: string;
+	thumbnailUrl?: string; // PNG thumbnail of first page
 	// If the original upload was a Word document, backend may set these
 	originalWordFile?: string;
 	convertedFromWord?: boolean;

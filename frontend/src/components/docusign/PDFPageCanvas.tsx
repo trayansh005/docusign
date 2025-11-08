@@ -57,10 +57,44 @@ export const PDFPageCanvas: React.FC<PDFPageCanvasProps> = ({
 		console.log("[PDFPageCanvas] Page loaded:", { width, height, page: pageNumber });
 	};
 
+	// Handle render errors from react-pdf / pdf.js
+	const handleRenderError = (error: unknown) => {
+		// pdf.js uses several error names/messages for cancelled renders. Ignore those benign cancellations.
+		const msg = String(error || "");
+		const errName =
+			error && typeof error === "object" && "name" in (error as Record<string, unknown>)
+				? String((error as Record<string, unknown>).name)
+				: undefined;
+		if (
+			errName === "RenderingCancelledException" ||
+			errName === "AbortException" ||
+			/Task cancelled/.test(msg) ||
+			/TextLayer task cancelled/.test(msg) ||
+			/Rendering cancelled/.test(msg)
+		) {
+			// Silently ignore expected cancellations
+			return;
+		}
+		console.error("[PDFPageCanvas] Render error:", error);
+	};
+
+	const handleTextLayerError = (error: unknown) => {
+		// Text layer specific cancellations are common; ignore them
+		const msg = String(error || "");
+		const errName2 =
+			error && typeof error === "object" && "name" in (error as Record<string, unknown>)
+				? String((error as Record<string, unknown>).name)
+				: undefined;
+		if (errName2 === "AbortException" || /TextLayer task cancelled/.test(msg)) {
+			return;
+		}
+		console.error("[PDFPageCanvas] Text layer error:", error);
+	};
+
 	console.log("[PDFPageCanvas] Rendering PDF from:", pdfUrl, "page:", pageNumber);
 
 	// Handle empty or invalid PDF URL
-	if (!pdfUrl || pdfUrl.trim() === '') {
+	if (!pdfUrl || pdfUrl.trim() === "") {
 		return (
 			<div className={className} style={{ width: "100%", maxWidth: "1200px" }}>
 				<div className="flex items-center justify-center p-8 min-h-[600px] bg-red-900/20 border border-red-500/30 rounded-lg">
@@ -101,6 +135,8 @@ export const PDFPageCanvas: React.FC<PDFPageCanvasProps> = ({
 						rotate={rotation}
 						scale={zoom}
 						onLoadSuccess={onPageLoadSuccess}
+						onRenderError={handleRenderError}
+						onRenderTextLayerError={handleTextLayerError}
 						loading={
 							<div className="flex items-center justify-center p-8 min-h-[400px] bg-gray-800/50 rounded-lg">
 								<div className="text-white font-medium">Loading page {pageNumber}...</div>

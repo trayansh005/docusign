@@ -44,11 +44,12 @@ interface SignaturePadProps {
 	onSignatureComplete: (
 		fieldId: string,
 		signatureData: string,
-		meta?: { fontId?: string; isPlainText?: boolean }
+		meta?: { fontId?: string; isPlainText?: boolean; text?: string }
 	) => void;
 	onClose: () => void;
 	className?: string;
 	recipientName?: string;
+	recipientEmail?: string;
 }
 
 export const SignaturePad: React.FC<SignaturePadProps> = ({
@@ -57,12 +58,41 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 	onClose,
 	className = "",
 	recipientName,
+	recipientEmail,
 }) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const [isDrawing, setIsDrawing] = useState(false);
 	const [hasDrawing, setHasDrawing] = useState(false);
-	const [textValue, setTextValue] = useState<string>("");
-	const [signatureMode, setSignatureMode] = useState<"draw" | "type" | "custom">("draw");
+
+	// Initialize text value based on field type
+	const getInitialTextValue = () => {
+		if (field.type === "name" && recipientName) {
+			return recipientName;
+		}
+		if (field.type === "email" && recipientEmail) {
+			return recipientEmail;
+		}
+		if (field.type === "initial" && recipientName) {
+			// Get initials from recipient name
+			const names = recipientName.trim().split(/\s+/);
+			const initials = names.map((n) => n.charAt(0).toUpperCase()).join("");
+			return initials;
+		}
+		return "";
+	};
+
+	// Initialize signature mode - for initials with recipient name, default to type mode
+	const getInitialSignatureMode = () => {
+		if (field.type === "initial" && recipientName) {
+			return "type";
+		}
+		return "draw";
+	};
+
+	const [textValue, setTextValue] = useState<string>(getInitialTextValue());
+	const [signatureMode, setSignatureMode] = useState<"draw" | "type" | "custom">(
+		getInitialSignatureMode()
+	);
 	const [selectedFontId, setSelectedFontId] = useState<string>(SIGNATURE_FONTS[0].id);
 
 	// Initialize canvas
@@ -189,7 +219,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 					ctx.textAlign = "center";
 					ctx.fillText(text, width / 2, height / 2);
 					const dataUrl = off.toDataURL("image/png");
-					onSignatureComplete(field.id, dataUrl, { fontId: selectedFontId });
+					onSignatureComplete(field.id, dataUrl, { fontId: selectedFontId, text: text });
 				} else {
 					console.warn("[SignaturePad] No text to save!");
 				}
@@ -305,20 +335,35 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 	};
 
 	const renderTextField = () => {
+		// Check if this is a name or email field with prefilled data
+		const isNameField = field.type === "name";
+		const isEmailField = field.type === "email";
+		const isPrefilled = (isNameField && recipientName) || (isEmailField && recipientEmail);
+		const isReadOnly = !!isPrefilled;
+
 		return (
 			<div className="space-y-4">
 				<div>
 					<label className="block text-sm font-medium text-gray-700 mb-2">
-						Enter text for this field:
+						{isPrefilled ? `${getFieldLabel()}:` : `Enter text for this field:`}
 					</label>
 					<input
 						type={field.type === "email" ? "email" : field.type === "phone" ? "tel" : "text"}
 						value={textValue}
-						onChange={(e) => setTextValue(e.target.value)}
+						onChange={(e) => !isReadOnly && setTextValue(e.target.value)}
 						placeholder={`Enter ${getFieldLabel().toLowerCase()}...`}
-						className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-						autoFocus
+						className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+							isReadOnly ? "bg-gray-100 cursor-not-allowed" : ""
+						}`}
+						autoFocus={!isPrefilled}
+						readOnly={isReadOnly}
+						disabled={isReadOnly}
 					/>
+					{isPrefilled && (
+						<p className="text-xs text-gray-500 mt-1">
+							This field is automatically filled with your account information.
+						</p>
+					)}
 				</div>
 				{/* Preview */}
 				{textValue.trim() && (
@@ -390,7 +435,8 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 				<div className="flex items-center gap-2">
 					{getFieldIcon()}
 					<h3 className="text-lg font-semibold text-gray-900" style={{ color: "#111827" }}>
-						Add your {getFieldLabel()}{recipientName ? ` — ${recipientName}` : ""}
+						Add your {getFieldLabel()}
+						{recipientName ? ` — ${recipientName}` : ""}
 					</h3>
 				</div>
 				<button

@@ -25,11 +25,27 @@ export function isPdfDocument(template: DocuSignTemplateData): boolean {
 }
 
 /**
+ * Get the thumbnail image URL for a template (first page as PNG)
+ */
+export function getTemplateThumbnailUrl(template: DocuSignTemplateData): string {
+	// Use thumbnail from metadata if available
+	if (template.metadata?.thumbnailUrl) {
+		return template.metadata.thumbnailUrl;
+	}
+
+	// Fallback: try to construct thumbnail path
+	if (template._id) {
+		return `/api/uploads/signatures/templates/${template._id}/thumbnail.png`;
+	}
+
+	console.error("[getTemplateThumbnailUrl] Cannot construct thumbnail URL for template:", template);
+	return "";
+}
+
+/**
  * Get the PDF URL for a template (both PDFs and Word docs are served as PDFs)
  */
-export function getTemplatePageImageUrl(
-	template: DocuSignTemplateData
-): string {
+export function getTemplatePageImageUrl(template: DocuSignTemplateData): string {
 	// All documents (PDF and Word) are now served as PDFs
 	// Word documents are converted to PDF on the backend
 

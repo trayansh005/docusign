@@ -1,4 +1,4 @@
-export type TabType = "upload" | "templates" | "viewer" | "status" | "activity" | "tracking";
+export type TabType = "upload" | "templates" | "status" | "activity" | "tracking";
 
 export interface Tab {
 	id: TabType;
@@ -11,4 +11,6 @@ export interface Recipient {
 	id: string;
 	name: string;
 	email?: string;
+	signingOrder: number;
+	color?: string; // Color for visual identification
 }

@@ -8,6 +8,7 @@ import Subscription from "../../models/Subscription.js";
 import DocuSignDocument from "../../models/DocuSignDocument.js";
 import { logDocuSignActivity } from "../../services/ActivityService.js";
 import { processWordDocument, isWordDocument } from "../../utils/wordProcessor.js";
+import { generatePdfThumbnail } from "../../utils/pdfThumbnailGenerator.js";
 import multer from "multer";
 import { getFreeTierLimits } from "../../utils/freeTierLimits.js";
 
@@ -211,6 +212,24 @@ export const uploadAndProcessDocument = async (req, res) => {
 			throw new Error("PDF has no pages or could not be read");
 		}
 
+		// Generate thumbnail for preview
+		console.log(`[Upload] Generating thumbnail for template ${templateId}`);
+		const thumbnailPath = path.join(templateDir, "thumbnail.png");
+		console.log(`[Upload] Thumbnail will be saved to: ${thumbnailPath}`);
+		console.log(`[Upload] PDF path for thumbnail: ${pdfFilePath}`);
+		console.log(`[Upload] PDF exists: ${fs.existsSync(pdfFilePath)}`);
+
+		const thumbnailResult = await generatePdfThumbnail(pdfFilePath, thumbnailPath);
+
+		let thumbnailUrl = null;
+		if (thumbnailResult.success) {
+			thumbnailUrl = `/api/uploads/signatures/templates/${templateId}/thumbnail.png`;
+			console.log(`[Upload] Thumbnail generated successfully: ${thumbnailUrl}`);
+			console.log(`[Upload] Thumbnail file exists: ${fs.existsSync(thumbnailPath)}`);
+		} else {
+			console.warn(`[Upload] Thumbnail generation failed (non-blocking): ${thumbnailResult.error}`);
+		}
+
 		// Update template with processed data
 		template.name = name || path.parse(req.file.originalname).name;
 		template.numPages = numPages;
@@ -242,9 +261,11 @@ export const uploadAndProcessDocument = async (req, res) => {
 			fileSize: req.file.size,
 			originalPdfPath: pdfUrl, // This is what pdfUrl virtual field reads from
 			originalFilePath: `/api/uploads/signatures/templates/${templateId}/${storedFileName}`,
+			thumbnailUrl: thumbnailUrl, // PNG thumbnail for preview
 		};
 
 		console.log(`[Upload] Set metadata.originalPdfPath: ${template.metadata.originalPdfPath}`);
+		console.log(`[Upload] Set metadata.thumbnailUrl: ${template.metadata.thumbnailUrl}`);
 		template.markModified("metadata");
 		await template.save();
 

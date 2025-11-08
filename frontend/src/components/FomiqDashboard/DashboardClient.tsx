@@ -7,22 +7,18 @@ import { DocuSignTemplateData } from "@/types/docusign";
 import { TabNavigation } from "./TabNavigation";
 import { DashboardTabs } from "./DashboardTabs";
 import { tabs } from "./constants";
-import { TabType, Recipient } from "./types";
+import { TabType } from "./types";
 import apiClient from "@/lib/apiClient";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-interface DashboardClientProps { }
+interface DashboardClientProps {}
 
-export default function DashboardClient({ }: DashboardClientProps) {
+export default function DashboardClient({}: DashboardClientProps) {
 	const router = useRouter();
 	const user = useAuthStore((state) => state.user);
 	const isLoading = useAuthStore((state) => state.isLoading);
 	const [activeTab, setActiveTab] = useState<TabType>("upload");
-	const [selectedTemplate, setSelectedTemplate] = useState<DocuSignTemplateData | null>(null);
-	const [recipients, setRecipients] = useState<Recipient[]>([]);
-	const [messageSubject, setMessageSubject] = useState("Please sign this document");
-	const [messageBody, setMessageBody] = useState("Please review and sign the highlighted fields.");
-	const [resultUrls, setResultUrls] = useState<string[] | null>(null);
+	const [selectedTemplate] = useState<DocuSignTemplateData | null>(null);
 	const [usage, setUsage] = useState<{
 		hasActiveSubscription?: boolean;
 		uploads?: { used: number; limit: number };
@@ -76,53 +72,70 @@ export default function DashboardClient({ }: DashboardClientProps) {
 			return;
 		}
 		console.log("Selecting template:", template._id, template.metadata?.filename || template.name);
-		setSelectedTemplate(template);
-		if (activeTab === "templates") {
-			setActiveTab("viewer");
-		}
+
+		// Navigate to the dedicated viewer page
+		router.push(`/fomiqsign/dashboard/viewer?templateId=${template._id}`);
 	};
 
 	const handleUploadSuccess = (template: DocuSignTemplateData) => {
-		setSelectedTemplate(template);
-		setActiveTab("viewer");
+		// After upload, navigate to the viewer page
+		router.push(`/fomiqsign/dashboard/viewer?templateId=${template._id}`);
 	};
 
 	return (
 		<div className="space-y-6">
 			{/* Free plan usage banner */}
 			{usage && usage.hasActiveSubscription === false && (
-				<div className={`rounded-lg border p-4 ${(usage.uploads && usage.uploads.used >= usage.uploads.limit) ||
+				<div
+					className={`rounded-lg border p-4 ${
+						(usage.uploads && usage.uploads.used >= usage.uploads.limit) ||
 						(usage.signs && usage.signs.used >= usage.signs.limit)
-						? "border-red-400/40 bg-red-50/80 text-red-900"
-						: "border-yellow-400/40 bg-yellow-50/80 text-yellow-900"
-					}`}>
+							? "border-red-400/40 bg-red-50/80 text-red-900"
+							: "border-yellow-400/40 bg-yellow-50/80 text-yellow-900"
+					}`}
+				>
 					<div className="flex items-start justify-between gap-3">
 						<div className="flex-1">
 							<p className="font-medium">You are on the Free plan</p>
 							<div className="mt-2 text-sm space-y-1">
 								<div className="flex items-center gap-2">
-									<span className={usage.uploads && usage.uploads.used >= usage.uploads.limit ? "font-semibold" : ""}>
+									<span
+										className={
+											usage.uploads && usage.uploads.used >= usage.uploads.limit
+												? "font-semibold"
+												: ""
+										}
+									>
 										📄 Uploads: {usage.uploads?.used ?? 0} of {usage.uploads?.limit ?? 1} used
 									</span>
 									{usage.uploads && usage.uploads.used >= usage.uploads.limit && (
-										<span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded-full">Limit reached</span>
+										<span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded-full">
+											Limit reached
+										</span>
 									)}
 								</div>
 								<div className="flex items-center gap-2">
-									<span className={usage.signs && usage.signs.used >= usage.signs.limit ? "font-semibold" : ""}>
-										✍️ Signing: {usage.signs?.used ?? 0} of {usage.signs?.limit ?? 2} used this month
+									<span
+										className={
+											usage.signs && usage.signs.used >= usage.signs.limit ? "font-semibold" : ""
+										}
+									>
+										✍️ Signing: {usage.signs?.used ?? 0} of {usage.signs?.limit ?? 2} used this
+										month
 									</span>
 									{usage.signs && usage.signs.used >= usage.signs.limit && (
-										<span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded-full">Limit reached</span>
+										<span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded-full">
+											Limit reached
+										</span>
 									)}
 								</div>
 							</div>
 							{((usage.uploads && usage.uploads.used >= usage.uploads.limit) ||
 								(usage.signs && usage.signs.used >= usage.signs.limit)) && (
-									<p className="text-sm mt-2 font-medium">
-										⚠️ Upgrade to continue using all features.
-									</p>
-								)}
+								<p className="text-sm mt-2 font-medium">
+									⚠️ Upgrade to continue using all features.
+								</p>
+							)}
 						</div>
 						<a
 							href="/subscription"
@@ -137,18 +150,9 @@ export default function DashboardClient({ }: DashboardClientProps) {
 			<DashboardTabs
 				activeTab={activeTab}
 				selectedTemplate={selectedTemplate}
-				recipients={recipients}
-				messageSubject={messageSubject}
-				messageBody={messageBody}
-				resultUrls={resultUrls}
 				onTemplateSelect={handleTemplateSelect}
 				onUploadSuccess={handleUploadSuccess}
 				onTabChange={setActiveTab}
-				setSelectedTemplate={setSelectedTemplate}
-				setRecipients={setRecipients}
-				setMessageSubject={setMessageSubject}
-				setMessageBody={setMessageBody}
-				setResultUrls={setResultUrls}
 			/>
 		</div>
 	);

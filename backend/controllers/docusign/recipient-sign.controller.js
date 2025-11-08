@@ -7,6 +7,7 @@ import { PDFDocument as PDFLibDocument, StandardFonts } from "pdf-lib";
 import sharp from "sharp";
 import { fileURLToPath } from "url";
 import { resolveTemplatePdfPath, getSignedPdfPath } from "../../utils/pdfPathResolver.js";
+import { logDocuSignActivity } from "../../services/ActivityService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -675,9 +676,38 @@ export const recipientSignDocument = async (req, res) => {
 				recipient.signatureStatus = "signed";
 				recipient.signedAt = new Date();
 
+				// Log the signing activity with IP tracking
+				await logDocuSignActivity(
+					userId,
+					"DOCUSIGN_DOCUMENT_SIGNED",
+					`Document signed by recipient: ${recipient.name} (${recipient.email})`,
+					{
+						templateId: template._id,
+						templateName: template.name,
+						recipientId: recipient.id,
+						recipientName: recipient.name,
+						recipientEmail: recipient.email,
+						signerType: "recipient",
+					},
+					req
+				);
+
 				// Update signing status for remaining recipients (doesn't save)
 				template.updateSigningStatus();
 			}
+		} else {
+			// Log activity for template owner signing
+			await logDocuSignActivity(
+				userId,
+				"DOCUSIGN_DOCUMENT_SIGNED",
+				`Document signed by template owner`,
+				{
+					templateId: template._id,
+					templateName: template.name,
+					signerType: "owner",
+				},
+				req
+			);
 		}
 
 		// Check if all recipients have signed

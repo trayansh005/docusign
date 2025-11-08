@@ -88,7 +88,10 @@ export function FinalizePanel({
 			// Crop to content bounds to remove excess transparent space
 			const imageData = ctx.getImageData(0, 0, canvasWidth, canvasHeight);
 			const pixels = imageData.data;
-			let minX = canvasWidth, minY = canvasHeight, maxX = 0, maxY = 0;
+			let minX = canvasWidth,
+				minY = canvasHeight,
+				maxX = 0,
+				maxY = 0;
 
 			// Find bounds of non-transparent pixels
 			for (let y = 0; y < canvasHeight; y++) {
@@ -124,11 +127,7 @@ export function FinalizePanel({
 			}
 
 			// Copy cropped region
-			croppedCtx.putImageData(
-				ctx.getImageData(minX, minY, cropWidth, cropHeight),
-				0,
-				0
-			);
+			croppedCtx.putImageData(ctx.getImageData(minX, minY, cropWidth, cropHeight), 0, 0);
 
 			// Convert to data URL
 			resolve(croppedCanvas.toDataURL("image/png"));
@@ -260,8 +259,8 @@ export function FinalizePanel({
 					field.value && field.value.length > 0 && !field.value.startsWith("data:image/")
 						? field.value
 						: field.type === "initial"
-							? userInitials
-							: userFullName;
+						? userInitials
+						: userFullName;
 
 				const fontFamily = getFontFamily(field.fontId);
 				const width = Math.round((field.wPct / 100) * 800); // Assume 800px viewport width
@@ -332,7 +331,7 @@ export function FinalizePanel({
 					}))
 					.filter((sig) => sig.signatureImageBuffer), // Only include signatures with actual data
 
-				// Include placeholder fields for recipients to fill
+				// Include placeholder fields for recipients to fill - with recipient assignment
 				placeholderFields: recipientPlaceholderFields.map((field) => ({
 					id: field.id,
 					type: field.type,
@@ -342,11 +341,18 @@ export function FinalizePanel({
 					wPct: field.wPct,
 					hPct: field.hPct,
 					placeholderText: field.placeholderText,
+					recipientId: field.recipientId, // Assigned recipient ID
+					recipientName: field.recipientName, // Display name
 					required: field.required || false,
 				})),
 
-				// Include recipients and message
-				recipients: recipients || [],
+				// Include recipients with signing order
+				recipients: recipients.map((r) => ({
+					id: r.id,
+					name: r.name,
+					email: r.email,
+					signingOrder: r.signingOrder,
+				})),
 				message: { subject: subject || "", body: body || "" },
 			};
 
@@ -509,17 +515,17 @@ export function FinalizePanel({
 					<div className="rounded-lg border border-green-200 bg-green-50 p-4">
 						<div className="flex items-start gap-3">
 							<CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
-							<div>
+							<div className="flex-1">
 								<div className="text-green-800 font-semibold">
 									Signed document generated successfully
 								</div>
 								<p className="text-sm text-green-700 mt-1">
-									Your final PDF with signatures is ready. You can open it in a new tab or view it
-									inline below.
+									Your final PDF with signatures is ready. You can open it in a new tab or download
+									it.
 								</p>
 								<div className="mt-3 flex items-center gap-3">
 									<a
-										className="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+										className="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors"
 										href={resultUrls[0]}
 										target="_blank"
 										rel="noreferrer"
@@ -527,7 +533,7 @@ export function FinalizePanel({
 										Open Final PDF
 									</a>
 									<a
-										className="inline-flex items-center rounded-md border border-green-300 px-3 py-2 text-sm font-medium text-green-800 hover:bg-green-100"
+										className="inline-flex items-center rounded-md border border-green-300 bg-white px-3 py-2 text-sm font-medium text-green-800 hover:bg-green-100 transition-colors"
 										href={resultUrls[0]}
 										download
 									>
@@ -535,18 +541,6 @@ export function FinalizePanel({
 									</a>
 								</div>
 							</div>
-						</div>
-
-						<div className="mt-4">
-							<iframe
-								src={resultUrls[0]}
-								title="Signed PDF Preview"
-								className="w-full h-96 rounded-md border"
-							/>
-							<p className="text-xs text-gray-500 mt-2">
-								If the preview doesn&apos;t render, click &quot;Open Final PDF&quot; to view in a
-								new tab.
-							</p>
 						</div>
 					</div>
 				)}

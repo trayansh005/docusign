@@ -2,17 +2,9 @@
 
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-	FileText,
-	Eye,
-	Edit,
-	Trash2,
-	AlertCircle,
-	CheckCircle,
-	Clock,
-	Archive,
-} from "lucide-react";
+import { FileText, Edit, Trash2, AlertCircle } from "lucide-react";
 import { getTemplates, deleteTemplate } from "@/services/docusignAPI";
+import { getTemplateThumbnailUrl } from "@/utils/documentUtils";
 import { DocuSignTemplateData } from "@/types/docusign";
 
 interface TemplateListProps {
@@ -49,23 +41,6 @@ export const TemplateList: React.FC<TemplateListProps> = ({
 		},
 	});
 
-	const getStatusIcon = (status: string) => {
-		switch (status) {
-			case "active":
-				return <CheckCircle className="h-4 w-4 text-green-500" />;
-			case "draft":
-				return <Edit className="h-4 w-4 text-yellow-500" />;
-			case "processing":
-				return <Clock className="h-4 w-4 text-blue-500" />;
-			case "final":
-				return <Archive className="h-4 w-4 text-purple-500" />;
-			case "failed":
-				return <AlertCircle className="h-4 w-4 text-red-500" />;
-			default:
-				return <FileText className="h-4 w-4 text-gray-300" />;
-		}
-	};
-
 	const getStatusColor = (status: string) => {
 		switch (status) {
 			case "active":
@@ -81,11 +56,6 @@ export const TemplateList: React.FC<TemplateListProps> = ({
 			default:
 				return "bg-slate-50 text-slate-700 border-slate-200";
 		}
-	};
-
-	const formatFileSize = (bytes: number) => {
-		const mb = bytes / (1024 * 1024);
-		return mb < 1 ? `${(mb * 1024).toFixed(0)} KB` : `${mb.toFixed(2)} MB`;
 	};
 
 	const formatDate = (dateString: string) => {
@@ -195,85 +165,83 @@ export const TemplateList: React.FC<TemplateListProps> = ({
 					data?.data.map((template) => (
 						<div
 							key={template._id}
-							className="group bg-white border border-slate-200 rounded-xl p-6 hover:shadow-lg hover:border-slate-300 transition-all duration-200 hover:-translate-y-0.5"
+							className="group bg-white border border-slate-200 rounded-xl p-4 hover:shadow-lg hover:border-slate-300 transition-all duration-200"
 						>
-							<div className="flex items-start justify-between">
-								<div className="flex items-start space-x-4 flex-1">
-									<div className="flex-shrink-0 mt-1">{getStatusIcon(template.status)}</div>
-									<div className="flex-1 min-w-0">
-										<div className="flex items-center space-x-3 mb-3">
-											<h3 className="text-lg font-semibold text-slate-900 truncate">
+							<div className="flex items-center justify-between gap-4">
+								<div className="flex items-center gap-4 flex-1 min-w-0">
+									<div className="flex-shrink-0">
+										<img
+											src={getTemplateThumbnailUrl(template)}
+											alt={template.metadata?.filename || template.name || "template"}
+											className="h-20 w-16 object-cover rounded-md border border-slate-200 bg-slate-50"
+											onError={(e) => {
+												// Fallback to placeholder if thumbnail fails
+												(e.target as HTMLImageElement).src =
+													"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 80'%3E%3Crect width='64' height='80' fill='%23f1f5f9'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='12' fill='%2394a3b8'%3EPDF%3C/text%3E%3C/svg%3E";
+											}}
+										/>
+									</div>
+									<div className="min-w-0">
+										<div className="flex items-center space-x-3 mb-1">
+											<h5 className="text-md font-semibold text-slate-900 truncate">
 												{template.metadata?.filename || template.name || "Untitled Template"}
-											</h3>
+											</h5>
 											<span
-												className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(
+												className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(
 													template.status
 												)}`}
 											>
 												{template.status}
 											</span>
 										</div>
-										<div className="grid grid-cols-2 gap-4 text-sm text-slate-600">
-											<div className="flex items-center space-x-2">
-												<span className="font-medium">Pages:</span>
-												<span>{template.numPages || 0}</span>
-											</div>
-											<div className="flex items-center space-x-2">
-												<span className="font-medium">Size:</span>
-												<span>
-													{template.metadata?.fileSize
-														? formatFileSize(template.metadata.fileSize)
-														: "Unknown"}
-												</span>
-											</div>
-											<div className="flex items-center space-x-2">
-												<span className="font-medium">Fields:</span>
-												<span>{template.signatureFields?.length || 0}</span>
-											</div>
-											<div className="flex items-center space-x-2">
-												<span className="font-medium">Created:</span>
-												<span>
-													{template.createdAt ? formatDate(template.createdAt) : "Unknown"}
-												</span>
-											</div>
-											{template.createdBy && (
-												<div className="col-span-2 flex items-center space-x-2">
-													<span className="font-medium">By:</span>
-													<span>
-														{template.createdBy.firstName} {template.createdBy.lastName}
-													</span>
-												</div>
-											)}
+
+										<div className="text-sm text-slate-600 flex flex-wrap gap-4">
+											<span className="flex items-center gap-2">
+												<strong className="text-slate-800">{template.numPages || 0}</strong>
+												<span className="text-slate-500">pages</span>
+											</span>
+											<span className="flex items-center gap-2">
+												<strong className="text-slate-800">
+													{template.signatureFields?.length || 0}
+												</strong>
+												<span className="text-slate-500">signers</span>
+											</span>
+											<span className="text-slate-500">
+												{template.createdAt ? formatDate(template.createdAt) : "Unknown"}
+											</span>
 										</div>
 									</div>
 								</div>
-								<div className="flex items-center space-x-1 ml-4">
+
+								<div className="flex items-center gap-2 flex-shrink-0">
 									<button
 										onClick={() => onViewTemplate?.(template)}
-										className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 group-hover:bg-slate-50"
-										title="View template"
+										className="px-3 py-2 bg-white border border-slate-200 text-sm rounded-md hover:bg-slate-50"
 									>
-										<Eye className="h-5 w-5" />
+										View
 									</button>
-									<button
-										onClick={() => onEditTemplate?.(template)}
-										className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all duration-200 group-hover:bg-slate-50"
-										title="Edit template"
-									>
-										<Edit className="h-5 w-5" />
-									</button>
-									<button
-										onClick={() => {
-											if (confirm("Are you sure you want to delete this template?")) {
-												deleteMutation.mutate(template._id);
-											}
-										}}
-										disabled={deleteMutation.isPending}
-										className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 group-hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-										title="Delete template"
-									>
-										<Trash2 className="h-5 w-5" />
-									</button>
+
+									<div className="flex items-center space-x-1">
+										<button
+											onClick={() => onEditTemplate?.(template)}
+											className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all duration-200 hidden md:inline-flex"
+											title="Edit template"
+										>
+											<Edit className="h-5 w-5" />
+										</button>
+										<button
+											onClick={() => {
+												if (confirm("Are you sure you want to delete this template?")) {
+													deleteMutation.mutate(template._id);
+												}
+											}}
+											disabled={deleteMutation.isPending}
+											className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 hidden md:inline-flex disabled:opacity-50 disabled:cursor-not-allowed"
+											title="Delete template"
+										>
+											<Trash2 className="h-5 w-5" />
+										</button>
+									</div>
 								</div>
 							</div>
 						</div>

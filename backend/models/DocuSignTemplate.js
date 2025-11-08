@@ -10,6 +10,9 @@ const signatureFieldSchema = new mongoose.Schema(
 			type: String,
 			required: true,
 		},
+		recipientName: {
+			type: String, // Display name of the recipient assigned to this field
+		},
 		type: {
 			type: String,
 			enum: ["signature", "date", "initial", "text", "name", "email", "phone", "address"],
@@ -97,6 +100,10 @@ const recipientSchema = new mongoose.Schema(
 			required: true,
 			min: 1,
 		},
+		// Color for visual identification
+		color: {
+			type: String,
+		},
 		// When the recipient signed
 		signedAt: {
 			type: Date,
@@ -159,6 +166,7 @@ const templateSchema = new mongoose.Schema(
 			mimeType: { type: String, default: "application/pdf" },
 			fileSize: Number,
 			originalPdfPath: String,
+			thumbnailUrl: String, // PNG thumbnail of first page
 			// Reference to DocuSignDocument containing the original PDF
 			document: { type: mongoose.Schema.Types.ObjectId, ref: "DocuSignDocument" },
 			fileHash: String,
@@ -245,7 +253,7 @@ templateSchema.methods.updateSignatureField = function (fieldId, updates) {
 templateSchema.methods.getNextRecipientToSign = function () {
 	// Find the next recipient in signing order who hasn't signed yet
 	const pendingRecipients = this.recipients
-		.filter(r => r.signatureStatus === "pending" || r.signatureStatus === "waiting")
+		.filter((r) => r.signatureStatus === "pending" || r.signatureStatus === "waiting")
 		.sort((a, b) => a.signingOrder - b.signingOrder);
 
 	return pendingRecipients.length > 0 ? pendingRecipients[0] : null;
@@ -282,7 +290,7 @@ templateSchema.methods.updateSigningStatus = function () {
 };
 
 templateSchema.methods.canRecipientSign = function (recipientId) {
-	const recipient = this.recipients.find(r => r.id === recipientId || r.email === recipientId);
+	const recipient = this.recipients.find((r) => r.id === recipientId || r.email === recipientId);
 	if (!recipient) return false;
 
 	// Check if this recipient is next in line to sign
@@ -291,7 +299,7 @@ templateSchema.methods.canRecipientSign = function (recipientId) {
 };
 
 templateSchema.methods.markRecipientSigned = function (recipientId) {
-	const recipient = this.recipients.find(r => r.id === recipientId || r.email === recipientId);
+	const recipient = this.recipients.find((r) => r.id === recipientId || r.email === recipientId);
 	if (recipient) {
 		recipient.signatureStatus = "signed";
 		recipient.signedAt = new Date();
@@ -300,7 +308,7 @@ templateSchema.methods.markRecipientSigned = function (recipientId) {
 		this.updateSigningStatus();
 
 		// Check if all recipients have signed
-		const allSigned = this.recipients.every(r => r.signatureStatus === "signed");
+		const allSigned = this.recipients.every((r) => r.signatureStatus === "signed");
 		if (allSigned) {
 			this.status = "final";
 		}

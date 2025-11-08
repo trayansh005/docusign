@@ -14,14 +14,18 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
 		setIsClient(true);
 	}, []);
 
-	// Hide header on login and register pages
-	const shouldShowHeader = isClient && !["/login", "/register"].includes(pathname);
+	// Hide header on login, register, and viewer pages
+	const shouldShowHeader =
+		isClient && !["/login", "/register", "/fomiqsign/dashboard/viewer"].includes(pathname);
+
+	// Hide footer on viewer page
+	const shouldShowFooter = isClient && pathname !== "/fomiqsign/dashboard/viewer";
 
 	return (
 		<>
 			{shouldShowHeader && <Header />}
 			<main className="flex-1 relative z-10">{children}</main>
-			<Footer />
+			{shouldShowFooter && <Footer />}
 			<Toaster theme="dark" position="top-right" richColors closeButton />
 		</>
 	);
