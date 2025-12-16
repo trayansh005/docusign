@@ -4,6 +4,8 @@ import helmet from "helmet";
 import morgan from "morgan";
 import compression from "compression";
 import cookieParser from "cookie-parser";
+import hpp from "hpp";
+import mongoSanitize from "express-mongo-sanitize";
 
 export function configureMiddleware(app) {
 	// Security middleware
@@ -45,6 +47,14 @@ export function configureMiddleware(app) {
 		})
 	);
 	app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+	// Security hardening
+	app.use(hpp());
+	app.use(
+		mongoSanitize({
+			replaceWith: "_",
+		})
+	);
 
 	// Parse cookies
 	app.use(cookieParser());

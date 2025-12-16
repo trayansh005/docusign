@@ -5,6 +5,8 @@ import helmet from "helmet";
 import morgan from "morgan";
 import compression from "compression";
 import cookieParser from "cookie-parser";
+import hpp from "hpp";
+import mongoSanitize from "express-mongo-sanitize";
 import path from "path";
 import { fileURLToPath } from "url";
 import { apiRateLimit, authRateLimit, sanitizeInput } from "./middlewares/security.js";
@@ -63,6 +65,14 @@ app.use(
 // Body parsing middleware
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Security hardening
+app.use(hpp());
+app.use(
+	mongoSanitize({
+		replaceWith: "_",
+	})
+);
 
 // Cookie parser middleware
 app.use(cookieParser());
