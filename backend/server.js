@@ -1,31 +1,29 @@
+import compression from "compression";
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
-import helmet from "helmet";
-import morgan from "morgan";
-import compression from "compression";
-import cookieParser from "cookie-parser";
-import hpp from "hpp";
 import mongoSanitize from "express-mongo-sanitize";
+import helmet from "helmet";
+import hpp from "hpp";
+import morgan from "morgan";
 import path from "path";
 import { fileURLToPath } from "url";
-import { apiRateLimit, authRateLimit, sanitizeInput } from "./middlewares/security.js";
 import connectDB from "./database/connection.js";
-import authRoutes from "./routes/auth.js";
-import subscriptionRoutes from "./routes/subscription.js";
+import { apiRateLimit, authRateLimit, sanitizeInput } from "./middlewares/security.js";
 import activityRoutes from "./routes/activity.js";
+import authRoutes from "./routes/auth.js";
+import dashboardRoutes from "./routes/dashboard.js";
 import docusignRoutes from "./routes/docusign.js";
 import signatureRoutes from "./routes/signature.js";
+import subscriptionRoutes from "./routes/subscription.js";
 import userRoutes from "./routes/user.js";
-import dashboardRoutes from "./routes/dashboard.js";
-import uploadsStatic from "./middleware/uploadsStatic.js";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // Security middleware - Helmet with default settings (same as RCSS)
 app.use(helmet());

@@ -9,11 +9,35 @@ import mongoSanitize from "express-mongo-sanitize";
 
 export function configureMiddleware(app) {
 	// Security middleware
+	const allowedOrigins = [
+		process.env.FRONTEND_URL,
+		"http://localhost:3000",
+		"http://127.0.0.1:3000",
+	].filter(Boolean);
+
 	const corsOptions = {
-		origin: process.env.FRONTEND_URL || "http://localhost:3000",
+		origin: (origin, callback) => {
+			// Allow requests with no origin (like mobile apps or curl)
+			if (!origin) return callback(null, true);
+
+			if (allowedOrigins.includes(origin) || process.env.NODE_ENV === "development") {
+				callback(null, true);
+			} else {
+				callback(new Error("Not allowed by CORS"));
+			}
+		},
 		credentials: true,
 		methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-		allowedHeaders: ["Content-Type", "Authorization", "Cookie", "Set-Cookie"],
+		allowedHeaders: [
+			"Content-Type",
+			"Authorization",
+			"Cookie",
+			"X-Requested-With",
+			"Accept",
+			"X-API-Version",
+		],
+		exposedHeaders: ["Set-Cookie"],
+		maxAge: 86400, // Cache preflight requests for 24 hours
 	};
 
 	app.use(cors(corsOptions));
