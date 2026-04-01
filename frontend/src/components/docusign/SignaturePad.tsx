@@ -442,7 +442,8 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 					<button
 						onClick={onClose}
 						className="text-gray-400 hover:text-gray-300 transition-colors text-2xl font-bold"
-					×
+					>
+						×
 				</button>
 			</div>
 
