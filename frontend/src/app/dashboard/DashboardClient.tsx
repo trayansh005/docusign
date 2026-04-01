@@ -87,7 +87,7 @@ export default function DashboardClient() {
 
 	// Signing progress state
 	const [documentsWithRecipients, setDocumentsWithRecipients] = useState<DocuSignTemplateData[]>(
-		[]
+		[],
 	);
 	const [loadingDocuments, setLoadingDocuments] = useState(false);
 
@@ -198,7 +198,7 @@ export default function DashboardClient() {
 
 			// Filter documents that have recipients
 			const docsWithRecipients = response.data.filter(
-				(doc) => doc.recipients && doc.recipients.length > 0
+				(doc) => doc.recipients && doc.recipients.length > 0,
 			);
 
 			console.log("Documents with recipients:", docsWithRecipients.length);
@@ -314,38 +314,59 @@ export default function DashboardClient() {
 
 				{/* Free plan usage banner (shows when there is no active subscription) */}
 				{usage && usage.hasActiveSubscription === false && (
-					<div className={`mb-8 rounded-lg border px-4 py-3 ${(usage.uploads && usage.uploads.used >= usage.uploads.limit) ||
+					<div
+						className={`mb-8 rounded-lg border px-4 py-3 ${
+							(usage.uploads && usage.uploads.used >= usage.uploads.limit) ||
 							(usage.signs && usage.signs.used >= usage.signs.limit)
-							? "border-red-500/30 bg-red-500/10 text-red-200"
-							: "border-yellow-500/30 bg-yellow-500/10 text-yellow-200"
-						}`}>
+								? "border-red-500/30 bg-red-500/10 text-red-200"
+								: "border-yellow-500/30 bg-yellow-500/10 text-yellow-200"
+						}`}
+					>
 						<div className="flex items-start justify-between gap-4">
 							<div className="flex-1">
 								<p className="font-medium">You are on the Free plan</p>
 								<div className="text-sm mt-2 space-y-1">
 									<div className="flex items-center gap-2">
-										<span className={usage.uploads && usage.uploads.used >= usage.uploads.limit ? "text-red-300 font-semibold" : ""}>
+										<span
+											className={
+												usage.uploads && usage.uploads.used >= usage.uploads.limit
+													? "text-red-300 font-semibold"
+													: ""
+											}
+										>
 											📄 Uploads: {usage.uploads?.used ?? 0} of {usage.uploads?.limit ?? 1} used
 										</span>
 										{usage.uploads && usage.uploads.used >= usage.uploads.limit && (
-											<span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded-full">Limit reached</span>
+											<span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded-full">
+												Limit reached
+											</span>
 										)}
 									</div>
 									<div className="flex items-center gap-2">
-										<span className={usage.signs && usage.signs.used >= usage.signs.limit ? "text-red-300 font-semibold" : ""}>
-											✍️ Document Signing: {usage.signs?.used ?? 0} of {usage.signs?.limit ?? 2} used this month
+										<span
+											className={
+												usage.signs && usage.signs.used >= usage.signs.limit
+													? "text-red-300 font-semibold"
+													: ""
+											}
+										>
+											✍️ Document Signing: {usage.signs?.used ?? 0} of {usage.signs?.limit ?? 2}{" "}
+											used this month
 										</span>
 										{usage.signs && usage.signs.used >= usage.signs.limit && (
-											<span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded-full">Limit reached</span>
+											<span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded-full">
+												Limit reached
+											</span>
 										)}
 									</div>
 								</div>
 								{((usage.uploads && usage.uploads.used >= usage.uploads.limit) ||
 									(usage.signs && usage.signs.used >= usage.signs.limit)) && (
-										<p className="text-sm mt-3 font-medium">
-											⚠️ You&apos;ve reached your free plan limit. Upgrade to continue using all features.
-										</p>
-									)}
+									<p className="text-sm mt-3 font-medium">
+										⚠️ You&apos;ve reached your free plan limit. Upgrade to continue using all
+										features.
+									</p>
+								)}
 							</div>
 							<Link
 								href="/subscription"
@@ -595,10 +616,11 @@ export default function DashboardClient() {
 													<button
 														key={pageNum}
 														onClick={() => loadDashboardData(pageNum)}
-														className={`px-3 py-1 rounded-md text-sm transition-colors ${inboxPage === pageNum
-															? "bg-blue-600 text-white"
-															: "bg-gray-700 hover:bg-gray-600 text-white"
-															}`}
+														className={`px-3 py-1 rounded-md text-sm transition-colors ${
+															inboxPage === pageNum
+																? "bg-blue-600 text-white"
+																: "bg-gray-700 hover:bg-gray-600 text-white"
+														}`}
 													>
 														{pageNum}
 													</button>
@@ -667,12 +689,13 @@ export default function DashboardClient() {
 							<div className="bg-gray-800/30 rounded-lg p-4">
 								<p className="text-gray-400 text-sm mb-1">Status</p>
 								<p
-									className={`font-semibold ${subscription.status === "active"
-										? "text-green-400"
-										: subscription.status === "canceled"
-											? "text-red-400"
-											: "text-yellow-400"
-										}`}
+									className={`font-semibold ${
+										subscription.status === "active"
+											? "text-green-400"
+											: subscription.status === "canceled"
+												? "text-red-400"
+												: "text-yellow-400"
+									}`}
 								>
 									{subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
 								</p>
@@ -813,7 +836,6 @@ export default function DashboardClient() {
 									</div>
 									<SigningProgressWidget
 										recipients={doc.recipients}
-
 										onViewDetails={() => router.push(`/dashboard/signing-progress`)}
 										className="bg-gray-800/30 border-gray-700"
 									/>
@@ -873,7 +895,7 @@ export default function DashboardClient() {
 								)}
 								<div className="flex gap-2 justify-end flex-wrap">
 									<button
-										className="px-4 py-2 bg-yellow-500 text-black rounded-md"
+										className="px-4 py-2 bg-yellow-500 text-yellow-950 font-semibold rounded-md hover:bg-yellow-600"
 										onClick={async () => {
 											setCancelling(true);
 											try {
@@ -945,7 +967,7 @@ export default function DashboardClient() {
 												Yes, cancel now
 											</button>
 											<button
-												className="px-3 py-2 bg-gray-200 text-black rounded-md"
+												className="px-3 py-2 bg-gray-300 text-gray-900 font-medium rounded-md hover:bg-gray-400"
 												onClick={() => setConfirmImmediate(false)}
 											>
 												No, go back
@@ -953,7 +975,7 @@ export default function DashboardClient() {
 										</>
 									)}
 									<button
-										className="px-4 py-2 bg-gray-200 text-black rounded-md"
+										className="px-3 py-2 bg-gray-300 text-gray-900 font-medium rounded-md hover:bg-gray-400"
 										onClick={() => {
 											setShowCancelModal(false);
 											setConfirmImmediate(false);

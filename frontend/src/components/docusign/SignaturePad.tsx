@@ -399,10 +399,10 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 
 	if (field.type === "date") {
 		return (
-			<div className={`bg-white rounded-lg shadow-lg p-6 ${className}`}>
+			<div className={`bg-slate-900 rounded-lg shadow-lg p-6 ${className}`}>
 				<div className="flex items-center gap-2 mb-4">
 					{getFieldIcon()}
-					<h3 className="text-lg font-semibold text-gray-900">{getFieldLabel()}</h3>
+					<h3 className="text-lg font-semibold text-white">{getFieldLabel()}</h3>
 				</div>
 				{renderDateField()}
 			</div>
@@ -418,10 +418,10 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 		field.type === "address"
 	) {
 		return (
-			<div className={`bg-white rounded-lg shadow-lg p-6 ${className}`}>
+			<div className={`bg-slate-900 rounded-lg shadow-lg p-6 ${className}`}>
 				<div className="flex items-center gap-2 mb-4">
 					{getFieldIcon()}
-					<h3 className="text-lg font-semibold text-gray-900">{getFieldLabel()}</h3>
+					<h3 className="text-lg font-semibold text-white">{getFieldLabel()}</h3>
 				</div>
 				{renderTextField()}
 			</div>
@@ -430,20 +430,18 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 
 	// Signature and Initial fields - DRAW OR TYPE
 	return (
-		<div className={`bg-white rounded-lg shadow-lg p-6 ${className}`} style={{ color: "#1f2937" }}>
-			<div className="flex items-center justify-between mb-4">
-				<div className="flex items-center gap-2">
-					{getFieldIcon()}
-					<h3 className="text-lg font-semibold text-gray-900" style={{ color: "#111827" }}>
-						Add your {getFieldLabel()}
-						{recipientName ? ` — ${recipientName}` : ""}
-					</h3>
-				</div>
-				<button
-					onClick={onClose}
-					className="text-gray-400 hover:text-gray-600 transition-colors text-2xl font-bold"
-					style={{ color: "#9ca3af" }}
-				>
+			<div className={`bg-slate-900 rounded-lg shadow-lg p-6 ${className}`} style={{ color: "#e5e7eb" }}>
+				<div className="flex items-center justify-between mb-4">
+					<div className="flex items-center gap-2">
+						{getFieldIcon()}
+						<h3 className="text-lg font-semibold text-white">
+							Add your {getFieldLabel()}
+							{recipientName ? ` — ${recipientName}` : ""}
+						</h3>
+					</div>
+					<button
+						onClick={onClose}
+						className="text-gray-400 hover:text-gray-300 transition-colors text-2xl font-bold"
 					×
 				</button>
 			</div>
