@@ -1,7 +1,7 @@
 "use client";
 
-import ActivityClient from "@/app/fomiqsign/activity/ActivityClient";
-import StatusTrackerClient from "@/app/fomiqsign/status-tracker/StatusTrackerClient";
+import ActivityClient from "@/app/(main)/fomiqsign/activity/ActivityClient";
+import StatusTrackerClient from "@/app/(main)/fomiqsign/status-tracker/StatusTrackerClient";
 import { PDFUpload } from "@/components/docusign/PDFUpload";
 import { SignatureTracking } from "@/components/docusign/SignatureTracking";
 import { TemplateList } from "@/components/docusign/TemplateList";
