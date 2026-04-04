@@ -1,51 +1,73 @@
+import jwt from "jsonwebtoken";
 import Session from "../models/Session.js";
 import User from "../models/User.js";
 
 /**
- * Middleware to authenticate requests using session-based authentication
- * Validates session from httpOnly cookie and attaches user to request
+ * Middleware to authenticate requests using session-based or token-based authentication
+ * Supporting both legacy sessions and new Bearer tokens for mirroring Fomiq pattern.
  */
 export const authenticateSession = async (request, reply) => {
   try {
-    const sessionId = request.cookies?.sessionId;
+    let user = null;
+    let session = null;
 
-    if (!sessionId) {
+    // 1. Check for Bearer token first (New Fomiq-mirrored pattern)
+    const authHeader = request.headers.authorization || request.headers.Authorization;
+    
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.substring(7);
+      if (token && token !== "undefined" && token !== "null") {
+        try {
+          const JWT_SECRET = process.env.JWT_SECRET;
+          if (!JWT_SECRET) {
+            request.log.error("JWT_SECRET is not set in environment");
+          } else {
+            const decoded = jwt.verify(token, JWT_SECRET);
+            // Support both 'id' and 'userId' in payload
+            const userId = decoded.id || decoded.userId;
+            
+            if (userId) {
+              user = await User.findById(userId).select("-password");
+              if (user) {
+                request.log.info({ userId: user._id }, "Authenticated via Bearer token");
+              } else {
+                request.log.warn({ userId }, "User from token not found in database");
+              }
+            } else {
+              request.log.warn("Token decoded successfully but contained no user ID");
+            }
+          }
+        } catch (err) {
+          request.log.warn({ error: err.message }, "Bearer token verification failed");
+        }
+      }
+    }
+
+    // 2. Fallback to Legacy Session (if no valid user from token)
+    if (!user) {
+      const sessionId = request.cookies?.sessionId;
+      if (sessionId) {
+        session = await Session.findBySessionId(sessionId);
+        if (session && session.isActive && !session.isExpired()) {
+          user = await User.findById(session.userId);
+          if (user) {
+            request.log.info({ userId: user._id }, "Authenticated via Legacy Session");
+            // Extend session
+            session.extend(7).catch((err) => request.log.error("Failed to extend session:", err));
+          }
+        }
+      }
+    }
+
+    if (!user) {
+      request.log.warn({ 
+        hasAuthHeader: !!authHeader, 
+        hasSessionId: !!request.cookies?.sessionId 
+      }, "Authentication failed: No valid token or session");
+      
       return reply.status(401).send({
         success: false,
         message: "Session required",
-      });
-    }
-
-    const session = await Session.findBySessionId(sessionId);
-
-    if (!session) {
-      reply.clearCookie("sessionId", { path: "/", domain: process.env.COOKIE_DOMAIN || undefined });
-      return reply.status(401).send({
-        success: false,
-        message: "Invalid session",
-      });
-    }
-
-    if (!session.isActive) {
-      return reply.status(401).send({
-        success: false,
-        message: "Session terminated",
-      });
-    }
-
-    if (session.isExpired()) {
-      return reply.status(401).send({
-        success: false,
-        message: "Session expired",
-      });
-    }
-
-    const user = await User.findById(session.userId);
-
-    if (!user) {
-      return reply.status(401).send({
-        success: false,
-        message: "User not found",
       });
     }
 
@@ -56,13 +78,8 @@ export const authenticateSession = async (request, reply) => {
       });
     }
 
-    // Update lastActivity and extend expiresAt by 7 days
-    session.extend(7).catch((err) => {
-      request.log.error("Failed to extend session:", err);
-    });
-
     request.user = user;
-    request.session = session;
+    if (session) request.session = session;
   } catch (error) {
     request.log.error("Session authentication error:", error);
     return reply.status(500).send({
