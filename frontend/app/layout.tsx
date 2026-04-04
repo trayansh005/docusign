@@ -17,7 +17,6 @@ import "./globals.css";
 import LayoutContent from "./components/LayoutContent";
 import Header from "./components/Header";
 import { Providers } from "@/components/Providers";
-import { headers } from "next/headers";
 
 const inter = Inter({
 	variable: "--font-inter",
@@ -118,13 +117,6 @@ export default async function RootLayout({
 }: Readonly<{
 	children: React.ReactNode;
 }>) {
-	// Read pathname server-side to conditionally show header
-	const headersList = await headers();
-	const pathname = headersList.get("x-invoke-path") || headersList.get("x-pathname") || "";
-	const hideHeader = ["/login", "/register", "/fomiqsign/dashboard/viewer"].some((p) =>
-		pathname.startsWith(p)
-	);
-
 	return (
 		<html lang="en" className="dark">
 			<body
@@ -134,7 +126,7 @@ export default async function RootLayout({
 				<div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent -z-10" />
 
 				<Providers>
-					{!hideHeader && <Header />}
+					<Header />
 					<LayoutContent>{children}</LayoutContent>
 				</Providers>
 

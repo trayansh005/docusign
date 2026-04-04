@@ -6,7 +6,7 @@ export function proxy(request: NextRequest) {
 	const pathname = request.nextUrl.pathname;
 	const hasSessionId = request.cookies.has("sessionId");
 
-	const protectedPaths = ["/dashboard", "/fomiqsign", "/profile", "/settings", "/subscription"];
+	const protectedPaths = ["/dashboard", "/fomiqsign", "/profile", "/settings"];
 	const isProtected = protectedPaths.some((path) => pathname.startsWith(path));
 
 	const authPaths = ["/login", "/register"];
