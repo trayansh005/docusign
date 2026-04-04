@@ -229,26 +229,7 @@ export default function DashboardClient() {
 		}
 	};
 
-	// Show loading spinner while auth is initializing
-	if (isLoading) {
-		return (
-			<div className="min-h-screen flex items-center justify-center">
-				<div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
-				<span className="ml-4 text-white">Loading...</span>
-			</div>
-		);
-	}
-
-	// If not loading and not authenticated, the useEffect will handle redirect
-	// Show loading briefly to avoid flash of content
-	if (!user) {
-		return (
-			<div className="min-h-screen flex items-center justify-center">
-				<div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
-				<span className="ml-4 text-white">Redirecting...</span>
-			</div>
-		);
-	}
+	// Auth protection handled by proxy.ts — no loading/redirect UI needed here.	}
 
 	return (
 		<div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
