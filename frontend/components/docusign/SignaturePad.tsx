@@ -44,7 +44,7 @@ interface SignaturePadProps {
 	onSignatureComplete: (
 		fieldId: string,
 		signatureData: string,
-		meta?: { fontId?: string; isPlainText?: boolean; text?: string }
+		meta?: { fontId?: string; isPlainText?: boolean; text?: string },
 	) => void;
 	onClose: () => void;
 	className?: string;
@@ -91,7 +91,7 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 
 	const [textValue, setTextValue] = useState<string>(getInitialTextValue());
 	const [signatureMode, setSignatureMode] = useState<"draw" | "type" | "custom">(
-		getInitialSignatureMode()
+		getInitialSignatureMode(),
 	);
 	const [selectedFontId, setSelectedFontId] = useState<string>(SIGNATURE_FONTS[0].id);
 
@@ -430,20 +430,23 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 
 	// Signature and Initial fields - DRAW OR TYPE
 	return (
-			<div className={`bg-slate-900 rounded-lg shadow-lg p-6 ${className}`} style={{ color: "#e5e7eb" }}>
-				<div className="flex items-center justify-between mb-4">
-					<div className="flex items-center gap-2">
-						{getFieldIcon()}
-						<h3 className="text-lg font-semibold text-white">
-							Add your {getFieldLabel()}
-							{recipientName ? ` — ${recipientName}` : ""}
-						</h3>
-					</div>
-					<button
-						onClick={onClose}
-						className="text-gray-400 hover:text-gray-300 transition-colors text-2xl font-bold"
-					>
-						×
+		<div
+			className={`bg-slate-900 rounded-lg shadow-lg p-6 ${className}`}
+			style={{ color: "#e5e7eb" }}
+		>
+			<div className="flex items-center justify-between mb-4">
+				<div className="flex items-center gap-2">
+					{getFieldIcon()}
+					<h3 className="text-lg font-semibold text-white">
+						Add your {getFieldLabel()}
+						{recipientName ? ` — ${recipientName}` : ""}
+					</h3>
+				</div>
+				<button
+					onClick={onClose}
+					className="text-gray-400 hover:text-gray-300 transition-colors text-2xl font-bold"
+				>
+					×
 				</button>
 			</div>
 
@@ -660,8 +663,8 @@ export const SignaturePad: React.FC<SignaturePadProps> = ({
 						signatureMode === "draw"
 							? !hasDrawing
 							: signatureMode === "type" || signatureMode === "custom"
-							? !textValue.trim()
-							: false
+								? !textValue.trim()
+								: false
 					}
 					className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 					style={{ color: "#ffffff" }}
