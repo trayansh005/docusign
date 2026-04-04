@@ -28,7 +28,7 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 	return {
 		// Initial state
 		user: null,
-		isLoading: false,
+		isLoading: true, // true until initialize() completes
 		isInitialized: false,
 
 		// State setters
@@ -155,3 +155,9 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 		},
 	};
 });
+
+// Auto-initialize on module load — fires before any component mounts,
+// so the header and all consumers get user state as early as possible.
+if (typeof window !== "undefined") {
+	useAuthStore.getState().initialize();
+}

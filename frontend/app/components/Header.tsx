@@ -13,6 +13,7 @@ export default function Header() {
 	const user = useAuthStore((state) => state.user);
 	const logout = useAuthStore((state) => state.logout);
 	const isLoading = useAuthStore((state) => state.isLoading);
+	const isInitialized = useAuthStore((state) => state.isInitialized);
 
 	const handleLogout = async () => {
 		await logout();
@@ -39,7 +40,7 @@ export default function Header() {
 
 					{/* Desktop Navigation */}
 					<nav className="hidden md:flex items-center space-x-1 text-white">
-						{isLoading ? (
+						{(!isInitialized || isLoading) ? (
 							<div className="flex items-center space-x-2">
 								<div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
 								<span className="text-gray-400 text-sm">Loading...</span>
@@ -151,7 +152,7 @@ export default function Header() {
 						}`}
 				>
 					<nav className="flex flex-col space-y-2 pt-4 border-t border-white/10">
-						{isLoading ? (
+						{(!isInitialized || isLoading) ? (
 							<div className="flex items-center justify-center space-x-2 py-4">
 								<div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
 								<span className="text-gray-400 text-sm">Loading...</span>
