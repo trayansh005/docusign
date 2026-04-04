@@ -38,7 +38,8 @@ function setCookie(name: string, value: string, maxAge: number) {
 
 function deleteCookie(name: string) {
   if (typeof document === "undefined") return;
-	document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax`;
+  const secure = location.protocol === "https:" ? "; Secure" : "";
+	document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax${secure}`;
 }
 
 export function getAccessToken(): string | null {
@@ -112,5 +113,6 @@ export async function logoutAction(): Promise<void> {
 	} finally {
 		deleteCookie(COOKIE_NAME);
 		deleteCookie(REFRESH_COOKIE);
+    deleteCookie("sessionId"); // Clear legacy session cookie
 	}
 }

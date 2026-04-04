@@ -66,4 +66,5 @@ export function clearAuthCookies(reply) {
 
   reply.setCookie("accessToken", "", { ...base, maxAge: 0 });
   reply.setCookie("refreshToken", "", { ...base, maxAge: 0 });
+  reply.setCookie("sessionId", "", { ...base, maxAge: 0 });
 }
