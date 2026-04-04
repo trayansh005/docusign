@@ -15,8 +15,9 @@ import {
 } from "next/font/google";
 import "./globals.css";
 import LayoutContent from "./components/LayoutContent";
-import { AuthInitializer } from "@/components/AuthInitializer";
+import Header from "./components/Header";
 import { Providers } from "@/components/Providers";
+import { headers } from "next/headers";
 
 const inter = Inter({
 	variable: "--font-inter",
@@ -112,11 +113,18 @@ export const viewport: Viewport = {
 	initialScale: 1,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
 	children,
 }: Readonly<{
 	children: React.ReactNode;
 }>) {
+	// Read pathname server-side to conditionally show header
+	const headersList = await headers();
+	const pathname = headersList.get("x-invoke-path") || headersList.get("x-pathname") || "";
+	const hideHeader = ["/login", "/register", "/fomiqsign/dashboard/viewer"].some((p) =>
+		pathname.startsWith(p)
+	);
+
 	return (
 		<html lang="en" className="dark">
 			<body
@@ -126,11 +134,10 @@ export default function RootLayout({
 				<div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent -z-10" />
 
 				<Providers>
-					<AuthInitializer />
+					{!hideHeader && <Header />}
 					<LayoutContent>{children}</LayoutContent>
 				</Providers>
 
-				{/* Background Elements */}
 				<div className="fixed top-0 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse -z-10" />
 				<div className="fixed bottom-0 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl animate-pulse -z-10" />
 			</body>
