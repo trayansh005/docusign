@@ -30,6 +30,27 @@ import testRoutes from "./routes/test.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+/**
+ * 1. Immediate Directory Initialization
+ * Ensuring that the uploads folder exists BEFORE any plugins (like @fastify/static)
+ * attempt to access it.
+ */
+const requiredDirs = [
+  "uploads",
+  "uploads/temp",
+  "uploads/signatures",
+  "uploads/signatures/templates",
+  "uploads/signatures/users"
+];
+
+for (const dir of requiredDirs) {
+  const dirPath = path.join(__dirname, dir);
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+    console.log(`[BOOT] Created required directory: ${dir}`);
+  }
+}
+
 const fastify = Fastify({
   logger: {
     level: "info",
@@ -49,15 +70,15 @@ const fastify = Fastify({
 
 // Register Core Plugins
 await fastify.register(helmet, {
-  contentSecurityPolicy: false, // Disable for development if needed
+  contentSecurityPolicy: false,
 });
 await fastify.register(compress);
 await fastify.register(cookie);
 
 // Raw Body for Stripe Webhooks
 await fastify.register(fastifyRawBody, {
-  field: "rawBody", // field name to store the raw body
-  global: false, // only for specific routes
+  field: "rawBody",
+  global: false,
   encoding: "utf8",
   runFirst: true,
 });
@@ -91,7 +112,7 @@ await fastify.register(rateLimit, {
 
 await fastify.register(multipart, {
   limits: {
-    fileSize: 20 * 1024 * 1024, // 20MB
+    fileSize: 20 * 1024 * 1024,
   },
 });
 
@@ -102,8 +123,18 @@ await fastify.register(authPlugin);
 // Static files
 await fastify.register(fastifyStatic, {
   root: path.join(__dirname, "uploads"),
-  prefix: "/uploads/", // Match the URL structure used in models
+  prefix: "/uploads/",
   decorateReply: false,
+});
+
+// Root Route - Health & Connectivity check
+fastify.get("/", async (request, reply) => {
+  return {
+    name: "FomiqSign API",
+    version: "1.0.0",
+    status: "online",
+    environment: process.env.NODE_ENV || "development"
+  };
 });
 
 // Health check
@@ -121,31 +152,14 @@ await fastify.register(activityRoutes, { prefix: "/api/activity" });
 await fastify.register(authRoutes, { prefix: "/api/auth" });
 await fastify.register(dashboardRoutes, { prefix: "/api/dashboard" });
 await fastify.register(docusignRoutes, { prefix: "/api/docusign" });
-await fastify.register(signatureRoutes, { prefix: "/api/signatures" });
-await fastify.register(subscriptionRoutes, { prefix: "/api/subscriptions" });
+await fastify.register(signatureRoutes, { prefix: "/api/signature" }); // Changed to singular
+await fastify.register(subscriptionRoutes, { prefix: "/api/subscription" }); // Changed to singular
 await fastify.register(userRoutes, { prefix: "/api/user" });
 await fastify.register(contactRoutes, { prefix: "/api/contact" });
 await fastify.register(testRoutes, { prefix: "/api/test" });
 
 const start = async () => {
   try {
-    // Ensure required directories exist
-    const requiredDirs = [
-      "uploads",
-      "uploads/temp",
-      "uploads/signatures",
-      "uploads/signatures/templates",
-      "uploads/signatures/users"
-    ];
-    
-    for (const dir of requiredDirs) {
-      const dirPath = path.join(__dirname, dir);
-      if (!fs.existsSync(dirPath)) {
-        fs.mkdirSync(dirPath, { recursive: true });
-        fastify.log.info(`Created required directory: ${dir}`);
-      }
-    }
-
     const PORT = process.env.PORT || 5002;
     const HOST = "0.0.0.0";
     
