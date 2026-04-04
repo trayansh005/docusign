@@ -17,6 +17,7 @@ export default function DashboardClient({}: DashboardClientProps) {
 	const router = useRouter();
 	const user = useAuthStore((state) => state.user);
 	const isLoading = useAuthStore((state) => state.isLoading);
+	const isInitialized = useAuthStore((state) => state.isInitialized);
 	const [activeTab, setActiveTab] = useState<TabType>("upload");
 	const [selectedTemplate] = useState<DocuSignTemplateData | null>(null);
 	const [usage, setUsage] = useState<{
@@ -25,14 +26,15 @@ export default function DashboardClient({}: DashboardClientProps) {
 		signs?: { used: number; limit: number };
 	} | null>(null);
 
-	// Auth guard - redirect to login if not authenticated
+	// Auth guard - wait for isInitialized before redirecting
 	useEffect(() => {
-		if (!isLoading && !user) {
+		if (isInitialized && !isLoading && !user) {
 			router.replace("/login");
 		}
-	}, [user, isLoading, router]);
+	}, [isInitialized, user, isLoading, router]);
 
 	useEffect(() => {
+		if (!isInitialized || !user) return;
 		let mounted = true;
 		(async () => {
 			try {

@@ -39,7 +39,7 @@ function buildCookieConfig(request) {
     httpOnly: true,
     secure: process.env.COOKIE_SECURE !== undefined
       ? String(process.env.COOKIE_SECURE).toLowerCase() === "true"
-      : process.env.NODE_ENV === "production",
+      : process.env.NODE_ENV === "production", // always true in production
     sameSite: process.env.COOKIE_SAMESITE || "lax",
     domain,
     path: "/",

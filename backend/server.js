@@ -66,6 +66,8 @@ const fastify = Fastify({
           },
   },
   bodyLimit: 1048576 * 20, // 20MB body limit
+  // Required for correct IP resolution and cookie handling behind a reverse proxy
+  trustProxy: true,
 });
 
 // Register Core Plugins
@@ -103,7 +105,7 @@ await fastify.register(cors, {
 });
 
 // Trust Proxy (Required for rate limiting behind reverse proxy)
-fastify.decorate("trustProxy", true);
+// NOTE: trustProxy is already set in the Fastify constructor above.
 
 await fastify.register(rateLimit, {
   max: 100,

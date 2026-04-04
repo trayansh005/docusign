@@ -66,6 +66,7 @@ interface InboxItem {
 export default function DashboardClient() {
 	const user = useAuthStore((state) => state.user);
 	const isLoading = useAuthStore((state) => state.isLoading);
+	const isInitialized = useAuthStore((state) => state.isInitialized);
 	const router = useRouter();
 	const [stats, setStats] = useState<UserStats | null>({
 		totalDocuments: 0,
@@ -93,14 +94,13 @@ export default function DashboardClient() {
 	const [loadingDocuments, setLoadingDocuments] = useState(false);
 
 	// Auth guard - redirect to login if not authenticated
-	// Only redirect after auth has finished loading to avoid redirect loops
+	// Wait for isInitialized so we don't redirect before the session check completes
 	useEffect(() => {
-		// Wait for auth to finish loading before checking
-		if (!isLoading && !user) {
+		if (isInitialized && !isLoading && !user) {
 			console.log("🔒 Dashboard: Not authenticated, redirecting to login");
 			router.replace("/login");
 		}
-	}, [user, isLoading, router]);
+	}, [isInitialized, user, isLoading, router]);
 
 	// Activities query (disabled - uses hydrated cache from server)
 	const { data: activitiesData } = useQuery({
@@ -191,10 +191,12 @@ export default function DashboardClient() {
 	}, []);
 
 	// Phase 1 Optimization: Single useEffect that calls parallel loader
+	// Only fire after auth is confirmed — prevents 401 spam before session check completes
 	useEffect(() => {
+		if (!isInitialized || !user) return;
 		loadDashboardData();
 		loadDocumentsWithRecipients();
-	}, [loadDashboardData, loadDocumentsWithRecipients]);
+	}, [isInitialized, user, loadDashboardData, loadDocumentsWithRecipients]);
 
 	// Convert backend path to absolute URL using the configured API base
 	const getAbsolutePdfUrl = (pdfPath: string | undefined) => {
