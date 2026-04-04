@@ -60,22 +60,8 @@ instance.interceptors.response.use(
 	(response) => {
 		const data = response.data;
 
-		// Automatically store tokens in JS-accessible cookies if returned in the JSON body
-		if (typeof window !== "undefined") {
-			const ONE_DAY = 60 * 60 * 24;
-			const SEVEN_DAYS = ONE_DAY * 7;
-			const secure = location.protocol === "https:" ? "; Secure" : "";
-
-			if (data.token || data.accessToken) {
-				const token = data.token || data.accessToken;
-				document.cookie = `accessToken=${token}; Path=/; Max-Age=${ONE_DAY}; SameSite=Lax${secure}`;
-			}
-
-			if (data.refreshToken) {
-				document.cookie = `refreshToken=${data.refreshToken}; Path=/; Max-Age=${SEVEN_DAYS}; SameSite=Lax${secure}`;
-			}
-		}
-
+		// The backend already sets httpOnly auth cookies (accessToken, refreshToken).
+		// We avoid setting them manually here to prevent duplicates and maintain security.
 		return response;
 	},
 	(error) => {

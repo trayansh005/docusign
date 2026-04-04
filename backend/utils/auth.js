@@ -57,14 +57,23 @@ export function setAuthCookies(reply, accessToken, refreshToken, rememberMe = fa
 
 /**
  * Clear auth cookies (logout).
+ * Sets both maxAge: 0 and an expires date in the past for maximum compatibility.
  */
 export function clearAuthCookies(reply) {
   const isProd = process.env.NODE_ENV === "production";
   const domain = process.env.COOKIE_DOMAIN || undefined;
 
-  const base = { httpOnly: true, secure: isProd, sameSite: "lax", domain, path: "/" };
+  const base = {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: "lax",
+    domain,
+    path: "/",
+    maxAge: 0,
+    expires: new Date(0), // Set to historical epoch to force immediate deletion
+  };
 
-  reply.setCookie("accessToken", "", { ...base, maxAge: 0 });
-  reply.setCookie("refreshToken", "", { ...base, maxAge: 0 });
-  reply.setCookie("sessionId", "", { ...base, maxAge: 0 });
+  reply.setCookie("accessToken", "", base);
+  reply.setCookie("refreshToken", "", base);
+  reply.setCookie("sessionId", "", base);
 }

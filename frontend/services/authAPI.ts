@@ -1,7 +1,21 @@
 import apiClient from "@/lib/apiClient";
+import { deleteCookie } from "@/lib/authClient";
 import { LoginCredentials, RegisterData, AuthResponse, User } from "@/types/auth";
 
 export const authAPI = {
+	async logout(): Promise<void> {
+		try {
+			await apiClient.post("/auth/logout", {});
+		} catch (error) {
+			console.error("Logout API error:", error);
+		} finally {
+			// Clear frontend-owned cookies as a safety measure
+			deleteCookie("accessToken");
+			deleteCookie("refreshToken");
+			deleteCookie("sessionId");
+		}
+	},
+
 	async login(credentials: LoginCredentials): Promise<AuthResponse> {
 		try {
 			const data = await apiClient.post<{ success: boolean; message?: string; data?: { user: User } }>(
@@ -88,14 +102,6 @@ export const authAPI = {
 			}
 			console.error("Password change error:", error);
 			return { success: false, message: "Network error. Please try again." };
-		}
-	},
-
-	async logout(): Promise<void> {
-		try {
-			await apiClient.post("/auth/logout", {});
-		} catch (error) {
-			console.error("Logout API error:", error);
 		}
 	},
 

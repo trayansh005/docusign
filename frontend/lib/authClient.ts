@@ -36,10 +36,17 @@ function setCookie(name: string, value: string, maxAge: number) {
 	document.cookie = `${name}=${value}; Path=/; Max-Age=${maxAge}; SameSite=Lax${secure}`;
 }
 
-function deleteCookie(name: string) {
+export function deleteCookie(name: string) {
   if (typeof document === "undefined") return;
-  const secure = location.protocol === "https:" ? "; Secure" : "";
+	const secure = location.protocol === "https:" ? "; Secure" : "";
+  const domain = window.location.hostname.includes("fomiqsign.com") ? "; Domain=.fomiqsign.com" : "";
+
+	// Try clearing without domain
 	document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax${secure}`;
+  // Try clearing with domain to handle cookies set for .fomiqsign.com
+  if (domain) {
+    document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax${secure}${domain}`;
+  }
 }
 
 export function getAccessToken(): string | null {
