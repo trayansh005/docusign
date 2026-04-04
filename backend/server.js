@@ -90,11 +90,14 @@ await fastify.register(cors, {
     const allowedOrigins = [
       process.env.FRONTEND_URL || "http://localhost:3000",
       "https://fomiqsign.com",
+      "https://www.fomiqsign.com",
       "http://localhost:3000",
     ];
+    // Log rejected origins in production to help debug
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      fastify.log.warn({ origin }, "CORS rejected origin");
       callback(new Error("Not allowed by CORS"), false);
     }
   },

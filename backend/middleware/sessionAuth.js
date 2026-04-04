@@ -19,6 +19,7 @@ export const authenticateSession = async (request, reply) => {
     const session = await Session.findBySessionId(sessionId);
 
     if (!session) {
+      reply.clearCookie("sessionId", { path: "/", domain: process.env.COOKIE_DOMAIN || undefined });
       return reply.status(401).send({
         success: false,
         message: "Invalid session",

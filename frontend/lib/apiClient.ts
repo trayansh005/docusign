@@ -27,6 +27,13 @@ class ApiClient {
 
 			// Handle 401 Unauthorized - session expired or invalid
 			if (response.status === 401) {
+				// Import dynamically to avoid circular deps
+				const { useAuthStore } = await import("@/stores/authStore");
+				useAuthStore.getState().clearUser();
+				if (typeof window !== "undefined") {
+					const redirect = encodeURIComponent(window.location.pathname);
+					window.location.href = `/login?redirect=${redirect}`;
+				}
 				const error = new Error("Unauthorized") as Error & { status: number };
 				error.status = 401;
 				throw error;

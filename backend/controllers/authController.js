@@ -154,6 +154,8 @@ export const login = async (request, reply) => {
     user.lastLogin = new Date();
     await user.save();
 
+    request.log.info({ sessionId, userId: user._id.toString() }, "Login: session created");
+
     reply.setCookie("sessionId", sessionId, {
       ...buildCookieConfig(request),
       maxAge: sessionDuration,

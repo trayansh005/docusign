@@ -18,7 +18,9 @@ async function fastifyAuth(fastify, options) {
       const session = await Session.findBySessionId(sessionId);
 
       if (!session) {
-        request.log.warn({ sessionId }, "Auth check failed: Session not found in DB");
+        request.log.warn({ sessionId, sessionIdLength: sessionId.length }, "Auth check failed: Session not found in DB");
+        // Clear the stale cookie so the browser doesn't keep sending it
+        reply.clearCookie("sessionId", { path: "/", domain: process.env.COOKIE_DOMAIN || undefined });
         return reply.status(401).send({
           success: false,
           message: "Invalid session",
