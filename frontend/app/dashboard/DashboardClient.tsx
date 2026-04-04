@@ -10,6 +10,7 @@ import { Activity } from "@/types/activity";
 import { SigningProgressWidget } from "@/components/docusign/SigningProgressWidget";
 import { getTemplates } from "@/services/docusignAPI";
 import { DocuSignTemplateData } from "@/types/docusign";
+import apiClient from "@/lib/apiClient";
 
 interface UserStats {
 	totalDocuments: number;
@@ -101,84 +102,57 @@ export default function DashboardClient() {
 		}
 	}, [user, isLoading, router]);
 
-	// Phase 1 Optimization: Reuse server-prefetched activities (remove duplicate fetch)
+	// Activities query (disabled - uses hydrated cache from server)
 	const { data: activitiesData } = useQuery({
 		queryKey: ["activities"],
 		queryFn: async () => {
-			// This queryFn is never called because enabled: false
-			// But it's required by React Query even when disabled
-			const res = await fetch("/api/activity", { credentials: "include" });
-			if (!res.ok) throw new Error("Failed to fetch activities");
-			const data = await res.json();
+			const data = await apiClient.get<{ data: Activity[] }>("/activity");
 			return data.data || [];
 		},
-		enabled: false, // Don't refetch - use hydrated cache from server
-		gcTime: 5 * 60 * 1000, // Cache for 5 minutes
+		enabled: false,
+		gcTime: 5 * 60 * 1000,
 	});
 
-	// Phase 1 Optimization: Parallelize API calls with Promise.all
+	// Parallelize dashboard data loading
 	const loadDashboardData = useCallback(async (pageNum: number = 1) => {
 		try {
-			// Fetch all data in parallel
-			const [statsRes, inboxRes, subscriptionRes] = await Promise.all([
-				fetch("/api/dashboard/stats", { credentials: "include" }),
-				fetch(`/api/dashboard/inbox?page=${pageNum}&limit=${INBOX_LIMIT}`, {
-					credentials: "include",
-				}),
-				fetch("/api/subscription/me", { credentials: "include" }),
+			const [statsData, inboxData, subscriptionData] = await Promise.all([
+				apiClient.get<{ success: boolean; data: { owner: UserStats["owner"]; assigned: UserStats["assigned"]; usage: FreeUsage } }>("/dashboard/stats"),
+				apiClient.get<{ success: boolean; data: InboxItem[]; pagination: { current: number; total: number; pages: number } }>(`/dashboard/inbox?page=${pageNum}&limit=${INBOX_LIMIT}`),
+				apiClient.get<{ subscription?: SubscriptionData }>("/subscription/me").catch(() => null),
 			]);
 
-			// Process stats response
-			if (statsRes.ok) {
-				const json = await statsRes.json();
-				if (json?.success && json?.data) {
-					setStats({
-						totalDocuments: json.data.owner?.total || 0,
-						pendingSignatures: json.data.assigned?.pending || 0,
-						completedSignatures: json.data.assigned?.completed || 0,
-						subscriptionStatus: "Free Plan",
-						owner: json.data.owner,
-						assigned: json.data.assigned,
-					});
-					if (json.data.usage) {
-						setUsage(json.data.usage as FreeUsage);
-					}
+			if (statsData?.success && statsData?.data) {
+				setStats({
+					totalDocuments: statsData.data.owner?.total || 0,
+					pendingSignatures: statsData.data.assigned?.pending || 0,
+					completedSignatures: statsData.data.assigned?.completed || 0,
+					subscriptionStatus: "Free Plan",
+					owner: statsData.data.owner,
+					assigned: statsData.data.assigned,
+				});
+				if (statsData.data.usage) setUsage(statsData.data.usage);
+			}
+
+			if (inboxData?.success && Array.isArray(inboxData?.data)) {
+				setInbox(inboxData.data);
+				if (inboxData.pagination) {
+					setInboxPage(inboxData.pagination.current);
+					setInboxTotal(inboxData.pagination.total);
+					setInboxPages(inboxData.pagination.pages);
 				}
 			}
 
-			// Process inbox response
-			if (inboxRes.ok) {
-				const json = await inboxRes.json();
-				if (json?.success && Array.isArray(json.data)) {
-					setInbox(json.data);
-					if (json.pagination) {
-						setInboxPage(json.pagination.current);
-						setInboxTotal(json.pagination.total);
-						setInboxPages(json.pagination.pages);
-					}
-				}
-			}
-
-			// Process subscription response
-			if (subscriptionRes.ok) {
-				const subscriptionData = await subscriptionRes.json();
-				if (subscriptionData?.subscription) {
-					setSubscription(subscriptionData.subscription);
-					// Update stats subscription status
-					setStats((prev) => ({
-						...prev!,
-						subscriptionStatus: subscriptionData.subscription?.planId?.name || "Free Plan",
-					}));
-				}
+			if (subscriptionData?.subscription) {
+				setSubscription(subscriptionData.subscription);
+				setStats((prev) => ({
+					...prev!,
+					subscriptionStatus: subscriptionData.subscription?.planId?.name || "Free Plan",
+				}));
 			}
 		} catch (error) {
 			console.error("Failed to load dashboard data:", error);
-			setStats({
-				totalDocuments: 0,
-				pendingSignatures: 0,
-				completedSignatures: 0,
-				subscriptionStatus: "Free Plan",
-			});
+			setStats({ totalDocuments: 0, pendingSignatures: 0, completedSignatures: 0, subscriptionStatus: "Free Plan" });
 		}
 	}, []);
 
@@ -222,21 +196,13 @@ export default function DashboardClient() {
 		loadDocumentsWithRecipients();
 	}, [loadDashboardData, loadDocumentsWithRecipients]);
 
-	// Helper to convert backend path to absolute URL
+	// Convert backend path to absolute URL using the configured API base
 	const getAbsolutePdfUrl = (pdfPath: string | undefined) => {
 		if (!pdfPath) return "";
 		if (pdfPath.startsWith("http://") || pdfPath.startsWith("https://")) return pdfPath;
-
-		// Backend is at localhost:5000, paths like /uploads/... need http://localhost:5000/api
-		const backendBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
-		const baseWithoutApi = backendBase.replace(/\/api$/, "");
+		const backendBase = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002/api").replace(/\/api$/, "");
 		const cleanPath = pdfPath.startsWith("/") ? pdfPath : `/${pdfPath}`;
-
-		// PDF files are served from /api/uploads, not /uploads
-		if (cleanPath.startsWith("/uploads/")) {
-			return `${baseWithoutApi}/api${cleanPath}`;
-		}
-		return `${baseWithoutApi}${cleanPath}`;
+		return `${backendBase}${cleanPath}`;
 	};
 
 	// Extract activities from API response

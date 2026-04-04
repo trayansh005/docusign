@@ -1,5 +1,7 @@
-const rawBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
-const API_BASE_URL = rawBase.endsWith("/api") ? rawBase : rawBase.replace(/\/$/, "") + "/api";
+// Use the env variable exactly as set — no fragile appending logic.
+// Local:  NEXT_PUBLIC_API_URL=http://localhost:5002/api
+// VPS:    NEXT_PUBLIC_API_URL=https://api.fomiqsign.com/api
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002/api").replace(/\/$/, "");
 
 class ApiClient {
 	private baseURL: string;

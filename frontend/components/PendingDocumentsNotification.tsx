@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useAuthStore } from "@/stores/authStore";
 import { useState, useRef, useEffect } from "react";
+import apiClient from "@/lib/apiClient";
 
 interface PendingDocumentsNotificationProps {
 	badgeOnly?: boolean;
@@ -37,23 +38,21 @@ export function PendingDocumentsNotification({
 	const { data: countData, refetch } = useQuery({
 		queryKey: ["pendingDocumentsCount"],
 		queryFn: async () => {
-			const res = await fetch("/api/dashboard/pending-count", { credentials: "include" });
-			if (!res.ok) throw new Error("Failed to fetch pending count");
-			const data = await res.json();
+			const data = await apiClient.get<{ data: { pendingCount: number; unreadCount: number } }>(
+				"/dashboard/pending-count"
+			);
 			return data.data;
 		},
 		enabled: !!user,
-		refetchInterval: 60000, // Refetch every minute
+		refetchInterval: 60000,
 	});
 
 	// Get inbox items when dropdown is open
 	const { data: inboxData, isLoading } = useQuery({
 		queryKey: ["pendingDocumentsList"],
 		queryFn: async () => {
-			const res = await fetch("/api/dashboard/inbox?page=1&limit=5", { credentials: "include" });
-			if (!res.ok) throw new Error("Failed to fetch inbox");
-			const data = await res.json();
-			return data.data as InboxItem[];
+			const data = await apiClient.get<{ data: InboxItem[] }>("/dashboard/inbox?page=1&limit=5");
+			return data.data;
 		},
 		enabled: !!user && isOpen,
 	});
@@ -64,11 +63,9 @@ export function PendingDocumentsNotification({
 	// Mark notifications as read when dropdown opens
 	useEffect(() => {
 		if (isOpen && unreadCount > 0) {
-			fetch("/api/dashboard/mark-notifications-read", {
-				method: "POST",
-				credentials: "include",
-			})
-				.then(() => refetch()) // Refetch to update the count immediately
+			apiClient
+				.post("/dashboard/mark-notifications-read")
+				.then(() => refetch())
 				.catch(console.error);
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps

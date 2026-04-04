@@ -136,18 +136,18 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 			return result;
 		},
 
-		// Logout
+		// Logout — API call MUST complete first before clearing state.
+		// Clearing state early causes a race: React re-runs initialize(),
+		// finds the cookie still valid, and restores the session.
 		logout: async (): Promise<void> => {
-			get().clearUser();
-
 			try {
 				await authAPI.logout();
 			} catch (error) {
+				// Even if the API call fails, proceed with clearing local state.
 				console.error("Logout API error:", error);
-			}
-
-			if (typeof window !== "undefined") {
-				window.location.href = "/login";
+			} finally {
+				// Clear state AFTER the session cookie has been invalidated.
+				get().clearUser();
 			}
 		},
 	};

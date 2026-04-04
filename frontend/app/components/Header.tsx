@@ -3,14 +3,21 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/authStore";
 import { PendingDocumentsNotification } from "@/components/PendingDocumentsNotification";
 
 export default function Header() {
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
+	const router = useRouter();
 	const user = useAuthStore((state) => state.user);
 	const logout = useAuthStore((state) => state.logout);
 	const isLoading = useAuthStore((state) => state.isLoading);
+
+	const handleLogout = async () => {
+		await logout();
+		router.push("/login");
+	};
 
 	return (
 		<header className="sticky top-0 z-50 w-full border-b border-white/10 bg-black/20 backdrop-blur-xl">
@@ -87,7 +94,7 @@ export default function Header() {
 												</div>
 											</Link>
 											<button
-												onClick={logout}
+												onClick={handleLogout}
 												className="nav-link hover:text-red-400 transition-colors text-sm"
 												title="Sign Out"
 											>
@@ -234,8 +241,8 @@ export default function Header() {
 										<hr className="border-white/10 my-2" />
 										<button
 											onClick={() => {
-												logout();
 												setIsMenuOpen(false);
+												handleLogout();
 											}}
 											className="nav-link text-center hover:text-red-400 transition-colors flex items-center justify-center space-x-2"
 										>

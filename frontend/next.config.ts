@@ -3,16 +3,17 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
 	images: {
 		remotePatterns: [
+			// Local development
 			{
 				protocol: "http",
 				hostname: "localhost",
-				port: "5000",
-				pathname: "/api/**",
+				port: "5002",
+				pathname: "/uploads/**",
 			},
+			// Production VPS
 			{
-				protocol: "http",
-				hostname: "localhost",
-				port: "5000",
+				protocol: "https",
+				hostname: "api.fomiqsign.com",
 				pathname: "/uploads/**",
 			},
 		],

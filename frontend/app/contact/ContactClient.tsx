@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { toast } from "sonner";
+import apiClient from "@/lib/apiClient";
 
 interface ContactForm {
 	name: string;
@@ -36,25 +37,11 @@ export default function ContactClient() {
 		setIsSubmitting(true);
 
 		try {
-			const response = await fetch("/api/contact", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(formData),
-			});
-
-			const data = await response.json();
+			const data = await apiClient.post<{ success: boolean; message?: string }>("/contact", formData);
 
 			if (data.success) {
-				toast.success("Message sent successfully! We\u0027ll get back to you soon.");
-				setFormData({
-					name: "",
-					email: "",
-					subject: "",
-					message: "",
-					category: "general",
-				});
+				toast.success("Message sent successfully! We'll get back to you soon.");
+				setFormData({ name: "", email: "", subject: "", message: "", category: "general" });
 			} else {
 				toast.error(data.message || "Failed to send message. Please try again.");
 			}

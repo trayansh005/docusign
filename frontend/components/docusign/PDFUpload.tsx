@@ -33,7 +33,9 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
 			const formData = new FormData();
 			formData.append("document", file);
 
-			const res = await fetch("/api/docusign/upload", {
+			// Use absolute URL from env — relative fetch() hits fomiqsign.com, not api.fomiqsign.com
+			const apiBase = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002/api").replace(/\/$/, "");
+			const res = await fetch(`${apiBase}/docusign/upload`, {
 				method: "POST",
 				body: formData,
 				credentials: "include",
