@@ -1,6 +1,7 @@
 import "dotenv/config";
 import Fastify from "fastify";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
@@ -128,11 +129,30 @@ await fastify.register(testRoutes, { prefix: "/api/test" });
 
 const start = async () => {
   try {
+    // Ensure required directories exist
+    const requiredDirs = [
+      "uploads",
+      "uploads/temp",
+      "uploads/signatures",
+      "uploads/signatures/templates",
+      "uploads/signatures/users"
+    ];
+    
+    for (const dir of requiredDirs) {
+      const dirPath = path.join(__dirname, dir);
+      if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+        fastify.log.info(`Created required directory: ${dir}`);
+      }
+    }
+
     const PORT = process.env.PORT || 5002;
-    await fastify.listen({ port: PORT, host: "0.0.0.0" });
-    fastify.log.info(`🚀 Fastify Server running on port ${PORT}`);
+    const HOST = "0.0.0.0";
+    
+    await fastify.listen({ port: PORT, host: HOST });
+    fastify.log.info(`🚀 Fastify Server running on port ${PORT} at ${HOST}`);
   } catch (err) {
-    fastify.log.error(err);
+    fastify.log.error("Failed to start server", err);
     process.exit(1);
   }
 };

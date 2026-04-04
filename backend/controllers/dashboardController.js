@@ -122,7 +122,10 @@ export const getPendingDocumentsCount = async (request, reply) => {
     const userId = request.user?.id || request.user?._id;
     const email = request.user?.email;
 
-    if (!userId) return reply.status(401).send({ success: false, message: "Unauthorized" });
+    if (!userId) {
+      request.log.warn("getPendingDocumentsCount: No userId in request");
+      return reply.status(401).send({ success: false, message: "Unauthorized" });
+    }
 
     const userObjectId = new mongoose.Types.ObjectId(userId);
 
@@ -139,6 +142,8 @@ export const getPendingDocumentsCount = async (request, reply) => {
     if (email) {
       assignedFilter.$or.push({ "recipients.email": email });
     }
+
+    request.log.info({ userId, email }, "Fetching pending documents");
 
     const templates = await DocuSignTemplate.find(assignedFilter).select("recipients updatedAt").lean();
 
@@ -161,6 +166,8 @@ export const getPendingDocumentsCount = async (request, reply) => {
       unreadCount = pendingTemplates.filter((t) => new Date(t.updatedAt) > new Date(lastReadAt)).length;
     }
 
+    request.log.info({ pendingCount, unreadCount }, "Computed pending counts");
+
     return {
       success: true,
       data: {
@@ -169,7 +176,7 @@ export const getPendingDocumentsCount = async (request, reply) => {
       },
     };
   } catch (error) {
-    request.log.error("getPendingDocumentsCount error", error);
+    request.log.error({ err: error, userId: request.user?.id }, "getPendingDocumentsCount error");
     return reply.status(500).send({ success: false, message: error.message || "Failed to get pending count" });
   }
 };

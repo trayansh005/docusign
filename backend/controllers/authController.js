@@ -14,9 +14,9 @@ const cookieConfig = {
     process.env.COOKIE_SAMESITE !== undefined
       ? process.env.COOKIE_SAMESITE
       : process.env.NODE_ENV === "production"
-      ? "strict"
+      ? "lax" // Changed from "strict" to "lax" for cross-subdomain support
       : "lax",
-  ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
+  domain: process.env.COOKIE_DOMAIN || undefined,
   path: "/",
 };
 
