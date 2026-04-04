@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/stores/authStore";
 import { Portal } from "@/components/Portal";
 import { Activity } from "@/types/activity";
 import { SigningProgressWidget } from "@/components/docusign/SigningProgressWidget";
@@ -64,6 +65,7 @@ interface InboxItem {
 
 export default function DashboardClient() {
 	const router = useRouter();
+	const user = useAuthStore((state) => state.user);
 	const [stats, setStats] = useState<UserStats | null>({
 		totalDocuments: 0,
 		pendingSignatures: 0,
