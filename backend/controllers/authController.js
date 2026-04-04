@@ -3,25 +3,48 @@ import User from "../models/User.js";
 import Session from "../models/Session.js";
 import { parseDeviceName } from "../utils/deviceParser.js";
 
-// Cookie configuration
-const cookieConfig = {
-  httpOnly: true,
-  secure:
-    process.env.COOKIE_SECURE !== undefined
-      ? String(process.env.COOKIE_SECURE).toLowerCase() === "true"
-      : process.env.NODE_ENV === "production",
-  sameSite:
-    process.env.COOKIE_SAMESITE !== undefined
-      ? process.env.COOKIE_SAMESITE
-      : process.env.NODE_ENV === "production"
-      ? "lax"
-      : "lax",
-  domain: process.env.COOKIE_DOMAIN || undefined,
-  path: "/",
-};
-
 // Session duration in seconds (Max-Age header is in seconds, not ms)
 const SESSION_MAX_AGE = 7 * 24 * 60 * 60; // 7 days
+
+/**
+ * Build cookie options at request-time.
+ *
+ * Domain strategy:
+ *  - Explicit COOKIE_DOMAIN env var always wins (e.g. ".fomiqsign.com").
+ *  - In production with no env var, derive the root domain from the request
+ *    Origin header so the cookie is shared across all subdomains
+ *    (fomiqsign.com ↔ api.fomiqsign.com).
+ *  - In development, omit domain so the cookie is scoped to localhost.
+ */
+function buildCookieConfig(request) {
+  let domain = process.env.COOKIE_DOMAIN || undefined;
+
+  if (!domain && process.env.NODE_ENV === "production") {
+    // Derive root domain from Origin, e.g. "https://fomiqsign.com" → ".fomiqsign.com"
+    const origin = request.headers["origin"] || request.headers["referer"] || "";
+    try {
+      const hostname = new URL(origin).hostname;
+      // Strip leading subdomain to get the registrable domain, then prefix with "."
+      // e.g. "api.fomiqsign.com" → ".fomiqsign.com", "fomiqsign.com" → ".fomiqsign.com"
+      const parts = hostname.split(".");
+      domain = parts.length > 2
+        ? "." + parts.slice(-2).join(".")
+        : "." + hostname;
+    } catch {
+      // Origin header missing or malformed — fall back to no domain restriction
+    }
+  }
+
+  return {
+    httpOnly: true,
+    secure: process.env.COOKIE_SECURE !== undefined
+      ? String(process.env.COOKIE_SECURE).toLowerCase() === "true"
+      : process.env.NODE_ENV === "production",
+    sameSite: process.env.COOKIE_SAMESITE || "lax",
+    domain,
+    path: "/",
+  };
+}
 
 // Register controller
 export const register = async (request, reply) => {
@@ -69,7 +92,7 @@ export const register = async (request, reply) => {
     await user.save();
 
     reply.setCookie("sessionId", sessionId, {
-      ...cookieConfig,
+      ...buildCookieConfig(request),
       maxAge: SESSION_MAX_AGE,
     });
 
@@ -132,7 +155,7 @@ export const login = async (request, reply) => {
     await user.save();
 
     reply.setCookie("sessionId", sessionId, {
-      ...cookieConfig,
+      ...buildCookieConfig(request),
       maxAge: sessionDuration,
     });
 
@@ -220,7 +243,7 @@ export const logout = async (request, reply) => {
     if (sessionId) {
       await Session.findOneAndDelete({ sessionId });
     }
-    reply.setCookie("sessionId", "", { ...cookieConfig, maxAge: 0 });
+    reply.setCookie("sessionId", "", { ...buildCookieConfig(request), maxAge: 0 });
     return { success: true, message: "Logged out successfully" };
   } catch (error) {
     request.log.error("Logout error:", error);
@@ -276,7 +299,7 @@ export const deleteSession = async (request, reply) => {
 export const logoutAll = async (request, reply) => {
   try {
     const result = await Session.deleteMany({ userId: request.user._id });
-    reply.setCookie("sessionId", "", { ...cookieConfig, maxAge: 0 });
+    reply.setCookie("sessionId", "", { ...buildCookieConfig(request), maxAge: 0 });
     return {
       success: true,
       message: "Logged out from all devices",
