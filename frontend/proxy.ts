@@ -1,27 +1,24 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Next 16 uses the proxy convention (renamed from middleware)
 export function proxy(request: NextRequest) {
 	const pathname = request.nextUrl.pathname;
-	const hasSessionId = request.cookies.has("sessionId");
+	// JWT auth — check for accessToken cookie (set by backend on login)
+	const hasToken = request.cookies.has("accessToken");
 
-	const protectedPaths = ["/dashboard", "/fomiqsign", "/profile", "/settings"];
+	const protectedPaths = ["/dashboard", "/fomiqsign", "/profile", "/settings", "/subscription"];
 	const isProtected = protectedPaths.some((path) => pathname.startsWith(path));
 
 	const authPaths = ["/login", "/register"];
 	const isAuthPage = authPaths.includes(pathname);
 
-	if (isProtected) {
-		if (!hasSessionId) {
-			const loginUrl = new URL("/login", request.url);
-			loginUrl.searchParams.set("redirect", pathname);
-			return NextResponse.redirect(loginUrl);
-		}
-		return NextResponse.next();
+	if (isProtected && !hasToken) {
+		const loginUrl = new URL("/login", request.url);
+		loginUrl.searchParams.set("redirect", pathname);
+		return NextResponse.redirect(loginUrl);
 	}
 
-	if (isAuthPage && hasSessionId) {
+	if (isAuthPage && hasToken) {
 		return NextResponse.redirect(new URL("/dashboard", request.url));
 	}
 

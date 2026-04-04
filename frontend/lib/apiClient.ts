@@ -1,60 +1,65 @@
-// Use the env variable exactly as set — no fragile appending logic.
-// Local:  NEXT_PUBLIC_API_URL=http://localhost:5002/api
-// VPS:    NEXT_PUBLIC_API_URL=https://api.fomiqsign.com/api
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002/api").replace(/\/$/, "");
 
 class ApiClient {
 	private baseURL: string;
+	private isRefreshing = false;
 
 	constructor(baseURL: string) {
 		this.baseURL = baseURL;
 	}
 
-	private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+	private async makeRequest<T>(endpoint: string, options: RequestInit = {}, retry = true): Promise<T> {
 		const url = `${this.baseURL}${endpoint}`;
 
 		const config: RequestInit = {
 			...options,
-			headers: {
-				"Content-Type": "application/json",
-				...options.headers,
-			},
+			headers: { "Content-Type": "application/json", ...options.headers },
 			credentials: "include",
 		};
 
-		try {
-			const response = await fetch(url, config);
+		const response = await fetch(url, config);
 
-			// Handle 401 Unauthorized - session expired or invalid
-			if (response.status === 401) {
-				// Import dynamically to avoid circular deps
-				const { useAuthStore } = await import("@/stores/authStore");
-				useAuthStore.getState().clearUser();
-				if (typeof window !== "undefined") {
-					const redirect = encodeURIComponent(window.location.pathname);
-					window.location.href = `/login?redirect=${redirect}`;
-				}
-				const error = new Error("Unauthorized") as Error & { status: number };
-				error.status = 401;
-				throw error;
-			}
+		if (response.status === 401 && retry) {
+			let body: { needsRefresh?: boolean } = {};
+			try { body = await response.clone().json(); } catch { /* ignore */ }
 
-			const text = await response.text();
-			let data: unknown = null;
-			if (text) {
+			if (body.needsRefresh && !this.isRefreshing) {
+				// Try to refresh the access token
+				this.isRefreshing = true;
 				try {
-					data = JSON.parse(text);
+					const refreshRes = await fetch(`${this.baseURL}/auth/refresh`, {
+						method: "POST",
+						credentials: "include",
+					});
+					this.isRefreshing = false;
+
+					if (refreshRes.ok) {
+						// Retry original request with new token
+						return this.makeRequest<T>(endpoint, options, false);
+					}
 				} catch {
-					const snippet = text.slice(0, 200).replace(/\s+/g, " ");
-					const msg = `Expected JSON response but received non-JSON (status ${response.status}). Response start: ${snippet}`;
-					throw new Error(msg);
+					this.isRefreshing = false;
 				}
 			}
 
-			return data as T;
-		} catch (error) {
-			console.error("API request failed:", error);
+			// Refresh failed or not needed — clear state and redirect
+			const { useAuthStore } = await import("@/stores/authStore");
+			useAuthStore.getState().clearUser();
+			if (typeof window !== "undefined") {
+				window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
+			}
+			const error = new Error("Unauthorized") as Error & { status: number };
+			error.status = 401;
 			throw error;
+		}
+
+		const text = await response.text();
+		if (!text) return null as T;
+
+		try {
+			return JSON.parse(text) as T;
+		} catch {
+			throw new Error(`Expected JSON but got: ${text.slice(0, 200)}`);
 		}
 	}
 

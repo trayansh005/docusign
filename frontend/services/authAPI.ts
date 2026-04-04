@@ -1,5 +1,5 @@
 import apiClient from "@/lib/apiClient";
-import { LoginCredentials, RegisterData, AuthResponse, User, Session } from "@/types/auth";
+import { LoginCredentials, RegisterData, AuthResponse, User } from "@/types/auth";
 
 export const authAPI = {
 	async login(credentials: LoginCredentials): Promise<AuthResponse> {
@@ -31,8 +31,7 @@ export const authAPI = {
 				return { success: true, message: data.message || "Registration successful", user: data.data.user };
 			}
 			if (data.errors && Array.isArray(data.errors)) {
-				const errorMessages = data.errors.map((e) => e.message).join(", ");
-				return { success: false, message: `Validation failed: ${errorMessages}` };
+				return { success: false, message: data.errors.map((e) => e.message).join(", ") };
 			}
 			return { success: false, message: data.message || "Registration failed" };
 		} catch (error) {
@@ -49,7 +48,6 @@ export const authAPI = {
 			}
 			return { success: false };
 		} catch (error: unknown) {
-			// 401 means unauthenticated — not an unexpected error
 			if (error && typeof error === "object" && "status" in error && (error as { status: number }).status === 401) {
 				return { success: false };
 			}
@@ -101,43 +99,11 @@ export const authAPI = {
 		}
 	},
 
-	async getSessions(): Promise<{ success: boolean; sessions?: Session[] }> {
-		try {
-			const data = await apiClient.get<{ success: boolean; data?: { sessions: Session[] } }>("/auth/sessions");
-			if (data.success && data.data?.sessions) {
-				return { success: true, sessions: data.data.sessions };
-			}
-			return { success: false };
-		} catch (error) {
-			if (error && typeof error === "object" && "status" in error && (error as { status: number }).status === 401) {
-				throw error;
-			}
-			console.error("Get sessions error:", error);
-			return { success: false };
-		}
-	},
-
-	async deleteSession(sessionId: string): Promise<{ success: boolean; message?: string }> {
-		try {
-			const data = await apiClient.delete<{ success: boolean; message?: string }>(`/auth/sessions/${sessionId}`);
-			return { success: data.success, message: data.message };
-		} catch (error) {
-			if (error && typeof error === "object" && "status" in error && (error as { status: number }).status === 401) {
-				throw error;
-			}
-			console.error("Delete session error:", error);
-			return { success: false, message: "Network error. Please try again." };
-		}
-	},
-
 	async logoutAll(): Promise<{ success: boolean; message?: string }> {
 		try {
 			const data = await apiClient.post<{ success: boolean; message?: string }>("/auth/logout-all");
 			return { success: data.success, message: data.message };
 		} catch (error) {
-			if (error && typeof error === "object" && "status" in error && (error as { status: number }).status === 401) {
-				throw error;
-			}
 			console.error("Logout all error:", error);
 			return { success: false, message: "Network error. Please try again." };
 		}

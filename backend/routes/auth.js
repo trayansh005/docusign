@@ -1,12 +1,11 @@
 import {
   register,
   login,
+  refreshToken,
   getProfile,
   updateProfile,
   changePassword,
   logout,
-  getSessions,
-  deleteSession,
   logoutAll,
 } from "../controllers/authController.js";
 import {
@@ -20,10 +19,8 @@ export default async function authRoutes(fastify, options) {
   // Public routes
   fastify.post("/register", { schema: registerSchema }, register);
   fastify.post("/login", { schema: loginSchema }, login);
-
-  // Logout is intentionally public — we should be able to clear the cookie
-  // even if the session has already expired or is invalid.
   fastify.post("/logout", logout);
+  fastify.post("/refresh", refreshToken);
 
   // Protected routes
   fastify.register(async function (protectedRoutes) {
@@ -32,13 +29,6 @@ export default async function authRoutes(fastify, options) {
     protectedRoutes.get("/profile", getProfile);
     protectedRoutes.put("/profile", { schema: updateProfileSchema }, updateProfile);
     protectedRoutes.put("/change-password", { schema: changePasswordSchema }, changePassword);
-
-    // Session management
-    protectedRoutes.get("/sessions", getSessions);
-    protectedRoutes.delete("/sessions/:sessionId", deleteSession);
-
-    // logoutAll requires auth so request.user._id is available
     protectedRoutes.post("/logout-all", logoutAll);
   });
 }
-
