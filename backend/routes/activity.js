@@ -1,13 +1,12 @@
-import express from "express";
-import { authenticateSession } from "../middleware/sessionAuth.js";
 import { getRecentActivities, getDocuSignActivities } from "../controllers/activityController.js";
 
-const router = express.Router();
+export default async function activityRoutes(fastify, options) {
+  fastify.addHook("preHandler", fastify.authenticate);
 
-// Get recent activities for the authenticated user
-router.get("/recent", authenticateSession, getRecentActivities);
+  // Get recent activities for the authenticated user
+  fastify.get("/recent", getRecentActivities);
 
-// Get DocuSign activities with filtering and pagination
-router.get("/docusign", authenticateSession, getDocuSignActivities);
+  // Get DocuSign activities with filtering and pagination
+  fastify.get("/docusign", getDocuSignActivities);
+}
 
-export default router;

@@ -2,525 +2,290 @@ import crypto from "crypto";
 import User from "../models/User.js";
 import Session from "../models/Session.js";
 import { parseDeviceName } from "../utils/deviceParser.js";
-import { customValidations } from "../middlewares/validation.js";
 
-// Cookie configuration (env-overridable for cross-site deployments)
-// If your frontend and backend are on different domains, set:
-// COOKIE_SAMESITE=none and COOKIE_SECURE=true (requires HTTPS)
+// Cookie configuration
 const cookieConfig = {
-	httpOnly: true,
-	secure:
-		process.env.COOKIE_SECURE !== undefined
-			? String(process.env.COOKIE_SECURE).toLowerCase() === "true"
-			: process.env.NODE_ENV === "production",
-	sameSite:
-		process.env.COOKIE_SAMESITE !== undefined
-			? process.env.COOKIE_SAMESITE
-			: process.env.NODE_ENV === "production"
-				? "strict"
-				: "lax",
-	...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
-	path: "/",
+  httpOnly: true,
+  secure:
+    process.env.COOKIE_SECURE !== undefined
+      ? String(process.env.COOKIE_SECURE).toLowerCase() === "true"
+      : process.env.NODE_ENV === "production",
+  sameSite:
+    process.env.COOKIE_SAMESITE !== undefined
+      ? process.env.COOKIE_SAMESITE
+      : process.env.NODE_ENV === "production"
+      ? "strict"
+      : "lax",
+  ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
+  path: "/",
 };
 
 // Register controller
-export const register = async (req, res) => {
-	try {
-		const { firstName, lastName, email, password, phoneNumber, company } = req.body;
+export const register = async (request, reply) => {
+  try {
+    const { firstName, lastName, email, password, phoneNumber, company } = request.body;
 
-		// Validate required fields
-		if (!firstName || !lastName || !email || !password) {
-			return res.status(400).json({
-				success: false,
-				message: "Missing required fields",
-				errors: {
-					firstName: !firstName ? "First name is required" : null,
-					lastName: !lastName ? "Last name is required" : null,
-					email: !email ? "Email is required" : null,
-					password: !password ? "Password is required" : null,
-				},
-			});
-		}
+    // Check if user already exists
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      return reply.status(409).send({
+        success: false,
+        message: "User with this email already exists",
+      });
+    }
 
-		// Validate email format
-		if (!customValidations.isValidEmail(email)) {
-			return res.status(400).json({
-				success: false,
-				message: "Invalid email format",
-			});
-		}
+    // Create new user
+    const userData = {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: email.toLowerCase().trim(),
+      password,
+      phoneNumber: phoneNumber?.trim(),
+      company: company?.trim(),
+    };
 
-		// Validate password strength
-		if (!customValidations.isStrongPassword(password)) {
-			return res.status(400).json({
-				success: false,
-				message:
-					"Password must be at least 8 characters long and contain uppercase, lowercase, and numeric characters",
-			});
-		}
+    const user = new User(userData);
+    await user.save();
 
-		// Check if user already exists
-		const existingUser = await User.findOne({ email: email.toLowerCase() });
-		if (existingUser) {
-			return res.status(409).json({
-				success: false,
-				message: "User with this email already exists",
-			});
-		}
+    // Auto-login after registration
+    const sessionId = crypto.randomUUID();
+    const userAgent = request.headers["user-agent"] || "Unknown";
+    const ip = request.ip || "Unknown";
+    const deviceName = parseDeviceName(userAgent);
 
-		// Create new user
-		const userData = {
-			firstName: firstName.trim(),
-			lastName: lastName.trim(),
-			email: email.toLowerCase().trim(),
-			password,
-			phoneNumber: phoneNumber?.trim(),
-			company: company?.trim(),
-		};
+    const session = new Session({
+      sessionId,
+      userId: user._id,
+      deviceInfo: { userAgent, ip, deviceName },
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
 
-		const user = new User(userData);
-		await user.save();
+    await session.save();
 
-		// Auto-login after registration with session-based authentication
-		// Generate UUID for sessionId
-		const sessionId = crypto.randomUUID();
+    user.lastLogin = new Date();
+    await user.save();
 
-		// Parse device info from request headers
-		const userAgent = req.headers["user-agent"] || "Unknown";
-		const ip = req.ip || req.connection.remoteAddress || "Unknown";
-		const deviceName = parseDeviceName(userAgent);
+    reply.setCookie("sessionId", sessionId, {
+      ...cookieConfig,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
 
-		// Create Session document in database
-		const session = new Session({
-			sessionId,
-			userId: user._id,
-			deviceInfo: {
-				userAgent,
-				ip,
-				deviceName,
-			},
-			expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-		});
+    const userResponse = user.toObject();
+    delete userResponse.password;
 
-		await session.save();
-
-		// Update last login
-		user.lastLogin = new Date();
-		await user.save();
-
-		// Set httpOnly cookie with sessionId
-		res.cookie("sessionId", sessionId, {
-			...cookieConfig,
-			maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-		});
-
-		// Remove password from response
-		const userResponse = user.toObject();
-		delete userResponse.password;
-
-		res.status(201).json({
-			success: true,
-			message: "User registered and logged in successfully",
-			data: {
-				user: userResponse,
-			},
-		});
-	} catch (error) {
-		console.error("Registration error:", error);
-
-		if (error.code === 11000) {
-			return res.status(409).json({
-				success: false,
-				message: "User with this email already exists",
-			});
-		}
-
-		res.status(500).json({
-			success: false,
-			message: "Registration failed. Please try again.",
-			...(process.env.NODE_ENV === "development" && { error: error.message }),
-		});
-	}
+    return reply.status(201).send({
+      success: true,
+      message: "User registered and logged in successfully",
+      data: { user: userResponse },
+    });
+  } catch (error) {
+    request.log.error("Registration error:", error);
+    return reply.status(500).send({
+      success: false,
+      message: "Registration failed",
+    });
+  }
 };
 
-// Login controller with session-based authentication
-export const login = async (req, res) => {
-	try {
-		const { email, password } = req.body;
+// Login controller
+export const login = async (request, reply) => {
+  try {
+    const { email, password } = request.body;
 
-		// Validate required fields
-		if (!email || !password) {
-			return res.status(400).json({
-				success: false,
-				message: "Email and password are required",
-			});
-		}
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return reply.status(401).send({
+        success: false,
+        message: "Invalid credentials",
+      });
+    }
 
-		// Find user by email
-		const user = await User.findOne({ email: email.toLowerCase() });
-		if (!user) {
-			return res.status(401).json({
-				success: false,
-				message: "Invalid credentials",
-			});
-		}
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
+      return reply.status(401).send({
+        success: false,
+        message: "Invalid credentials",
+      });
+    }
 
-		// Verify password
-		const isPasswordValid = await user.comparePassword(password);
-		if (!isPasswordValid) {
-			return res.status(401).json({
-				success: false,
-				message: "Invalid credentials",
-			});
-		}
+    const sessionId = crypto.randomUUID();
+    const userAgent = request.headers["user-agent"] || "Unknown";
+    const ip = request.ip || "Unknown";
+    const deviceName = parseDeviceName(userAgent);
 
-		// Generate UUID for sessionId
-		const sessionId = crypto.randomUUID();
+    const session = new Session({
+      sessionId,
+      userId: user._id,
+      deviceInfo: { userAgent, ip, deviceName },
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
 
-		// Parse device info from request headers
-		const userAgent = req.headers["user-agent"] || "Unknown";
-		const ip = req.ip || req.connection.remoteAddress || "Unknown";
-		const deviceName = parseDeviceName(userAgent);
+    await session.save();
 
-		// Create Session document in database
-		const session = new Session({
-			sessionId,
-			userId: user._id,
-			deviceInfo: {
-				userAgent,
-				ip,
-				deviceName,
-			},
-			expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-		});
+    user.lastLogin = new Date();
+    await user.save();
 
-		await session.save();
+    reply.setCookie("sessionId", sessionId, {
+      ...cookieConfig,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
 
-		// Update last login
-		user.lastLogin = new Date();
-		await user.save();
+    const userResponse = user.toObject();
+    delete userResponse.password;
 
-		// Set httpOnly cookie with sessionId
-		res.cookie("sessionId", sessionId, {
-			...cookieConfig,
-			maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-		});
-
-		// Prepare user response
-		const userResponse = user.toObject();
-		delete userResponse.password;
-
-		res.status(200).json({
-			success: true,
-			message: "Login successful",
-			data: {
-				user: userResponse,
-			},
-		});
-	} catch (error) {
-		console.error("Login error:", error);
-		res.status(500).json({
-			success: false,
-			message: "Login failed. Please try again.",
-			...(process.env.NODE_ENV === "development" && { error: error.message }),
-		});
-	}
+    return reply.status(200).send({
+      success: true,
+      message: "Login successful",
+      data: { user: userResponse },
+    });
+  } catch (error) {
+    request.log.error("Login error:", error);
+    return reply.status(500).send({
+      success: false,
+      message: "Login failed",
+    });
+  }
 };
 
-// Get user profile
-export const getProfile = async (req, res) => {
-	try {
-		const user = req.user;
-
-		const userResponse = user.toObject();
-		delete userResponse.password;
-
-		res.status(200).json({
-			success: true,
-			data: {
-				user: userResponse,
-			},
-		});
-	} catch (error) {
-		console.error("Get profile error:", error);
-		res.status(500).json({
-			success: false,
-			message: "Failed to fetch profile",
-			...(process.env.NODE_ENV === "development" && { error: error.message }),
-		});
-	}
+// Get profile
+export const getProfile = async (request, reply) => {
+  const userResponse = request.user.toObject();
+  delete userResponse.password;
+  return { success: true, data: { user: userResponse } };
 };
 
-// Update user profile
-export const updateProfile = async (req, res) => {
-	try {
-		const { firstName, lastName, phoneNumber, company } = req.body;
-		const userId = req.user._id;
+// Update profile
+export const updateProfile = async (request, reply) => {
+  try {
+    const { firstName, lastName, phoneNumber, company } = request.body;
+    const userId = request.user._id;
 
-		const updateData = {};
-		if (firstName) updateData.firstName = firstName.trim();
-		if (lastName) updateData.lastName = lastName.trim();
-		if (phoneNumber) updateData.phoneNumber = phoneNumber.trim();
-		if (company) updateData.company = company.trim();
+    const updateData = {};
+    if (firstName) updateData.firstName = firstName.trim();
+    if (lastName) updateData.lastName = lastName.trim();
+    if (phoneNumber) updateData.phoneNumber = phoneNumber.trim();
+    if (company) updateData.company = company.trim();
 
-		const user = await User.findByIdAndUpdate(
-			userId,
-			{ $set: updateData },
-			{ new: true, runValidators: true }
-		).select("-password");
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).select("-password");
 
-		if (!user) {
-			return res.status(404).json({
-				success: false,
-				message: "User not found",
-			});
-		}
-
-		res.status(200).json({
-			success: true,
-			message: "Profile updated successfully",
-			data: {
-				user,
-			},
-		});
-	} catch (error) {
-		console.error("Update profile error:", error);
-		res.status(500).json({
-			success: false,
-			message: "Failed to update profile",
-			...(process.env.NODE_ENV === "development" && { error: error.message }),
-		});
-	}
+    return {
+      success: true,
+      message: "Profile updated successfully",
+      data: { user },
+    };
+  } catch (error) {
+    request.log.error("Update profile error:", error);
+    return reply.status(500).send({ success: false, message: "Update failed" });
+  }
 };
 
 // Change password
-export const changePassword = async (req, res) => {
-	try {
-		const { currentPassword, newPassword } = req.body;
-		const userId = req.user._id;
+export const changePassword = async (request, reply) => {
+  try {
+    const { currentPassword, newPassword } = request.body;
+    const user = await User.findById(request.user._id);
 
-		if (!currentPassword || !newPassword) {
-			return res.status(400).json({
-				success: false,
-				message: "Current password and new password are required",
-			});
-		}
+    const isCurrentPasswordValid = await user.comparePassword(currentPassword);
+    if (!isCurrentPasswordValid) {
+      return reply.status(401).send({
+        success: false,
+        message: "Current password is incorrect",
+      });
+    }
 
-		if (!customValidations.isStrongPassword(newPassword)) {
-			return res.status(400).json({
-				success: false,
-				message:
-					"New password must be at least 8 characters long and contain uppercase, lowercase, and numeric characters",
-			});
-		}
+    user.password = newPassword;
+    await user.save();
 
-		const user = await User.findById(userId);
-		if (!user) {
-			return res.status(404).json({
-				success: false,
-				message: "User not found",
-			});
-		}
-
-		const isCurrentPasswordValid = await user.comparePassword(currentPassword);
-		if (!isCurrentPasswordValid) {
-			return res.status(401).json({
-				success: false,
-				message: "Current password is incorrect",
-			});
-		}
-
-		user.password = newPassword;
-		await user.save();
-
-		res.status(200).json({
-			success: true,
-			message: "Password changed successfully",
-		});
-	} catch (error) {
-		console.error("Change password error:", error);
-		res.status(500).json({
-			success: false,
-			message: "Failed to change password",
-			...(process.env.NODE_ENV === "development" && { error: error.message }),
-		});
-	}
+    return { success: true, message: "Password changed successfully" };
+  } catch (error) {
+    request.log.error("Change password error:", error);
+    return reply.status(500).send({ success: false, message: "Change password failed" });
+  }
 };
 
-
-
-// Logout controller
-export const logout = async (req, res) => {
-	try {
-		// Extract sessionId from cookie
-		const sessionId = req.cookies?.sessionId;
-
-		if (sessionId) {
-			// Find and delete session from database
-			await Session.findOneAndDelete({ sessionId });
-		}
-
-		// Clear sessionId cookie by setting maxAge to 0
-		res.cookie("sessionId", "", {
-			...cookieConfig,
-			maxAge: 0,
-		});
-
-		res.status(200).json({
-			success: true,
-			message: "Logged out successfully",
-		});
-	} catch (error) {
-		console.error("Logout error:", error);
-		res.status(500).json({
-			success: false,
-			message: "Logout failed",
-		});
-	}
+// Logout
+export const logout = async (request, reply) => {
+  try {
+    const sessionId = request.cookies.sessionId;
+    if (sessionId) {
+      await Session.findOneAndDelete({ sessionId });
+    }
+    reply.setCookie("sessionId", "", { ...cookieConfig, maxAge: 0 });
+    return { success: true, message: "Logged out successfully" };
+  } catch (error) {
+    request.log.error("Logout error:", error);
+    return reply.status(500).send({ success: false, message: "Logout failed" });
+  }
 };
 
-// Get active sessions controller
-export const getSessions = async (req, res) => {
-	try {
-		const userId = req.user._id;
-		const currentSessionId = req.cookies?.sessionId;
+// Get sessions
+export const getSessions = async (request, reply) => {
+  try {
+    const userId = request.user._id;
+    const currentSessionId = request.cookies.sessionId;
 
-		// Query all active sessions for authenticated user
-		const sessions = await Session.find({
-			userId,
-			isActive: true,
-		})
-			.sort({ lastActivity: -1 }) // Order by lastActivity descending
-			.lean();
+    const sessions = await Session.find({ userId, isActive: true })
+      .sort({ lastActivity: -1 })
+      .lean();
 
-		// Transform sessions to client-safe format
-		const sessionList = sessions.map((session) => ({
-			id: session._id.toString(),
-			deviceInfo: {
-				deviceName: session.deviceInfo.deviceName,
-				userAgent: session.deviceInfo.userAgent,
-				ip: session.deviceInfo.ip,
-			},
-			createdAt: session.createdAt,
-			lastActivity: session.lastActivity,
-			expiresAt: session.expiresAt,
-			isCurrentSession: session.sessionId === currentSessionId, // Mark current session
-		}));
+    const sessionList = sessions.map((session) => ({
+      id: session._id.toString(),
+      deviceInfo: session.deviceInfo,
+      createdAt: session.createdAt,
+      lastActivity: session.lastActivity,
+      expiresAt: session.expiresAt,
+      isCurrentSession: session.sessionId === currentSessionId,
+    }));
 
-		res.status(200).json({
-			success: true,
-			data: {
-				sessions: sessionList,
-			},
-		});
-	} catch (error) {
-		console.error("Get sessions error:", error);
-		res.status(500).json({
-			success: false,
-			message: "Failed to fetch sessions",
-			...(process.env.NODE_ENV === "development" && { error: error.message }),
-		});
-	}
+    return { success: true, data: { sessions: sessionList } };
+  } catch (error) {
+    request.log.error("Get sessions error:", error);
+    return reply.status(500).send({ success: false, message: "Failed to fetch sessions" });
+  }
 };
 
-// Delete specific session controller
-export const deleteSession = async (req, res) => {
-	try {
-		const userId = req.user._id;
-		const sessionIdToDelete = req.params.sessionId;
+// Delete session
+export const deleteSession = async (request, reply) => {
+  try {
+    const { sessionId } = request.params;
+    const session = await Session.findById(sessionId);
 
-		if (!sessionIdToDelete) {
-			return res.status(400).json({
-				success: false,
-				message: "Session ID is required",
-			});
-		}
+    if (!session || session.userId.toString() !== request.user._id.toString()) {
+      return reply.status(403).send({ success: false, message: "Unauthorized or not found" });
+    }
 
-		// Find the session by _id (MongoDB ObjectId)
-		const session = await Session.findById(sessionIdToDelete);
-
-		if (!session) {
-			return res.status(404).json({
-				success: false,
-				message: "Session not found",
-			});
-		}
-
-		// Verify session belongs to authenticated user
-		if (session.userId.toString() !== userId.toString()) {
-			return res.status(403).json({
-				success: false,
-				message: "Cannot delete another user's session",
-			});
-		}
-
-		// Delete session from database
-		await Session.findByIdAndDelete(sessionIdToDelete);
-
-		res.status(200).json({
-			success: true,
-			message: "Session deleted successfully",
-		});
-	} catch (error) {
-		console.error("Delete session error:", error);
-		res.status(500).json({
-			success: false,
-			message: "Failed to delete session",
-			...(process.env.NODE_ENV === "development" && { error: error.message }),
-		});
-	}
+    await Session.findByIdAndDelete(sessionId);
+    return { success: true, message: "Session deleted successfully" };
+  } catch (error) {
+    request.log.error("Delete session error:", error);
+    return reply.status(500).send({ success: false, message: "Failed to delete session" });
+  }
 };
 
-// Logout from all devices controller
-export const logoutAll = async (req, res) => {
-	try {
-		const userId = req.user._id;
-
-		// Find all sessions for authenticated user
-		const result = await Session.deleteMany({ userId });
-
-		// Clear current sessionId cookie
-		res.cookie("sessionId", "", {
-			...cookieConfig,
-			maxAge: 0,
-		});
-
-		res.status(200).json({
-			success: true,
-			message: "Logged out from all devices successfully",
-			data: {
-				terminatedSessions: result.deletedCount,
-			},
-		});
-	} catch (error) {
-		console.error("Logout all error:", error);
-		res.status(500).json({
-			success: false,
-			message: "Failed to logout from all devices",
-			...(process.env.NODE_ENV === "development" && { error: error.message }),
-		});
-	}
+// Logout all
+export const logoutAll = async (request, reply) => {
+  try {
+    const result = await Session.deleteMany({ userId: request.user._id });
+    reply.setCookie("sessionId", "", { ...cookieConfig, maxAge: 0 });
+    return {
+      success: true,
+      message: "Logged out from all devices",
+      data: { terminatedSessions: result.deletedCount },
+    };
+  } catch (error) {
+    request.log.error("Logout all error:", error);
+    return reply.status(500).send({ success: false, message: "Logout all failed" });
+  }
 };
 
-// Validate token controller
-export const validateToken = async (req, res) => {
-	try {
-		const user = req.user;
-
-		const userResponse = user.toObject();
-		delete userResponse.password;
-
-		res.status(200).json({
-			success: true,
-			data: {
-				user: userResponse,
-			},
-		});
-	} catch (error) {
-		console.error("Validate token error:", error);
-		res.status(500).json({
-			success: false,
-			message: "Token validation failed",
-		});
-	}
+// Validate token
+export const validateToken = async (request, reply) => {
+  const userResponse = request.user.toObject();
+  delete userResponse.password;
+  return { success: true, data: { user: userResponse } };
 };
+

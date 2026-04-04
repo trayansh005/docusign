@@ -1,9 +1,9 @@
-import express from 'express';
-import { submitContactForm, validateContactForm } from '../controllers/contactController.js';
+import { submitContactForm, contactSchema } from '../controllers/contactController.js';
 
-const router = express.Router();
-
-// POST /api/contact - Submit contact form
-router.post('/', validateContactForm, submitContactForm);
-
-export default router;
+/**
+ * Contact routes Fastify plugin
+ */
+export default async function contactRoutes(fastify, options) {
+  // POST /api/contact - Submit contact form
+  fastify.post('/', { schema: contactSchema }, submitContactForm);
+}

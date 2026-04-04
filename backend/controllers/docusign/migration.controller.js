@@ -12,150 +12,97 @@ const TEMPLATES_DIR = path.join(BASE_DIR, "templates");
 
 /**
  * Migrate old templates to have proper pdfUrl
- * This fixes templates created before the refactor
  */
-export const migrateTemplates = async (req, res) => {
-    try {
-        console.log("[Migration] Starting template migration...");
+export const migrateTemplates = async (request, reply) => {
+  try {
+    request.log.info("[Migration] Starting template migration...");
 
-        // Find all templates without pdfUrl
-        const templates = await DocuSignTemplate.find({
-            $or: [
-                { pdfUrl: { $exists: false } },
-                { pdfUrl: "" },
-                { pdfUrl: null }
-            ],
-            isArchived: false
-        });
+    const templates = await DocuSignTemplate.find({
+      $or: [
+        { pdfUrl: { $exists: false } },
+        { pdfUrl: "" },
+        { pdfUrl: null }
+      ],
+      isArchived: false
+    });
 
-        console.log(`[Migration] Found ${templates.length} templates to migrate`);
+    request.log.info(`[Migration] Found ${templates.length} templates to migrate`);
 
-        const results = {
-            success: [],
-            failed: [],
-            skipped: []
-        };
+    const results = {
+      success: [],
+      failed: [],
+      skipped: []
+    };
 
-        for (const template of templates) {
-            const templateId = template._id.toString();
-            const templateDir = path.join(TEMPLATES_DIR, templateId);
+    for (const template of templates) {
+      const templateId = template._id.toString();
+      const templateDir = path.join(TEMPLATES_DIR, templateId);
 
-            console.log(`[Migration] Processing template: ${templateId} - ${template.name}`);
-
-            try {
-                // Check if template directory exists
-                if (!fs.existsSync(templateDir)) {
-                    console.warn(`[Migration] Template directory not found: ${templateDir}`);
-                    results.skipped.push({
-                        id: templateId,
-                        name: template.name,
-                        reason: "Directory not found"
-                    });
-                    continue;
-                }
-
-                // Check if this is a Word document
-                const isWordDoc = template.metadata?.mimeType?.includes('word') ||
-                    template.metadata?.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-                    template.metadata?.mimeType === 'application/msword';
-
-                let pdfPath = null;
-
-                if (isWordDoc) {
-                    // For Word documents, check if PDF already exists or convert
-                    const files = fs.readdirSync(templateDir);
-                    const existingPdf = files.find(f => f.endsWith('.pdf'));
-
-                    if (existingPdf) {
-                        pdfPath = path.join(templateDir, existingPdf);
-                        console.log(`[Migration] Found existing PDF: ${existingPdf}`);
-                    } else {
-                        // Find the Word file
-                        const wordFile = files.find(f =>
-                            f.endsWith('.docx') || f.endsWith('.doc')
-                        );
-
-                        if (wordFile) {
-                            const wordPath = path.join(templateDir, wordFile);
-                            console.log(`[Migration] Converting Word to PDF: ${wordFile}`);
-
-                            const conversionResult = await processWordDocument(wordPath, templateDir, templateId);
-
-                            if (conversionResult.success) {
-                                pdfPath = conversionResult.pdfPath;
-                                console.log(`[Migration] Conversion successful: ${pdfPath}`);
-                            } else {
-                                throw new Error(`Conversion failed: ${conversionResult.error}`);
-                            }
-                        } else {
-                            throw new Error("No Word file found in template directory");
-                        }
-                    }
-                } else {
-                    // For PDF documents, find the PDF file
-                    const files = fs.readdirSync(templateDir);
-                    const pdfFile = files.find(f => f.endsWith('.pdf'));
-
-                    if (pdfFile) {
-                        pdfPath = path.join(templateDir, pdfFile);
-                        console.log(`[Migration] Found PDF: ${pdfFile}`);
-                    } else {
-                        throw new Error("No PDF file found in template directory");
-                    }
-                }
-
-                if (!pdfPath || !fs.existsSync(pdfPath)) {
-                    throw new Error("PDF path not found or invalid");
-                }
-
-                // Update template with pdfUrl
-                const pdfFileName = path.basename(pdfPath);
-                template.pdfUrl = `/api/uploads/signatures/templates/${templateId}/${pdfFileName}`;
-
-                // Also update metadata if needed
-                if (!template.metadata.originalFilePath) {
-                    template.metadata.originalFilePath = template.pdfUrl;
-                }
-
-                template.markModified("metadata");
-                await template.save();
-
-                console.log(`[Migration] Successfully migrated template: ${templateId}`);
-                results.success.push({
-                    id: templateId,
-                    name: template.name,
-                    pdfUrl: template.pdfUrl
-                });
-
-            } catch (error) {
-                console.error(`[Migration] Failed to migrate template ${templateId}:`, error.message);
-                results.failed.push({
-                    id: templateId,
-                    name: template.name,
-                    error: error.message
-                });
-            }
+      try {
+        if (!fs.existsSync(templateDir)) {
+          request.log.warn(`[Migration] Template directory not found: ${templateDir}`);
+          results.skipped.push({ id: templateId, name: template.name, reason: "Directory not found" });
+          continue;
         }
 
-        console.log("[Migration] Migration complete:", results);
+        const isWordDoc = template.metadata?.mimeType?.includes('word') ||
+          template.metadata?.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+          template.metadata?.mimeType === 'application/msword';
 
-        return res.status(200).json({
-            success: true,
-            message: "Migration completed",
-            results: {
-                total: templates.length,
-                success: results.success.length,
-                failed: results.failed.length,
-                skipped: results.skipped.length
-            },
-            details: results
-        });
+        let pdfPath = null;
 
-    } catch (error) {
-        console.error("[Migration] Migration error:", error);
-        return res.status(500).json({
-            success: false,
-            message: error.message || "Migration failed"
-        });
+        if (isWordDoc) {
+          const files = fs.readdirSync(templateDir);
+          const existingPdf = files.find(f => f.endsWith('.pdf'));
+
+          if (existingPdf) {
+            pdfPath = path.join(templateDir, existingPdf);
+          } else {
+            const wordFile = files.find(f => f.endsWith('.docx') || f.endsWith('.doc'));
+            if (wordFile) {
+              const wordPath = path.join(templateDir, wordFile);
+              const conversionResult = await processWordDocument(wordPath, templateDir, templateId);
+              if (conversionResult.success) pdfPath = conversionResult.pdfPath;
+              else throw new Error(`Conversion failed: ${conversionResult.error}`);
+            } else throw new Error("No Word file found");
+          }
+        } else {
+          const files = fs.readdirSync(templateDir);
+          const pdfFile = files.find(f => f.endsWith('.pdf'));
+          if (pdfFile) pdfPath = path.join(templateDir, pdfFile);
+          else throw new Error("No PDF file found");
+        }
+
+        if (!pdfPath || !fs.existsSync(pdfPath)) throw new Error("PDF path invalid");
+
+        const pdfFileName = path.basename(pdfPath);
+        template.pdfUrl = `/api/uploads/signatures/templates/${templateId}/${pdfFileName}`;
+        if (!template.metadata.originalFilePath) template.metadata.originalFilePath = template.pdfUrl;
+
+        template.markModified("metadata");
+        await template.save();
+
+        results.success.push({ id: templateId, name: template.name, pdfUrl: template.pdfUrl });
+      } catch (error) {
+        request.log.error(`[Migration] Failed ${templateId}:`, error.message);
+        results.failed.push({ id: templateId, name: template.name, error: error.message });
+      }
     }
+
+    return {
+      success: true,
+      message: "Migration completed",
+      results: {
+        total: templates.length,
+        success: results.success.length,
+        failed: results.failed.length,
+        skipped: results.skipped.length
+      },
+      details: results
+    };
+  } catch (error) {
+    request.log.error("[Migration] Error:", error);
+    return reply.status(500).send({ success: false, message: error.message || "Migration failed" });
+  }
 };
+

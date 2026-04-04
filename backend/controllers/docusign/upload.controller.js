@@ -9,8 +9,8 @@ import DocuSignDocument from "../../models/DocuSignDocument.js";
 import { logDocuSignActivity } from "../../services/ActivityService.js";
 import { processWordDocument, isWordDocument } from "../../utils/wordProcessor.js";
 import { generatePdfThumbnail } from "../../utils/pdfThumbnailGenerator.js";
-import multer from "multer";
 import { getFreeTierLimits } from "../../utils/freeTierLimits.js";
+import { pipeline } from "stream/promises";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,317 +21,256 @@ const PDFS_DIR = path.join(BASE_DIR, "pdfs");
 
 // Ensure directories exist
 function ensureDirs() {
-	[BASE_DIR, TEMPLATES_DIR, PDFS_DIR].forEach((dir) => {
-		if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-	});
+  [BASE_DIR, TEMPLATES_DIR, PDFS_DIR].forEach((dir) => {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  });
 }
-
-// Optimized multer configuration
-const storage = multer.diskStorage({
-	destination: (req, file, cb) => {
-		ensureDirs();
-		cb(null, PDFS_DIR);
-	},
-	filename: (req, file, cb) => {
-		const uniqueId = uuidv4();
-		const ext = path.extname(file.originalname);
-		cb(null, `${uniqueId}${ext}`);
-	},
-});
-
-export const upload = multer({
-	storage,
-	fileFilter: (req, file, cb) => {
-		const allowedMimeTypes = [
-			"application/pdf",
-			"application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
-			"application/msword", // .doc
-		];
-		if (allowedMimeTypes.includes(file.mimetype)) {
-			cb(null, true);
-		} else {
-			cb(new Error("Only PDF, DOCX, and DOC files are allowed"), false);
-		}
-	},
-	limits: { fileSize: 20 * 1024 * 1024 }, // 20MB limit for PDF/DOC/DOCX
-});
 
 /**
  * Create initial template record
  */
-async function createInitialTemplate(file, name, type, userId) {
-	const template = await DocuSignTemplate.create({
-		name: name || `Document ${path.parse(file.originalname).name}`,
-		type: type || "document",
-		status: "draft",
-		createdBy: userId,
-		metadata: {
-			filename: file.originalname,
-			mimeType: file.mimetype,
-			fileSize: file.size,
-		},
-	});
+async function createInitialTemplate(fileInfo, name, type, userId) {
+  const template = await DocuSignTemplate.create({
+    name: name || `Document ${path.parse(fileInfo.filename).name}`,
+    type: type || "document",
+    status: "draft",
+    createdBy: userId,
+    metadata: {
+      filename: fileInfo.filename,
+      mimeType: fileInfo.mimetype,
+    },
+  });
 
-	return template;
+  return template;
 }
 
 /**
  * Mark template as failed
  */
 async function markTemplateAsFailed(template, errorMessage) {
-	try {
-		template.status = "failed";
-		template.metadata = template.metadata || {};
-		template.metadata.error = errorMessage;
-		await template.save();
-	} catch (err) {
-		console.error("Failed to mark template as failed:", err);
-	}
+  try {
+    template.status = "failed";
+    template.metadata = template.metadata || {};
+    template.metadata.error = errorMessage;
+    await template.save();
+  } catch (err) {
+    console.error("Failed to mark template as failed:", err);
+  }
 }
 
 /**
  * Get PDF page count using pdf-lib
  */
 async function getPdfPageCount(pdfPath) {
-	try {
-		const { PDFDocument } = await import("pdf-lib");
-		const pdfBytes = fs.readFileSync(pdfPath);
-		const pdfDoc = await PDFDocument.load(pdfBytes);
-		return pdfDoc.getPageCount();
-	} catch (error) {
-		console.error("Error getting PDF page count:", error);
-		throw new Error("Failed to read PDF page count");
-	}
+  try {
+    const { PDFDocument } = await import("pdf-lib");
+    const pdfBytes = fs.readFileSync(pdfPath);
+    const pdfDoc = await PDFDocument.load(pdfBytes);
+    return pdfDoc.getPageCount();
+  } catch (error) {
+    console.error("Error getting PDF page count:", error);
+    throw new Error("Failed to read PDF page count");
+  }
 }
 
 /**
  * Upload and process PDF or Word document
  */
-export const uploadAndProcessDocument = async (req, res) => {
-	// Enforce free-tier limit: users without an active subscription can only upload 1 document
-	try {
-		const userId = req.user?.id;
-		console.log("[Upload] User ID:", userId);
-		if (!userId) {
-			return res.status(401).json({ success: false, message: "Authentication required" });
-		}
+export const uploadAndProcessDocument = async (request, reply) => {
+  let template;
+  let tempFilePath;
 
-		// Check if user has an active subscription
-		const now = new Date();
-		const activeSub = await Subscription.findOne({
-			userId,
-			status: "active",
-			$or: [{ endDate: { $exists: false } }, { endDate: { $gt: now } }],
-		});
+  try {
+    const userId = request.user?.id;
+    if (!userId) {
+      return reply.status(401).send({ success: false, message: "Authentication required" });
+    }
 
-		console.log("[Upload] Active subscription found:", !!activeSub);
+    // Get the file from multipart request
+    const data = await request.file();
+    if (!data) {
+      return reply.status(400).send({ success: false, message: "No document file uploaded" });
+    }
 
-		if (!activeSub) {
-			// Count existing non-archived templates created by this user
-			const existingCount = await DocuSignTemplate.countDocuments({
-				createdBy: userId,
-				isArchived: { $ne: true },
-			});
+    const { filename, mimetype, file } = data;
+    const allowedMimeTypes = [
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/msword",
+    ];
 
-			const { uploadLimit } = getFreeTierLimits();
-			console.log("[Upload] Free tier - Existing count:", existingCount, "Limit:", uploadLimit);
+    if (!allowedMimeTypes.includes(mimetype)) {
+      return reply.status(400).send({ success: false, message: "Only PDF, DOCX, and DOC files are allowed" });
+    }
 
-			if (existingCount >= uploadLimit) {
-				console.log("[Upload] FREE LIMIT REACHED - returning 403");
-				return res.status(403).json({
-					success: false,
-					code: "FREE_LIMIT_REACHED",
-					message: "Free plan limit reached. Upgrade to upload more documents.",
-				});
-			}
-		}
-	} catch (limitErr) {
-		console.error("Free-tier upload limit check failed:", limitErr);
-		// Proceed without blocking on limit check failure
-	}
+    // Enforce free-tier limit
+    const now = new Date();
+    const activeSub = await Subscription.findOne({
+      userId,
+      status: "active",
+      $or: [{ endDate: { $exists: false } }, { endDate: { $gt: now } }],
+    });
 
-	if (!req.file) {
-		return res.status(400).json({
-			success: false,
-			message: "No document file uploaded",
-		});
-	}
+    if (!activeSub) {
+      const existingCount = await DocuSignTemplate.countDocuments({
+        createdBy: userId,
+        isArchived: { $ne: true },
+      });
 
-	const { name, type = "document" } = req.body;
-	const userId = req.user?.id;
-	let template;
+      const { uploadLimit } = getFreeTierLimits();
+      if (existingCount >= uploadLimit) {
+        return reply.status(403).send({
+          success: false,
+          code: "FREE_LIMIT_REACHED",
+          message: "Free plan limit reached. Upgrade to upload more documents.",
+        });
+      }
+    }
 
-	try {
-		// Validate document file first
-		if (!req.file.path || !fs.existsSync(req.file.path)) {
-			throw new Error("Document file not found or invalid");
-		}
+    // Prepare temporary storage
+    ensureDirs();
+    const uniqueId = uuidv4();
+    const ext = path.extname(filename);
+    const tempFilename = `${uniqueId}${ext}`;
+    tempFilePath = path.join(PDFS_DIR, tempFilename);
 
-		// Create initial template record
-		template = await createInitialTemplate(req.file, name, type, userId);
-		template.status = "processing";
-		await template.save();
+    // Save the file stream to temp location
+    await pipeline(file, fs.createWriteStream(tempFilePath));
 
-		const templateId = template._id.toString();
-		const templateDir = path.join(TEMPLATES_DIR, templateId);
-		if (!fs.existsSync(templateDir)) fs.mkdirSync(templateDir, { recursive: true });
+    // Get non-file fields (name, type)
+    const { name, type = "document" } = data.fields || {};
+    const nameValue = name?.value;
+    const typeValue = type?.value || "document";
 
-		// Move uploaded file to template directory
-		const safeOriginalName = path.basename(req.file.originalname).replace(/[^a-zA-Z0-9._-]/g, "_");
-		const storedFileName = `${templateId}_${safeOriginalName}`;
-		const newFilePath = path.join(templateDir, storedFileName);
-		fs.renameSync(req.file.path, newFilePath);
+    // Create initial template record
+    template = await createInitialTemplate({ filename, mimetype }, nameValue, typeValue, userId);
+    template.status = "processing";
+    await template.save();
 
-		let pdfFilePath = newFilePath;
-		let numPages = 0;
+    const templateId = template._id.toString();
+    const templateDir = path.join(TEMPLATES_DIR, templateId);
+    if (!fs.existsSync(templateDir)) fs.mkdirSync(templateDir, { recursive: true });
 
-		// Process based on file type
-		if (isWordDocument(req.file.mimetype)) {
-			console.log(`[Upload] Processing Word document: ${req.file.originalname}`);
+    // Move uploaded file to template directory
+    const safeOriginalName = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, "_");
+    const storedFileName = `${templateId}_${safeOriginalName}`;
+    const newFilePath = path.join(templateDir, storedFileName);
+    fs.renameSync(tempFilePath, newFilePath);
+    tempFilePath = null; // Mark as moved
 
-			// Convert Word to PDF first
-			const conversionResult = await processWordDocument(newFilePath, templateDir, templateId);
+    let pdfFilePath = newFilePath;
+    let numPages = 0;
 
-			if (conversionResult.success) {
-				// Use the converted PDF
-				pdfFilePath = conversionResult.pdfPath;
-				console.log(`[Upload] Word converted to PDF: ${pdfFilePath}`);
-				numPages = await getPdfPageCount(pdfFilePath);
-			} else {
-				// Conversion failed - return error
-				throw new Error(`Word to PDF conversion failed: ${conversionResult.error}`);
-			}
-		} else if (req.file.mimetype === "application/pdf") {
-			console.log(`[Upload] Processing PDF document: ${req.file.originalname}`);
-			numPages = await getPdfPageCount(pdfFilePath);
-		} else {
-			throw new Error("Unsupported file type");
-		}
+    // Process based on file type
+    if (isWordDocument(mimetype)) {
+      const conversionResult = await processWordDocument(newFilePath, templateDir, templateId);
+      if (conversionResult.success) {
+        pdfFilePath = conversionResult.pdfPath;
+        numPages = await getPdfPageCount(pdfFilePath);
+      } else {
+        throw new Error(`Word to PDF conversion failed: ${conversionResult.error}`);
+      }
+    } else if (mimetype === "application/pdf") {
+      numPages = await getPdfPageCount(pdfFilePath);
+    }
 
-		if (numPages === 0) {
-			throw new Error("PDF has no pages or could not be read");
-		}
+    if (numPages === 0) {
+      throw new Error("PDF has no pages or could not be read");
+    }
 
-		// Generate thumbnail for preview
-		console.log(`[Upload] Generating thumbnail for template ${templateId}`);
-		const thumbnailPath = path.join(templateDir, "thumbnail.png");
-		console.log(`[Upload] Thumbnail will be saved to: ${thumbnailPath}`);
-		console.log(`[Upload] PDF path for thumbnail: ${pdfFilePath}`);
-		console.log(`[Upload] PDF exists: ${fs.existsSync(pdfFilePath)}`);
+    // Generate thumbnail
+    const thumbnailPath = path.join(templateDir, "thumbnail.png");
+    const thumbnailResult = await generatePdfThumbnail(pdfFilePath, thumbnailPath);
 
-		const thumbnailResult = await generatePdfThumbnail(pdfFilePath, thumbnailPath);
+    let thumbnailUrl = null;
+    if (thumbnailResult.success) {
+      thumbnailUrl = `/api/uploads/signatures/templates/${templateId}/thumbnail.png`;
+    }
 
-		let thumbnailUrl = null;
-		if (thumbnailResult.success) {
-			thumbnailUrl = `/api/uploads/signatures/templates/${templateId}/thumbnail.png`;
-			console.log(`[Upload] Thumbnail generated successfully: ${thumbnailUrl}`);
-			console.log(`[Upload] Thumbnail file exists: ${fs.existsSync(thumbnailPath)}`);
-		} else {
-			console.warn(`[Upload] Thumbnail generation failed (non-blocking): ${thumbnailResult.error}`);
-		}
+    // Update template
+    template.name = nameValue || path.parse(filename).name;
+    template.numPages = numPages;
+    template.status = "draft";
 
-		// Update template with processed data
-		template.name = name || path.parse(req.file.originalname).name;
-		template.numPages = numPages;
-		template.status = "draft";
+    const normalizedPdfPath = pdfFilePath.replace(/\\/g, "/");
+    const pdfFileNameOut = normalizedPdfPath.split("/").pop();
+    const pdfUrl = `/api/uploads/signatures/templates/${templateId}/${pdfFileNameOut}`;
 
-		// Set pdfUrl to the PDF file (either original or converted from Word)
-		// Normalize the path to handle Windows backslashes
-		const normalizedPdfPath = pdfFilePath.replace(/\\/g, "/");
-		const pdfFileName = normalizedPdfPath.split("/").pop();
-		const pdfUrl = `/api/uploads/signatures/templates/${templateId}/${pdfFileName}`;
+    if (isWordDocument(mimetype)) {
+      template.metadata.originalWordFile = storedFileName;
+      template.metadata.convertedFromWord = true;
+    }
 
-		console.log(`[Upload] PDF file path: ${pdfFilePath}`);
-		console.log(`[Upload] Normalized path: ${normalizedPdfPath}`);
-		console.log(`[Upload] PDF file name: ${pdfFileName}`);
-		console.log(`[Upload] Constructed pdfUrl: ${pdfUrl}`);
-		console.log(`[Upload] PDF file exists: ${fs.existsSync(pdfFilePath)}`);
+    const fileSize = fs.statSync(newFilePath).size;
+    template.metadata = {
+      ...template.metadata,
+      fileId: templateId,
+      mimeType: mimetype,
+      fileSize: fileSize,
+      originalPdfPath: pdfUrl,
+      originalFilePath: `/api/uploads/signatures/templates/${templateId}/${storedFileName}`,
+      thumbnailUrl: thumbnailUrl,
+    };
 
-		// Store original Word document info if it was a Word file
-		if (isWordDocument(req.file.mimetype)) {
-			template.metadata.originalWordFile = storedFileName;
-			template.metadata.convertedFromWord = true;
-		}
+    template.markModified("metadata");
+    await template.save();
 
-		// Update metadata with PDF path (pdfUrl is a virtual field that reads from metadata.originalPdfPath)
-		template.metadata = {
-			...template.metadata,
-			fileId: templateId,
-			mimeType: req.file.mimetype,
-			fileSize: req.file.size,
-			originalPdfPath: pdfUrl, // This is what pdfUrl virtual field reads from
-			originalFilePath: `/api/uploads/signatures/templates/${templateId}/${storedFileName}`,
-			thumbnailUrl: thumbnailUrl, // PNG thumbnail for preview
-		};
+    // Create DocuSignDocument record
+    try {
+      const fileBuffer = fs.readFileSync(newFilePath);
+      const fileHash = crypto.createHash("sha256").update(fileBuffer).digest("hex");
+      const doc = await DocuSignDocument.create({
+        fileId: templateId,
+        filename: filename,
+        mimeType: mimetype,
+        fileSize: fileSize,
+        originalPdfPath: `/uploads/signatures/templates/${templateId}/${storedFileName}`,
+        fileHash,
+        status: "ready",
+        template: template._id,
+      });
 
-		console.log(`[Upload] Set metadata.originalPdfPath: ${template.metadata.originalPdfPath}`);
-		console.log(`[Upload] Set metadata.thumbnailUrl: ${template.metadata.thumbnailUrl}`);
-		template.markModified("metadata");
-		await template.save();
+      template.metadata.document = doc._id;
+      template.metadata.fileHash = fileHash;
+      template.markModified("metadata");
+      await template.save();
+    } catch (err) {
+      request.log.warn("Failed to create DocuSignDocument record:", err.message);
+    }
 
-		console.log(`[Upload] Template saved with pdfUrl: ${template.pdfUrl}`);
+    // Log activity
+    await logDocuSignActivity(
+      userId,
+      "DOCUSIGN_TEMPLATE_CREATED",
+      `Created DocuSign template: ${template.name}`,
+      { templateId: template._id, name: template.name, type: template.type },
+      request
+    );
 
-		// Create a DocuSignDocument record for the uploaded file
-		try {
-			const fileBuffer = fs.readFileSync(newFilePath);
-			const fileHash = crypto.createHash("sha256").update(fileBuffer).digest("hex");
-			const doc = await DocuSignDocument.create({
-				fileId: path.parse(req.file.filename).name,
-				filename: req.file.originalname,
-				mimeType: req.file.mimetype,
-				fileSize: req.file.size,
-				originalPdfPath: `/uploads/signatures/templates/${templateId}/${storedFileName}`,
-				fileHash,
-				status: "ready",
-				template: template._id, // Link back to the template
-			});
+    return reply.status(201).send({
+      success: true,
+      data: template.toObject(),
+      message: "Document processed successfully",
+    });
+  } catch (error) {
+    request.log.error("uploadAndProcessDocument error:", error);
 
-			// Link the document to the template
-			template.metadata.document = doc._id;
-			template.metadata.fileHash = fileHash;
-			template.markModified("metadata");
-			await template.save();
+    if (template) {
+      await markTemplateAsFailed(template, error.message);
+    }
 
-			console.log(
-				`[Upload] Created DocuSignDocument ${doc._id} linked to template ${template._id}`
-			);
-		} catch (err) {
-			console.warn("Failed to create DocuSignDocument for uploaded file:", err.message);
-		}
+    if (tempFilePath && fs.existsSync(tempFilePath)) {
+      try {
+        fs.unlinkSync(tempFilePath);
+      } catch (cleanupErr) {
+        request.log.error("Failed to cleanup temp file:", cleanupErr);
+      }
+    }
 
-		// Log activity
-		await logDocuSignActivity(
-			userId,
-			"DOCUSIGN_TEMPLATE_CREATED",
-			`Created DocuSign template: ${template.name}`,
-			{ templateId: template._id, name: template.name, type: template.type },
-			req
-		);
-
-		return res.status(201).json({
-			success: true,
-			data: template.toObject(),
-			message: "Document processed successfully",
-		});
-	} catch (error) {
-		console.error("uploadAndProcessDocument error:", error);
-
-		if (template) {
-			await markTemplateAsFailed(template, error.message);
-		}
-
-		// Clean up uploaded file if processing failed
-		if (req.file?.path && fs.existsSync(req.file.path)) {
-			try {
-				fs.unlinkSync(req.file.path);
-			} catch (cleanupErr) {
-				console.error("Failed to cleanup uploaded file:", cleanupErr);
-			}
-		}
-
-		return res.status(500).json({
-			success: false,
-			message: error.message || "Failed to process document",
-		});
-	}
+    return reply.status(500).send({
+      success: false,
+      message: error.message || "Failed to process document",
+    });
+  }
 };
+

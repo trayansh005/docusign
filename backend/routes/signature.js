@@ -1,41 +1,31 @@
-import express from "express";
-import multer from "multer";
-import path from "path";
-import { fileURLToPath } from "url";
-import {
-	uploadSignatureFile,
-	createSignatureFromDataUrl,
-	listSignatures,
-	deleteSignature,
-	setDefaultSignature,
-} from "../controllers/signatureController.js";
 import { authenticateSession } from "../middleware/sessionAuth.js";
 import { requireActiveSubscription } from "../middleware/requireSubscription.js";
+import {
+  uploadSignatureFile,
+  createSignatureFromDataUrl,
+  listSignatures,
+  deleteSignature,
+  setDefaultSignature,
+} from "../controllers/signatureController.js";
 
-const router = express.Router();
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+/**
+ * Signature routes Fastify plugin
+ */
+export default async function signatureRoutes(fastify, options) {
+  // Apply authentication and subscription check to all routes in this plugin
+  fastify.addHook("preHandler", authenticateSession);
 
-// Temp storage for multer (files will be moved by controller)
-const tmpDir = path.join(__dirname, "..", "uploads", "temp");
-const storage = multer.diskStorage({
-	destination: tmpDir,
-	filename: (req, file, cb) => cb(null, file.originalname),
-});
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+  // Routes for signature creation
+  fastify.register(async function (protectedRoutes) {
+    protectedRoutes.addHook("preHandler", requireActiveSubscription);
 
-// Authentication middleware expected on req.user
-// Require an active subscription for signature creation endpoints
-router.post(
-	"/upload",
-	authenticateSession,
-	requireActiveSubscription,
-	upload.single("file"),
-	uploadSignatureFile
-);
-router.post("/from-dataurl", authenticateSession, requireActiveSubscription, createSignatureFromDataUrl);
-router.get("/", authenticateSession, listSignatures);
-router.delete("/:id", authenticateSession, deleteSignature);
-router.post("/:id/default", authenticateSession, setDefaultSignature);
+    protectedRoutes.post("/upload", uploadSignatureFile);
+    protectedRoutes.post("/from-dataurl", createSignatureFromDataUrl);
+  });
 
-export default router;
+  // General signature management
+  fastify.get("/", listSignatures);
+  fastify.delete("/:id", deleteSignature);
+  fastify.post("/:id/default", setDefaultSignature);
+}
+

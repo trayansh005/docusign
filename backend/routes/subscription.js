@@ -1,42 +1,42 @@
-import express from "express";
 import { authenticateSession } from "../middleware/sessionAuth.js";
 import {
-	getPlans,
-	getUserSubscription,
-	createSubscription,
-	cancelSubscription,
-	deleteSubscription,
+  getPlans,
+  getUserSubscription,
+  createSubscription,
+  cancelSubscription,
+  deleteSubscription,
 } from "../controllers/subscriptionController.js";
 import {
-	createCheckoutSession,
-	verifySession,
-	stripeWebhook,
+  createCheckoutSession,
+  verifySession,
+  stripeWebhook,
 } from "../controllers/stripeController.js";
 
-const router = express.Router();
+/**
+ * Subscription routes Fastify plugin
+ */
+export default async function subscriptionRoutes(fastify, options) {
+  // Plans - public
+  fastify.get("/plans", getPlans);
 
-// Plans
-router.get("/plans", getPlans);
+  // Authenticated routes
+  fastify.register(async (instance) => {
+    instance.addHook("preHandler", authenticateSession);
 
-// User subscription
-router.get("/me", authenticateSession, getUserSubscription);
+    instance.get("/me", getUserSubscription);
+    instance.post("/", createSubscription);
+    instance.post("/cancel", cancelSubscription);
+    instance.delete("/:id", deleteSubscription);
+    instance.post("/checkout", createCheckoutSession);
+    instance.post("/verify", verifySession);
+  });
 
-// Create (manual) subscription
-router.post("/", authenticateSession, createSubscription);
+  // Webhook - needs raw body, no auth
+  // Note: rawBody should be enabled via @fastify/raw-body plugin in server.js
+  fastify.post("/webhook", {
+    config: {
+      rawBody: true
+    }
+  }, stripeWebhook);
+}
 
-// Cancel
-router.post("/cancel", authenticateSession, cancelSubscription);
-
-// Delete subscription by ID (admin/user action)
-router.delete("/:id", authenticateSession, deleteSubscription);
-
-// Stripe checkout creation
-router.post("/checkout", authenticateSession, createCheckoutSession);
-
-// Verify session (manual / fallback)
-router.post("/verify", authenticateSession, verifySession);
-
-// Webhook - needs raw body when mounted; Wire expects express.json by default in server.js
-router.post("/webhook", express.raw({ type: "application/json" }), stripeWebhook);
-
-export default router;

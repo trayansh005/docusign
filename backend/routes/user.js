@@ -1,9 +1,7 @@
-import express from "express";
-import { authenticateSession } from "../middleware/sessionAuth.js";
 import { listUsers } from "../controllers/userController.js";
 
-const router = express.Router();
+export default async function userRoutes(fastify, options) {
+  fastify.addHook("preHandler", fastify.authenticate);
+  fastify.get("/", listUsers);
+}
 
-router.get("/", authenticateSession, listUsers);
-
-export default router;

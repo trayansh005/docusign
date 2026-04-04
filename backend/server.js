@@ -1,16 +1,21 @@
-import compression from "compression";
-import cookieParser from "cookie-parser";
-import cors from "cors";
-import dotenv from "dotenv";
-import express from "express";
-import mongoSanitize from "express-mongo-sanitize";
-import helmet from "helmet";
-import hpp from "hpp";
-import morgan from "morgan";
+import "dotenv/config";
+import Fastify from "fastify";
 import path from "path";
 import { fileURLToPath } from "url";
-import connectDB from "./database/connection.js";
-import { apiRateLimit, authRateLimit, sanitizeInput } from "./middlewares/security.js";
+import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
+import compress from "@fastify/compress";
+import cookie from "@fastify/cookie";
+import fastifyStatic from "@fastify/static";
+import rateLimit from "@fastify/rate-limit";
+import multipart from "@fastify/multipart";
+import fastifyRawBody from "fastify-raw-body";
+
+// Plugins
+import dbPlugin from "./plugins/db.js";
+import authPlugin from "./plugins/auth.js";
+
+// Routes
 import activityRoutes from "./routes/activity.js";
 import authRoutes from "./routes/auth.js";
 import dashboardRoutes from "./routes/dashboard.js";
@@ -18,133 +23,118 @@ import docusignRoutes from "./routes/docusign.js";
 import signatureRoutes from "./routes/signature.js";
 import subscriptionRoutes from "./routes/subscription.js";
 import userRoutes from "./routes/user.js";
+import contactRoutes from "./routes/contact.js";
+import testRoutes from "./routes/test.js";
 
-dotenv.config();
-
-const app = express();
-const PORT = process.env.PORT || 5000;
 const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Security middleware - Helmet with default settings (same as RCSS)
-app.use(helmet());
-
-// Logging middleware
-app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
-
-// Compression middleware
-app.use(compression());
-
-// CORS middleware
-const allowedOrigins = [
-	process.env.FRONTEND_URL || "http://localhost:3000",
-	"https://fomiqsign.com",
-	"http://localhost:3000",
-];
-
-app.use(
-	cors({
-		origin: (origin, callback) => {
-			// Allow requests with no origin (like mobile apps or curl requests)
-			if (!origin) return callback(null, true);
-
-			if (allowedOrigins.indexOf(origin) !== -1) {
-				callback(null, true);
-			} else {
-				callback(new Error("Not allowed by CORS"));
-			}
-		},
-		credentials: true,
-		methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-		allowedHeaders: ["Content-Type", "Authorization", "Range"],
-		exposedHeaders: ["Content-Length", "Content-Range"],
-	})
-);
-
-// Body parsing middleware
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-
-// Security hardening
-app.use(hpp());
-app.use(
-	mongoSanitize({
-		replaceWith: "_",
-	})
-);
-
-// Cookie parser middleware
-app.use(cookieParser());
-
-// Debug middleware to test if /api/ middlewares are being called
-app.use("/api/", (req, res, next) => {
-	console.log("🔥 DEBUG: /api/ middleware called for:", req.method, req.originalUrl);
-	next();
+const fastify = Fastify({
+  logger: {
+    level: "info",
+    transport:
+      process.env.NODE_ENV === "production"
+        ? undefined
+        : {
+            target: "pino-pretty",
+            options: {
+              translateTime: "HH:MM:ss Z",
+              ignore: "pid,hostname",
+            },
+          },
+  },
+  bodyLimit: 1048576 * 20, // 20MB body limit
 });
 
-// Rate limiting
-app.use("/api/", apiRateLimit);
-
-// Input sanitization
-app.use(sanitizeInput);
-
-// Static files (frontend)
-app.use(express.static("../frontend"));
-
-// Static files (uploads) - middleware to set CORS headers and disable caching for signed PDFs
-app.use("/api/uploads", (req, res, next) => {
-	res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-
-	// Disable caching for signed PDFs (they get updated when recipients sign)
-	if (req.path.includes("/signatures/signed/")) {
-		res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-		res.setHeader("Pragma", "no-cache");
-		res.setHeader("Expires", "0");
-	}
-
-	next();
+// Register Core Plugins
+await fastify.register(helmet, {
+  contentSecurityPolicy: false, // Disable for development if needed
 });
-app.use("/api/uploads", express.static(path.join(process.cwd(), "uploads")));
+await fastify.register(compress);
+await fastify.register(cookie);
 
-// Mount API routes
-app.use("/api/auth", authRateLimit, authRoutes);
-app.use("/api/subscription", subscriptionRoutes);
-app.use("/api/activity", activityRoutes);
-app.use("/api/docusign", docusignRoutes);
-app.use("/api/signatures", signatureRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-
-// Test routes (only in development)
-if (process.env.NODE_ENV !== "production") {
-	const testRoutes = await import("./routes/test.js");
-	app.use("/api/test", testRoutes.default);
-}
-
-connectDB();
-
-// Health check route
-app.get("/api/health", (req, res) => {
-	res.status(200).json({
-		status: "OK",
-		timestamp: new Date().toISOString(),
-		uptime: process.uptime(),
-		environment: process.env.NODE_ENV || "development",
-	});
+// Raw Body for Stripe Webhooks
+await fastify.register(fastifyRawBody, {
+  field: "rawBody", // field name to store the raw body
+  global: false, // only for specific routes
+  encoding: "utf8",
+  runFirst: true,
 });
 
-// Graceful shutdown
-process.on("SIGTERM", () => {
-	console.log("SIGTERM received. Shutting down gracefully...");
-	process.exit(0);
+await fastify.register(cors, {
+  origin: (origin, callback) => {
+    const allowedOrigins = [
+      process.env.FRONTEND_URL || "http://localhost:3000",
+      "https://fomiqsign.com",
+      "http://localhost:3000",
+    ];
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"), false);
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "Range", "stripe-signature"],
+  exposedHeaders: ["Content-Length", "Content-Range"],
 });
 
-process.on("SIGINT", () => {
-	console.log("SIGINT received. Shutting down gracefully...");
-	process.exit(0);
+// Trust Proxy (Required for rate limiting behind reverse proxy)
+fastify.decorate("trustProxy", true);
+
+await fastify.register(rateLimit, {
+  max: 100,
+  timeWindow: "1 minute",
 });
 
-app.listen(PORT, () => {
-	console.log(`🚀 Server running on port ${PORT}`);
-	console.log(`📊 Health check available at http://localhost:${PORT}/api/health`);
-	console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+await fastify.register(multipart, {
+  limits: {
+    fileSize: 20 * 1024 * 1024, // 20MB
+  },
 });
+
+// Custom Plugins
+await fastify.register(dbPlugin);
+await fastify.register(authPlugin);
+
+// Static files
+await fastify.register(fastifyStatic, {
+  root: path.join(__dirname, "uploads"),
+  prefix: "/uploads/", // Match the URL structure used in models
+  decorateReply: false,
+});
+
+// Health check
+fastify.get("/api/health", async (request, reply) => {
+  return {
+    status: "OK",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || "development",
+  };
+});
+
+// API Routes
+await fastify.register(activityRoutes, { prefix: "/api/activity" });
+await fastify.register(authRoutes, { prefix: "/api/auth" });
+await fastify.register(dashboardRoutes, { prefix: "/api/dashboard" });
+await fastify.register(docusignRoutes, { prefix: "/api/docusign" });
+await fastify.register(signatureRoutes, { prefix: "/api/signatures" });
+await fastify.register(subscriptionRoutes, { prefix: "/api/subscriptions" });
+await fastify.register(userRoutes, { prefix: "/api/user" });
+await fastify.register(contactRoutes, { prefix: "/api/contact" });
+await fastify.register(testRoutes, { prefix: "/api/test" });
+
+const start = async () => {
+  try {
+    const PORT = process.env.PORT || 5002;
+    await fastify.listen({ port: PORT, host: "0.0.0.0" });
+    fastify.log.info(`🚀 Fastify Server running on port ${PORT}`);
+  } catch (err) {
+    fastify.log.error(err);
+    process.exit(1);
+  }
+};
+
+start();

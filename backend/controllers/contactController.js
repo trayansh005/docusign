@@ -1,81 +1,55 @@
-import { body, validationResult } from 'express-validator';
-
-// Contact form submission handler
-export const submitContactForm = async (req, res) => {
-    try {
-        // Check for validation errors
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                success: false,
-                message: 'Validation failed',
-                errors: errors.array()
-            });
-        }
-
-        const { name, email, subject, message, category } = req.body;
-
-        // Log the contact form submission (in production, you'd save to database or send email)
-        console.log('Contact form submission:', {
-            name,
-            email,
-            subject,
-            message,
-            category,
-            timestamp: new Date().toISOString(),
-            ip: req.ip,
-            userAgent: req.get('User-Agent')
-        });
-
-        // TODO: In production, implement one or more of the following:
-        // 1. Save to database
-        // 2. Send email notification to support team
-        // 3. Integrate with ticketing system
-        // 4. Send auto-reply email to user
-
-        // For now, just return success response
-        res.status(200).json({
-            success: true,
-            message: 'Thank you for your message! We will get back to you soon.',
-            data: {
-                submittedAt: new Date().toISOString(),
-                category,
-                subject
-            }
-        });
-
-    } catch (error) {
-        console.error('Contact form submission error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to submit contact form. Please try again later.'
-        });
+/**
+ * Validation schema for contact form
+ */
+export const contactSchema = {
+  body: {
+    type: 'object',
+    required: ['name', 'email', 'subject', 'message', 'category'],
+    properties: {
+      name: { type: 'string', minLength: 2, maxLength: 100 },
+      email: { type: 'string', format: 'email' },
+      subject: { type: 'string', minLength: 5, maxLength: 200 },
+      message: { type: 'string', minLength: 10, maxLength: 2000 },
+      category: { 
+        type: 'string', 
+        enum: ['general', 'support', 'billing', 'feature', 'bug', 'partnership'] 
+      }
     }
+  }
 };
 
-// Validation rules for contact form
-export const validateContactForm = [
-    body('name')
-        .trim()
-        .isLength({ min: 2, max: 100 })
-        .withMessage('Name must be between 2 and 100 characters'),
+// Contact form submission handler
+export const submitContactForm = async (request, reply) => {
+  try {
+    const { name, email, subject, message, category } = request.body;
 
-    body('email')
-        .isEmail()
-        .normalizeEmail()
-        .withMessage('Please provide a valid email address'),
+    // Log the contact form submission
+    request.log.info({
+      name,
+      email,
+      subject,
+      category,
+      timestamp: new Date().toISOString(),
+      ip: request.ip,
+      userAgent: request.headers['user-agent']
+    }, 'Contact form submission');
 
-    body('subject')
-        .trim()
-        .isLength({ min: 5, max: 200 })
-        .withMessage('Subject must be between 5 and 200 characters'),
+    // For now, just return success response
+    return {
+      success: true,
+      message: 'Thank you for your message! We will get back to you soon.',
+      data: {
+        submittedAt: new Date().toISOString(),
+        category,
+        subject
+      }
+    };
 
-    body('message')
-        .trim()
-        .isLength({ min: 10, max: 2000 })
-        .withMessage('Message must be between 10 and 2000 characters'),
-
-    body('category')
-        .isIn(['general', 'support', 'billing', 'feature', 'bug', 'partnership'])
-        .withMessage('Please select a valid category')
-];
+  } catch (error) {
+    request.log.error('Contact form submission error:', error);
+    return reply.status(500).send({
+      success: false,
+      message: 'Failed to submit contact form. Please try again later.'
+    });
+  }
+};

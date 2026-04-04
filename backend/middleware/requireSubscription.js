@@ -1,16 +1,17 @@
 import Subscription from "../models/Subscription.js";
 
-// Middleware to require an active subscription on the authenticated user
-export const requireActiveSubscription = async (req, res, next) => {
+/**
+ * Middleware to require an active subscription on the authenticated user
+ */
+export const requireActiveSubscription = async (request, reply) => {
   try {
-    const userId = req.user?.id;
+    const userId = request.user?.id;
     if (!userId) {
-      return res.status(401).json({ success: false, message: "Authentication required" });
+      return reply.status(401).send({ success: false, message: "Authentication required" });
     }
 
     const now = new Date();
 
-    // Consider a subscription active if status === 'active' and endDate is in the future (or not set)
     const subscription = await Subscription.findOne({
       userId,
       status: "active",
@@ -18,16 +19,15 @@ export const requireActiveSubscription = async (req, res, next) => {
     });
 
     if (!subscription) {
-      return res.status(403).json({ success: false, message: "Active subscription required" });
+      return reply.status(403).send({ success: false, message: "Active subscription required" });
     }
 
-    // Attach subscription to request for downstream handlers if needed
-    req.subscription = subscription;
-    next();
+    request.subscription = subscription;
   } catch (err) {
-    console.error("requireActiveSubscription error:", err);
-    return res.status(500).json({ success: false, message: "Subscription check failed" });
+    request.log.error("requireActiveSubscription error:", err);
+    return reply.status(500).send({ success: false, message: "Subscription check failed" });
   }
 };
 
 export default requireActiveSubscription;
+
