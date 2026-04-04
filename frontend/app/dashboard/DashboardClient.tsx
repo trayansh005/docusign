@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuthStore } from "@/stores/authStore";
 import { Portal } from "@/components/Portal";
 import { Activity } from "@/types/activity";
 import { SigningProgressWidget } from "@/components/docusign/SigningProgressWidget";
@@ -64,9 +63,6 @@ interface InboxItem {
 }
 
 export default function DashboardClient() {
-	const user = useAuthStore((state) => state.user);
-	const isLoading = useAuthStore((state) => state.isLoading);
-	const isInitialized = useAuthStore((state) => state.isInitialized);
 	const router = useRouter();
 	const [stats, setStats] = useState<UserStats | null>({
 		totalDocuments: 0,
@@ -80,27 +76,16 @@ export default function DashboardClient() {
 	const [confirmImmediate, setConfirmImmediate] = useState(false);
 	const [usage, setUsage] = useState<FreeUsage | null>(null);
 
-	// Phase 1 & 2 Optimization: Add inbox state with pagination
 	const [inbox, setInbox] = useState<InboxItem[]>([]);
 	const [inboxPage, setInboxPage] = useState(1);
 	const [inboxTotal, setInboxTotal] = useState(0);
 	const [inboxPages, setInboxPages] = useState(0);
 	const INBOX_LIMIT = 10;
 
-	// Signing progress state
-	const [documentsWithRecipients, setDocumentsWithRecipients] = useState<DocuSignTemplateData[]>(
-		[],
-	);
+	const [documentsWithRecipients, setDocumentsWithRecipients] = useState<DocuSignTemplateData[]>([]);
 	const [loadingDocuments, setLoadingDocuments] = useState(false);
 
-	// Auth guard - redirect to login if not authenticated
-	// Wait for isInitialized so we don't redirect before the session check completes
-	useEffect(() => {
-		if (isInitialized && !isLoading && !user) {
-			console.log("🔒 Dashboard: Not authenticated, redirecting to login");
-			router.replace("/login");
-		}
-	}, [isInitialized, user, isLoading, router]);
+	// Auth protection handled by proxy.ts — no client-side guard needed.
 
 	// Activities query (disabled - uses hydrated cache from server)
 	const { data: activitiesData } = useQuery({
@@ -191,12 +176,10 @@ export default function DashboardClient() {
 	}, []);
 
 	// Phase 1 Optimization: Single useEffect that calls parallel loader
-	// Only fire after auth is confirmed — prevents 401 spam before session check completes
 	useEffect(() => {
-		if (!isInitialized || !user) return;
 		loadDashboardData();
 		loadDocumentsWithRecipients();
-	}, [isInitialized, user, loadDashboardData, loadDocumentsWithRecipients]);
+	}, [loadDashboardData, loadDocumentsWithRecipients]);
 
 	// Convert backend path to absolute URL using the configured API base
 	const getAbsolutePdfUrl = (pdfPath: string | undefined) => {

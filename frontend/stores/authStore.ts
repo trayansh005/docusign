@@ -43,6 +43,9 @@ export const useAuthStore = create<AuthStore>((set, get) => {
 
 		// Initialize auth from session cookie on app load
 		initialize: async () => {
+			// If already initialized, don't re-run
+			if (get().isInitialized) return;
+
 			set({ isLoading: true });
 
 			try {
