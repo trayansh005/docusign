@@ -8,51 +8,49 @@ const REMEMBER_ME_REFRESH_EXPIRY = "30d";
  * Generate access + refresh tokens for a user.
  */
 export function generateTokens(user, rememberMe = false) {
-  const accessToken = jwt.sign(
-    {
-      id: user._id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role || "user",
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: ACCESS_TOKEN_EXPIRY },
-  );
+	const accessToken = jwt.sign(
+		{
+			id: user._id,
+			email: user.email,
+			firstName: user.firstName,
+			lastName: user.lastName,
+			role: user.role || "user",
+		},
+		process.env.JWT_SECRET,
+		{ expiresIn: ACCESS_TOKEN_EXPIRY },
+	);
 
-  const refreshToken = jwt.sign(
-    { id: user._id },
-    process.env.JWT_SECRET,
-    { expiresIn: rememberMe ? REMEMBER_ME_REFRESH_EXPIRY : REFRESH_TOKEN_EXPIRY },
-  );
+	const refreshToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+		expiresIn: rememberMe ? REMEMBER_ME_REFRESH_EXPIRY : REFRESH_TOKEN_EXPIRY,
+	});
 
-  return { accessToken, refreshToken };
+	return { accessToken, refreshToken };
 }
 
 /**
  * Set httpOnly auth cookies on the response.
  */
 export function setAuthCookies(reply, accessToken, refreshToken, rememberMe = false) {
-  const isProd = process.env.NODE_ENV === "production";
-  const domain = process.env.COOKIE_DOMAIN || undefined;
+	const isProd = process.env.NODE_ENV === "production";
+	const domain = process.env.COOKIE_DOMAIN || undefined;
 
-  const base = {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: "lax",
-    domain,
-    path: "/",
-  };
+	const base = {
+		httpOnly: true,
+		secure: isProd,
+		sameSite: "lax",
+		domain,
+		path: "/",
+	};
 
-  reply.setCookie("accessToken", accessToken, {
-    ...base,
-    maxAge: 24 * 60 * 60, // 1 day in seconds
-  });
+	reply.setCookie("accessToken", accessToken, {
+		...base,
+		maxAge: 24 * 60 * 60, // 1 day in seconds
+	});
 
-  reply.setCookie("refreshToken", refreshToken, {
-    ...base,
-    maxAge: (rememberMe ? 30 : 7) * 24 * 60 * 60,
-  });
+	reply.setCookie("refreshToken", refreshToken, {
+		...base,
+		maxAge: (rememberMe ? 30 : 7) * 24 * 60 * 60,
+	});
 }
 
 /**
@@ -60,20 +58,19 @@ export function setAuthCookies(reply, accessToken, refreshToken, rememberMe = fa
  * Sets both maxAge: 0 and an expires date in the past for maximum compatibility.
  */
 export function clearAuthCookies(reply) {
-  const isProd = process.env.NODE_ENV === "production";
-  const domain = process.env.COOKIE_DOMAIN || undefined;
+	const isProd = process.env.NODE_ENV === "production";
+	const domain = process.env.COOKIE_DOMAIN || undefined;
 
-  const base = {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: "lax",
-    domain,
-    path: "/",
-    maxAge: 0,
-    expires: new Date(0), // Set to historical epoch to force immediate deletion
-  };
+	const base = {
+		httpOnly: true,
+		secure: isProd,
+		sameSite: "lax",
+		domain,
+		path: "/",
+		maxAge: 0,
+		expires: new Date(0), // Set to historical epoch to force immediate deletion
+	};
 
-  reply.setCookie("accessToken", "", base);
-  reply.setCookie("refreshToken", "", base);
-  reply.setCookie("sessionId", "", base);
+	reply.setCookie("accessToken", "", base);
+	reply.setCookie("refreshToken", "", base);
 }

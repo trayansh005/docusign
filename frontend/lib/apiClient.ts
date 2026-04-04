@@ -1,11 +1,13 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
-import { getAccessToken } from "@/lib/authClient";
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002/api").replace(/\/$/, "");
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002/api").replace(
+	/\/$/,
+	"",
+);
 
 /**
- * We define a custom interface for our ApiClient to ensure TypeScript 
- * knows that our methods return the 'data' field directly (T) 
+ * We define a custom interface for our ApiClient to ensure TypeScript
+ * knows that our methods return the 'data' field directly (T)
  * instead of the full 'AxiosResponse<T>'.
  */
 export interface CustomApiClient {
@@ -46,22 +48,11 @@ instance.interceptors.request.use((config) => {
 			delete config.headers["content-type"];
 		}
 	}
-	// Attach Bearer token from frontend-owned cookie
-	if (typeof window !== "undefined") {
-		const token = getAccessToken();
-		if (token) {
-			config.headers.Authorization = `Bearer ${token}`;
-		}
-	}
 	return config;
 });
 
 instance.interceptors.response.use(
 	(response) => {
-		const data = response.data;
-
-		// The backend already sets httpOnly auth cookies (accessToken, refreshToken).
-		// We avoid setting them manually here to prevent duplicates and maintain security.
 		return response;
 	},
 	(error) => {
@@ -97,7 +88,7 @@ const apiClient: CustomApiClient = {
 		const response = await instance.delete<T>(url, config);
 		return response.data;
 	},
-	instance: instance
+	instance: instance,
 };
 
 export default apiClient;
