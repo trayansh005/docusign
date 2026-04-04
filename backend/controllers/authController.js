@@ -36,6 +36,8 @@ export const register = async (request, reply) => {
       success: true,
       message: "User registered and logged in successfully",
       data: { user: userResponse },
+      token: accessToken,
+      refreshToken: refreshToken,
     });
   } catch (error) {
     request.log.error("Registration error:", error);
@@ -73,6 +75,8 @@ export const login = async (request, reply) => {
       success: true,
       message: "Login successful",
       data: { user: userResponse },
+      token: accessToken,
+      refreshToken: refreshToken,
     });
   } catch (error) {
     request.log.error("Login error:", error);

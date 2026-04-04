@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { getAuthHeaders } from "./serverAuthHeaders";
 
 const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
@@ -32,28 +33,23 @@ export async function serverApiClient(endpoint: string, options: ServerApiOption
 	const { method = "GET", body, headers = {}, cache, revalidate, tags } = options;
 
 	try {
-		// Get cookies for server-side request
-		const cookieStore = await cookies();
+		// Get authenticated headers
+		let authHeaders = {};
+		try {
+			authHeaders = await getAuthHeaders(headers);
+		} catch (e) {
+			console.log("[ServerAPI] No auth headers found (unauthenticated request)");
+			authHeaders = headers;
+		}
 
-		// Get session cookie only
-		const sessionId = cookieStore.get("sessionId")?.value;
-
-		// Debug logging
 		console.log(`[ServerAPI] ${method} ${endpoint}`);
-		console.log(`[ServerAPI] Has sessionId:`, !!sessionId);
-
-		// Build cookie header with session cookie
-		const cookieHeader = sessionId ? `sessionId=${sessionId}` : "";
-
-		console.log(`[ServerAPI] Cookie header:`, cookieHeader ? "present" : "MISSING");
+		console.log(`[ServerAPI] Has Authorization:`, !!(authHeaders as any).Authorization);
 
 		const fetchOptions: RequestInit = {
 			method,
 			headers: {
 				"Content-Type": "application/json",
-				...headers,
-				// Forward session cookie to backend
-				...(cookieHeader && { Cookie: cookieHeader }),
+				...authHeaders,
 			},
 			credentials: 'include',
 			...(cache && { cache }),

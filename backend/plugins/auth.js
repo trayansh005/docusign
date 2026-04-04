@@ -10,7 +10,15 @@ async function fastifyAuth(fastify, options) {
       return reply.status(503).send({ success: false, message: "Server misconfigured" });
     }
 
-    const token = request.cookies?.accessToken;
+    let token = request.cookies?.accessToken;
+
+    const authHeader = request.headers.authorization || request.headers.Authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const bearerToken = authHeader.substring(7);
+      if (bearerToken && bearerToken !== "undefined" && bearerToken !== "null") {
+        token = bearerToken;
+      }
+    }
 
     if (!token) {
       return reply.status(401).send({ success: false, message: "Access token required" });

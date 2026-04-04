@@ -1,92 +1,81 @@
+import axios from "axios";
+import { getAccessToken } from "@/lib/authClient";
+
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002/api").replace(/\/$/, "");
 
-class ApiClient {
-	private baseURL: string;
-	private isRefreshing = false;
+const apiClient = axios.create({
+	baseURL: API_BASE_URL,
+	withCredentials: true,
+	headers: {
+		"Content-Type": "application/json",
+		Accept: "application/json",
+	},
+});
 
-	constructor(baseURL: string) {
-		this.baseURL = baseURL;
+const PROTECTED_PATH_PREFIXES = ["/dashboard", "/profile", "/settings", "/fomiqsign"];
+
+function shouldRedirectOnUnauthorized(pathname: string) {
+	if (pathname.startsWith("/login") || pathname.startsWith("/register")) {
+		return false;
 	}
 
-	private async makeRequest<T>(endpoint: string, options: RequestInit = {}, retry = true): Promise<T> {
-		const url = `${this.baseURL}${endpoint}`;
-
-		const config: RequestInit = {
-			...options,
-			headers: { "Content-Type": "application/json", ...options.headers },
-			credentials: "include",
-		};
-
-		const response = await fetch(url, config);
-
-		if (response.status === 401 && retry) {
-			let body: { needsRefresh?: boolean } = {};
-			try { body = await response.clone().json(); } catch { /* ignore */ }
-
-			if (body.needsRefresh && !this.isRefreshing) {
-				// Try to refresh the access token
-				this.isRefreshing = true;
-				try {
-					const refreshRes = await fetch(`${this.baseURL}/auth/refresh`, {
-						method: "POST",
-						credentials: "include",
-					});
-					this.isRefreshing = false;
-
-					if (refreshRes.ok) {
-						// Retry original request with new token
-						return this.makeRequest<T>(endpoint, options, false);
-					}
-				} catch {
-					this.isRefreshing = false;
-				}
-			}
-
-			// Refresh failed or not needed — clear state and redirect
-			const { useAuthStore } = await import("@/stores/authStore");
-			useAuthStore.getState().clearUser();
-			if (typeof window !== "undefined") {
-				window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
-			}
-			const error = new Error("Unauthorized") as Error & { status: number };
-			error.status = 401;
-			throw error;
-		}
-
-		const text = await response.text();
-		if (!text) return null as T;
-
-		try {
-			return JSON.parse(text) as T;
-		} catch {
-			throw new Error(`Expected JSON but got: ${text.slice(0, 200)}`);
-		}
-	}
-
-	async get<T>(endpoint: string, options?: RequestInit): Promise<T> {
-		return this.makeRequest<T>(endpoint, { ...options, method: "GET" });
-	}
-
-	async post<T>(endpoint: string, body?: unknown, options?: RequestInit): Promise<T> {
-		return this.makeRequest<T>(endpoint, {
-			...options,
-			method: "POST",
-			body: body ? JSON.stringify(body) : undefined,
-		});
-	}
-
-	async put<T>(endpoint: string, body?: unknown, options?: RequestInit): Promise<T> {
-		return this.makeRequest<T>(endpoint, {
-			...options,
-			method: "PUT",
-			body: body ? JSON.stringify(body) : undefined,
-		});
-	}
-
-	async delete<T>(endpoint: string, options?: RequestInit): Promise<T> {
-		return this.makeRequest<T>(endpoint, { ...options, method: "DELETE" });
-	}
+	return PROTECTED_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
-const apiClient = new ApiClient(API_BASE_URL);
+apiClient.interceptors.request.use((config) => {
+	if (config.data instanceof FormData) {
+		if (config.headers.delete) {
+			config.headers.delete("Content-Type");
+		} else {
+			delete config.headers["Content-Type"];
+			delete config.headers["content-type"];
+		}
+	}
+	// Attach Bearer token from frontend-owned cookie
+	if (typeof window !== "undefined") {
+		const token = getAccessToken();
+		if (token) {
+			config.headers.Authorization = `Bearer ${token}`;
+		}
+	}
+	return config;
+});
+
+apiClient.interceptors.response.use(
+	(response) => {
+    const data = response.data;
+    
+    // Automatically store tokens in JS-accessible cookies if returned in the JSON body
+    if (typeof window !== "undefined") {
+      const ONE_DAY = 60 * 60 * 24;
+      const SEVEN_DAYS = ONE_DAY * 7;
+      
+      const secure = location.protocol === "https:" ? "; Secure" : "";
+      
+      if (data.token || data.accessToken) {
+        const token = data.token || data.accessToken;
+        document.cookie = `accessToken=${token}; Path=/; Max-Age=${ONE_DAY}; SameSite=Lax${secure}`;
+      }
+      
+      if (data.refreshToken) {
+        document.cookie = `refreshToken=${data.refreshToken}; Path=/; Max-Age=${SEVEN_DAYS}; SameSite=Lax${secure}`;
+      }
+    }
+
+    // Return data directly to match previous ApiClient behavior
+    return data;
+  },
+	(error) => {
+		if (
+			error.response?.status === 401 &&
+			typeof window !== "undefined" &&
+			shouldRedirectOnUnauthorized(window.location.pathname)
+		) {
+      // Clear local state if possible (optional but recommended)
+			window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
+		}
+		return Promise.reject(error);
+	},
+);
+
 export default apiClient;
