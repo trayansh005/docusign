@@ -1,9 +1,24 @@
-import axios from "axios";
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 import { getAccessToken } from "@/lib/authClient";
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5002/api").replace(/\/$/, "");
 
-const apiClient = axios.create({
+/**
+ * We define a custom interface for our ApiClient to ensure TypeScript 
+ * knows that our methods return the 'data' field directly (T) 
+ * instead of the full 'AxiosResponse<T>'.
+ */
+export interface CustomApiClient {
+	get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>;
+	post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>;
+	put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>;
+	patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T>;
+	delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>;
+	// Allow access to the underlying instance if needed
+	instance: AxiosInstance;
+}
+
+const instance = axios.create({
 	baseURL: API_BASE_URL,
 	withCredentials: true,
 	headers: {
@@ -22,7 +37,7 @@ function shouldRedirectOnUnauthorized(pathname: string) {
 	return PROTECTED_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
-apiClient.interceptors.request.use((config) => {
+instance.interceptors.request.use((config) => {
 	if (config.data instanceof FormData) {
 		if (config.headers.delete) {
 			config.headers.delete("Content-Type");
@@ -41,41 +56,63 @@ apiClient.interceptors.request.use((config) => {
 	return config;
 });
 
-apiClient.interceptors.response.use(
+instance.interceptors.response.use(
 	(response) => {
-    const data = response.data;
-    
-    // Automatically store tokens in JS-accessible cookies if returned in the JSON body
-    if (typeof window !== "undefined") {
-      const ONE_DAY = 60 * 60 * 24;
-      const SEVEN_DAYS = ONE_DAY * 7;
-      
-      const secure = location.protocol === "https:" ? "; Secure" : "";
-      
-      if (data.token || data.accessToken) {
-        const token = data.token || data.accessToken;
-        document.cookie = `accessToken=${token}; Path=/; Max-Age=${ONE_DAY}; SameSite=Lax${secure}`;
-      }
-      
-      if (data.refreshToken) {
-        document.cookie = `refreshToken=${data.refreshToken}; Path=/; Max-Age=${SEVEN_DAYS}; SameSite=Lax${secure}`;
-      }
-    }
+		const data = response.data;
 
-    // Return data directly to match previous ApiClient behavior
-    return data;
-  },
+		// Automatically store tokens in JS-accessible cookies if returned in the JSON body
+		if (typeof window !== "undefined") {
+			const ONE_DAY = 60 * 60 * 24;
+			const SEVEN_DAYS = ONE_DAY * 7;
+			const secure = location.protocol === "https:" ? "; Secure" : "";
+
+			if (data.token || data.accessToken) {
+				const token = data.token || data.accessToken;
+				document.cookie = `accessToken=${token}; Path=/; Max-Age=${ONE_DAY}; SameSite=Lax${secure}`;
+			}
+
+			if (data.refreshToken) {
+				document.cookie = `refreshToken=${data.refreshToken}; Path=/; Max-Age=${SEVEN_DAYS}; SameSite=Lax${secure}`;
+			}
+		}
+
+		return response;
+	},
 	(error) => {
 		if (
 			error.response?.status === 401 &&
 			typeof window !== "undefined" &&
 			shouldRedirectOnUnauthorized(window.location.pathname)
 		) {
-      // Clear local state if possible (optional but recommended)
 			window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
 		}
 		return Promise.reject(error);
 	},
 );
 
+const apiClient: CustomApiClient = {
+	get: async <T>(url: string, config?: AxiosRequestConfig) => {
+		const response = await instance.get<T>(url, config);
+		return response.data;
+	},
+	post: async <T>(url: string, data?: any, config?: AxiosRequestConfig) => {
+		const response = await instance.post<T>(url, data, config);
+		return response.data;
+	},
+	put: async <T>(url: string, data?: any, config?: AxiosRequestConfig) => {
+		const response = await instance.put<T>(url, data, config);
+		return response.data;
+	},
+	patch: async <T>(url: string, data?: any, config?: AxiosRequestConfig) => {
+		const response = await instance.patch<T>(url, data, config);
+		return response.data;
+	},
+	delete: async <T>(url: string, config?: AxiosRequestConfig) => {
+		const response = await instance.delete<T>(url, config);
+		return response.data;
+	},
+	instance: instance
+};
+
 export default apiClient;
+export { instance };
