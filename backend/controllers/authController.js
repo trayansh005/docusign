@@ -14,11 +14,14 @@ const cookieConfig = {
     process.env.COOKIE_SAMESITE !== undefined
       ? process.env.COOKIE_SAMESITE
       : process.env.NODE_ENV === "production"
-      ? "lax" // Changed from "strict" to "lax" for cross-subdomain support
+      ? "lax"
       : "lax",
   domain: process.env.COOKIE_DOMAIN || undefined,
   path: "/",
 };
+
+// Session duration in seconds (Max-Age header is in seconds, not ms)
+const SESSION_MAX_AGE = 7 * 24 * 60 * 60; // 7 days
 
 // Register controller
 export const register = async (request, reply) => {
@@ -57,7 +60,7 @@ export const register = async (request, reply) => {
       sessionId,
       userId: user._id,
       deviceInfo: { userAgent, ip, deviceName },
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      expiresAt: new Date(Date.now() + SESSION_MAX_AGE * 1000),
     });
 
     await session.save();
@@ -67,7 +70,7 @@ export const register = async (request, reply) => {
 
     reply.setCookie("sessionId", sessionId, {
       ...cookieConfig,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: SESSION_MAX_AGE,
     });
 
     const userResponse = user.toObject();
@@ -90,7 +93,7 @@ export const register = async (request, reply) => {
 // Login controller
 export const login = async (request, reply) => {
   try {
-    const { email, password } = request.body;
+    const { email, password, rememberMe } = request.body;
 
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
@@ -113,11 +116,14 @@ export const login = async (request, reply) => {
     const ip = request.ip || "Unknown";
     const deviceName = parseDeviceName(userAgent);
 
+    // rememberMe extends session to 30 days, otherwise 7 days
+    const sessionDuration = rememberMe ? 30 * 24 * 60 * 60 : SESSION_MAX_AGE;
+
     const session = new Session({
       sessionId,
       userId: user._id,
       deviceInfo: { userAgent, ip, deviceName },
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      expiresAt: new Date(Date.now() + sessionDuration * 1000),
     });
 
     await session.save();
@@ -127,7 +133,7 @@ export const login = async (request, reply) => {
 
     reply.setCookie("sessionId", sessionId, {
       ...cookieConfig,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: sessionDuration,
     });
 
     const userResponse = user.toObject();

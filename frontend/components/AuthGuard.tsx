@@ -17,16 +17,20 @@ export function AuthGuard({ children }: AuthGuardProps) {
     const pathname = usePathname();
     const user = useAuthStore((state) => state.user);
     const isLoading = useAuthStore((state) => state.isLoading);
+    const isInitialized = useAuthStore((state) => state.isInitialized);
 
     useEffect(() => {
-        if (!isLoading && !user) {
+        // Wait until initialization is complete before deciding to redirect.
+        // Without this check, isLoading=false + user=null on first render
+        // causes an immediate redirect before getProfile has even been called.
+        if (isInitialized && !isLoading && !user) {
             const loginUrl = `/login?redirect=${encodeURIComponent(pathname)}`;
             router.replace(loginUrl);
         }
-    }, [isLoading, user, router, pathname]);
+    }, [isInitialized, isLoading, user, router, pathname]);
 
-    // Show loading state while checking auth
-    if (isLoading) {
+    // Show loading state while session is being checked
+    if (!isInitialized || isLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <div className="text-center">

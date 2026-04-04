@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 const userSchema = new mongoose.Schema(
 	{
@@ -211,16 +212,14 @@ userSchema.methods.toAuthJSON = function () {
 
 // Method to generate email verification token
 userSchema.methods.generateEmailVerificationToken = function () {
-	const token =
-		Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+	const token = crypto.randomBytes(32).toString("hex");
 	this.emailVerificationToken = token;
 	return token;
 };
 
 // Method to generate password reset token
 userSchema.methods.generatePasswordResetToken = function () {
-	const token =
-		Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+	const token = crypto.randomBytes(32).toString("hex");
 	this.passwordResetToken = token;
 	this.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
 	return token;

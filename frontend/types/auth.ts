@@ -2,6 +2,7 @@ export interface LoginCredentials {
 	email: string;
 	password: string;
 	userType?: "admin" | "user";
+	rememberMe?: boolean;
 }
 
 export interface RegisterData {

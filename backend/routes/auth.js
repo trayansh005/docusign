@@ -24,7 +24,6 @@ export default async function authRoutes(fastify, options) {
   // Logout is intentionally public — we should be able to clear the cookie
   // even if the session has already expired or is invalid.
   fastify.post("/logout", logout);
-  fastify.post("/logout-all", logoutAll);
 
   // Protected routes
   fastify.register(async function (protectedRoutes) {
@@ -37,6 +36,9 @@ export default async function authRoutes(fastify, options) {
     // Session management
     protectedRoutes.get("/sessions", getSessions);
     protectedRoutes.delete("/sessions/:sessionId", deleteSession);
+
+    // logoutAll requires auth so request.user._id is available
+    protectedRoutes.post("/logout-all", logoutAll);
   });
 }
 

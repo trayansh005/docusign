@@ -43,7 +43,7 @@ export default function Login() {
 			return;
 		}
 
-		const result = await login(formData);
+		const result = await login({ ...formData, rememberMe });
 
 		if (result.success) {
 			toast.success("Login Successful", {
