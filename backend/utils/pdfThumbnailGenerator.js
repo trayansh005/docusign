@@ -28,14 +28,18 @@ export async function generatePdfThumbnail(pdfPath, outputPath) {
 		const document = await pdf(pdfPath, { scale: 2.0 }); // Higher scale for better quality
 
 		// Get the first page
-		const page = await document.next();
+		let pageData = null;
+		for await (const page of document) {
+			pageData = page;
+			break; // We only need the first page
+		}
 
-		if (page.done) {
-			throw new Error("PDF has no pages");
+		if (!pageData) {
+			throw new Error("PDF has no pages or could not be processed");
 		}
 
 		// Save the image
-		fs.writeFileSync(outputPath, page.value);
+		fs.writeFileSync(outputPath, pageData);
 
 		console.log(`[PDF Thumbnail] Generated: ${outputPath}`);
 
